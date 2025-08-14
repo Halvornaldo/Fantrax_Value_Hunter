@@ -1,0 +1,94 @@
+# Fantrax Value Hunter - Git Ignore Rules
+
+# Sensitive Configuration
+config/fantrax_cookies.json
+config/*.json.local
+*.env
+
+# Data Cache (regenerated from API)
+data/
+*.json
+*.csv
+cache/
+temp/
+
+# Python
+__pycache__/
+*.py[cod]
+*$py.class
+*.so
+.Python
+build/
+develop-eggs/
+dist/
+downloads/
+eggs/
+.eggs/
+lib/
+lib64/
+parts/
+sdist/
+var/
+wheels/
+*.egg-info/
+.installed.cfg
+*.egg
+MANIFEST
+
+# Virtual Environment
+venv/
+env/
+ENV/
+.venv/
+.env/
+
+# IDE
+.vscode/
+.idea/
+*.swp
+*.swo
+*~
+
+# OS
+.DS_Store
+.DS_Store?
+._*
+.Spotlight-V100
+.Trashes
+ehthumbs.db
+Thumbs.db
+
+# Logs
+*.log
+logs/
+
+# Testing
+.pytest_cache/
+.coverage
+htmlcov/
+
+# Jupyter Notebooks
+.ipynb_checkpoints
+
+# Flask
+instance/
+.webassets-cache
+
+# Database
+*.db
+*.sqlite
+*.sqlite3
+
+# Temporary Files
+*.tmp
+*.bak
+*.backup
+
+# Documentation builds
+docs/_build/
+
+# API Keys and Secrets (double protection)
+*secret*
+*token*
+*api_key*
+*password*

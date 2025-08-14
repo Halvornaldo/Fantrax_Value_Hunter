@@ -1,0 +1,25 @@
+{
+  "_comment": "Copy this file to fantrax_cookies.json and fill with your browser cookies",
+  "instructions": [
+    "1. Log into your Fantrax league in browser",
+    "2. Open browser developer tools (F12)",
+    "3. Go to Application/Storage > Cookies > fantrax.com",
+    "4. Copy the cookie values below",
+    "5. Save as fantrax_cookies.json (without .example)"
+  ],
+  "required_cookies": {
+    "PHPSESSID": "your_session_id_here",
+    "fantrax_remember_token": "your_remember_token_here",
+    "user_id": "your_user_id_here"
+  },
+  "optional_cookies": {
+    "_ga": "google_analytics_id",
+    "_gid": "google_analytics_session",
+    "other_tracking_cookies": "as_needed"
+  },
+  "league_info": {
+    "league_id": "gjbogdx2mcmcvzqa",
+    "league_name": "Its Coming Home (EPL 2025-26)",
+    "season": "2025-26"
+  }
+}

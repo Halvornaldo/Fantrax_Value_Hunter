@@ -1,0 +1,44 @@
+# Fantrax Value Hunter - Python Dependencies
+# Core requirements for fantasy football analytics platform
+
+# API and Web Requests
+requests>=2.31.0
+urllib3>=2.0.0
+
+# Data Processing
+pandas>=2.0.0
+numpy>=1.24.0
+
+# Web Dashboard (Phase 3)
+Flask>=2.3.0
+Flask-CORS>=4.0.0
+
+# Input Validation
+marshmallow>=3.20.0
+
+# Web Scraping (Phase 2 - Fixture Difficulty)
+beautifulsoup4>=4.12.0
+lxml>=4.9.0
+selenium>=4.15.0  # For OddsChecker scraping
+
+# Data Visualization (Dashboard)
+plotly>=5.17.0
+
+# Configuration Management
+python-dotenv>=1.0.0
+
+# Testing
+pytest>=7.4.0
+pytest-cov>=4.1.0
+
+# Development Tools
+black>=23.0.0  # Code formatting
+flake8>=6.0.0  # Linting
+
+# Optional: Database Support (Future)
+# sqlite3 (built-in)
+# sqlalchemy>=2.0.0
+
+# Optional: Machine Learning (Phase 4)
+# scikit-learn>=1.3.0
+# tensorflow>=2.13.0
