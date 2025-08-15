@@ -2,6 +2,7 @@
 
 # Sensitive Configuration
 config/fantrax_cookies.json
+config/api_keys.json
 config/*.json.local
 *.env
 

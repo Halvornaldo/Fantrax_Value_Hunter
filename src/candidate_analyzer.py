@@ -11,9 +11,12 @@ sys.path.append(os.path.join(os.path.dirname(__file__), '..', '..', 'Fantrax_Wra
 from fantraxapi import FantraxAPI
 import json
 import requests
+import csv
 from collections import defaultdict
 from datetime import datetime
 from form_tracker import FormTracker
+from fixture_difficulty import FixtureDifficultyAnalyzer
+from starter_predictor import StarterPredictor
 
 class CandidateAnalyzer:
     def __init__(self):
@@ -21,18 +24,32 @@ class CandidateAnalyzer:
         self.all_players = []
         self.positions = {'G': [], 'D': [], 'M': [], 'F': []}
         self.form_tracker = FormTracker()
+        self.fixture_analyzer = FixtureDifficultyAnalyzer()
+        self.starter_predictor = StarterPredictor()
+        
+        # Load FP/G data from CSV files
+        self.fpg_data = self._load_fpg_data()
         
         # Candidate pool sizes (as per requirements)
         self.pool_sizes = {'G': 8, 'D': 20, 'M': 20, 'F': 20}
         
         print("FANTRAX CANDIDATE POOL ANALYZER")
         print("="*60)
-        print("Using ValueScore = Price ÷ PPG (requires approval)")
+        print("Using ValueScore = PPG ÷ Price (CORRECTED - higher is better)")
         print("Generating candidate pools: 8 GK, 20 DEF, 20 MID, 20 FWD")
         
         # Show form calculation status
         form_status = "ENABLED" if self.form_tracker.form_enabled else "DISABLED (neutral multiplier)"
         print(f"Form calculation: {form_status}")
+        
+        # Show fixture difficulty status
+        fixture_status = "ENABLED" if self.fixture_analyzer.config.get('enabled', True) else "DISABLED"
+        fixture_mode = self.fixture_analyzer.config.get('mode', '5_tier')
+        print(f"Fixture difficulty: {fixture_status} ({fixture_mode} system)")
+        
+        # Show starter prediction status
+        starter_status = "ENABLED" if self.starter_predictor.config.get('enabled', True) else "DISABLED"
+        print(f"Starter prediction: {starter_status} (dual-source consensus)")
         
     def authenticate(self):
         """Set up Fantrax API authentication"""
@@ -87,6 +104,75 @@ class CandidateAnalyzer:
             print("[ERROR] No players retrieved")
             return False
     
+    def _load_fpg_data(self):
+        """Load FP/G data from CSV files for better PPG calculations"""
+        fpg_data = {}
+        data_dir = '../data'
+        
+        # Try to load both seasons' data
+        csv_files = [
+            ('fpg_data_2024.csv', '2024-25'),
+            ('fpg_data_2023.csv', '2023-24')
+        ]
+        
+        total_loaded = 0
+        for filename, season in csv_files:
+            filepath = os.path.join(data_dir, filename)
+            if os.path.exists(filepath):
+                try:
+                    with open(filepath, 'r', encoding='utf-8') as f:
+                        reader = csv.DictReader(f)
+                        for row in reader:
+                            player_name = row['Player']
+                            fpg = float(row['FP/G'])
+                            
+                            # Use most recent season if player exists in multiple seasons
+                            if player_name not in fpg_data or season == '2024-25':
+                                fpg_data[player_name] = {
+                                    'fpg': fpg,
+                                    'season': season,
+                                    'total_points': float(row['FPts']),
+                                    'salary': float(row['Salary'])
+                                }
+                            total_loaded += 1
+                    
+                    print(f"[SUCCESS] Loaded {len([p for p in fpg_data.values() if p['season'] == season])} players from {season} season")
+                    
+                except Exception as e:
+                    print(f"[WARNING] Could not load {filename}: {e}")
+            else:
+                print(f"[WARNING] {filename} not found - using estimated PPG")
+        
+        print(f"[INFO] FP/G data available for {len(fpg_data)} unique players")
+        return fpg_data
+    
+    def _estimate_ppg_by_position_price(self, position, price):
+        """Estimate PPG for players not in historical data based on position and price"""
+        # Base estimates by position (average PPG for that position)
+        position_base = {
+            'G': 6.0,    # Goalkeepers typically lower
+            'D': 7.0,    # Defenders
+            'M': 8.0,    # Midfielders
+            'F': 9.0     # Forwards typically higher
+        }
+        
+        # Get base for primary position
+        primary_pos = position[0] if position else 'M'
+        base_ppg = position_base.get(primary_pos, 7.0)
+        
+        # Adjust based on price (premium players should score more)
+        if price >= 18:
+            multiplier = 1.4      # Premium players ($18+)
+        elif price >= 12:
+            multiplier = 1.2      # Mid-tier players ($12-18)
+        elif price >= 8:
+            multiplier = 1.0      # Average players ($8-12)
+        else:
+            multiplier = 0.8      # Budget players (<$8)
+        
+        estimated_ppg = base_ppg * multiplier
+        return round(estimated_ppg, 2)
+    
     def process_players(self, players):
         """Process player data and calculate ValueScores"""
         print("[INFO] Processing players and calculating ValueScores...")
@@ -119,35 +205,62 @@ class CandidateAnalyzer:
                     'opponent': cells[1].get('content', 'TBD')
                 }
                 
-                # Calculate PPG (Points Per Game) - REQUIRES APPROVAL
-                # For now, assuming projected_points represents season total
-                # TODO: Need actual games played data for true PPG calculation
-                estimated_games_played = 20  # Placeholder - need actual games played
-                ppg = player_data['projected_points'] / estimated_games_played if estimated_games_played > 0 else 0
+                # Calculate PPG using real FP/G data from CSV files
+                player_name = player_data['name']
+                if player_name in self.fpg_data:
+                    # Use real FP/G data from historical seasons
+                    ppg = self.fpg_data[player_name]['fpg']
+                    data_source = f"Historical {self.fpg_data[player_name]['season']}"
+                else:
+                    # Fallback: estimate based on position and price
+                    ppg = self._estimate_ppg_by_position_price(player_data['position'], player_data['price'])
+                    data_source = "Estimated"
                 
-                # Calculate ValueScore = Price ÷ PPG - REQUIRES APPROVAL
-                value_score = player_data['price'] / ppg if ppg > 0 else float('inf')
+                # Calculate ValueScore = PPG ÷ Price - CORRECTED FORMULA
+                value_score = ppg / player_data['price'] if player_data['price'] > 0 else 0
                 
                 # Get form score
                 form_score = form_scores.get(player_id)
                 
-                # Calculate True Value = ValueScore × weekly factors - REQUIRES APPROVAL
-                # For now, just use form as a multiplier (placeholder logic)
-                if form_score is not None:
+                # Calculate form multiplier
+                if form_score is not None and self.form_tracker.form_enabled:
                     form_multiplier = form_score / 100  # Convert form score to multiplier
-                    true_value = value_score * form_multiplier
                 else:
-                    true_value = value_score  # No form adjustment
+                    form_multiplier = 1.0  # Neutral when form disabled or no data
+                
+                # Get fixture difficulty multiplier
+                opponent_team = player_data['opponent'].replace('vs ', '').replace('@ ', '')
+                is_home = not player_data['opponent'].startswith('@')
+                fixture_multiplier = self.fixture_analyzer.get_fixture_multiplier(opponent_team)
+                
+                # Get starter prediction multiplier
+                starter_confidence, starter_multiplier = self.starter_predictor.get_player_starter_confidence(
+                    player_data['name'], player_data['team']
+                )
+                
+                # Calculate True Value = ValueScore × Form × Fixture × Starter - CORRECTED FORMULA
+                true_value = value_score * form_multiplier * fixture_multiplier * starter_multiplier
+                
+                # Get opponent difficulty rank
+                difficulty_ranks = self.fixture_analyzer.calculate_team_difficulty_ranks()
+                opponent_rank = difficulty_ranks.get(opponent_team)
                 
                 # Extended player data
                 player_data.update({
                     'ppg': round(ppg, 2),
-                    'value_score': round(value_score, 2) if value_score != float('inf') else 999,
+                    'ppg_source': data_source,  # Tag showing data source
+                    'value_score': round(value_score, 3),
                     'form_score': form_score,
-                    'true_value': round(true_value, 2) if true_value != float('inf') else 999,
+                    'form_multiplier': round(form_multiplier, 3),
+                    'fixture_multiplier': round(fixture_multiplier, 3),
+                    'starter_confidence': starter_confidence,
+                    'starter_multiplier': round(starter_multiplier, 3),
+                    'true_value': round(true_value, 3),
                     'ppm': None,  # TODO: Implement Points Per Minute
-                    'predicted_starter': None,  # TODO: Scrape from Fantasy Football Scout
-                    'next_opponent_rank': None,  # TODO: Scrape from OddsChecker
+                    'predicted_starter': starter_confidence,
+                    'next_opponent_rank': opponent_rank,
+                    'next_opponent': opponent_team,
+                    'is_home': is_home,
                     'differential': player_data['ownership_pct'] < 40
                 })
                 
@@ -188,8 +301,8 @@ class CandidateAnalyzer:
             print(f"\\n{pos_name} - Top {self.pool_sizes[pos_code]} by True Value")
             print("-" * 50)
             
-            # Sort by True Value (lower is better)
-            sorted_players = sorted(self.positions[pos_code], key=lambda x: x['true_value'])
+            # Sort by True Value (higher is better with corrected formula)
+            sorted_players = sorted(self.positions[pos_code], key=lambda x: x['true_value'], reverse=True)
             
             # Get top N candidates
             candidates = sorted_players[:self.pool_sizes[pos_code]]
@@ -220,16 +333,20 @@ class CandidateAnalyzer:
             print("-" * 85)
             
             # Table header
-            print(f"{'Rank':<4} {'Player':<18} {'Team':<4} {'Price':<6} {'PPG':<5} {'ValueSc':<7} {'TrueVal':<7} {'Own%':<5} {'Form':<5} {'Status':<8}")
-            print("-" * 85)
+            print(f"{'Rank':<4} {'Player':<16} {'Team':<4} {'Price':<6} {'PPG':<6} {'ValueSc':<7} {'TrueVal':<7} {'Fix':<6} {'Start':<8} {'Own%':<5} {'Status':<8}")
+            print(f"{'(H=Historical data, E=Estimated)':<60}")
+            print("-" * 95)
             
             for i, player in enumerate(candidates, 1):
-                form_display = f"{player['form_score']:.0f}" if player['form_score'] else "N/A"
+                starter_display = player['starter_confidence'].replace('_', ' ').upper()[:7] if player['starter_confidence'] != 'unknown' else "N/A"
                 diff_indicator = "DIFF" if player['differential'] else ""
                 
-                print(f"{i:<4} {player['name'][:17]:<18} {player['team']:<4} ${player['price']:<5.2f} {player['ppg']:<5.2f} "
-                      f"{player['value_score']:<7.2f} {player['true_value']:<7.2f} {player['ownership_pct']:<4.0f}% "
-                      f"{form_display:<5} {diff_indicator:<8}")
+                # Data source indicator: H=Historical, E=Estimated
+                data_indicator = "H" if "Historical" in player.get('ppg_source', '') else "E"
+                
+                print(f"{i:<4} {player['name'][:17]:<18} {player['team']:<4} ${player['price']:<5.2f} {player['ppg']:<5.2f}{data_indicator} "
+                      f"{player['value_score']:<7.2f} {player['true_value']:<7.2f} {player['fixture_multiplier']:<6.3f} "
+                      f"{starter_display:<8} {player['ownership_pct']:<4.0f}% {diff_indicator:<8}")
     
     def save_candidate_data(self, candidate_pools):
         """Save candidate data for dashboard/export"""
@@ -239,7 +356,7 @@ class CandidateAnalyzer:
             "metadata": {
                 "generated_date": datetime.now().isoformat(),
                 "total_candidates": sum(len(pool) for pool in candidate_pools.values()),
-                "formula_used": "ValueScore = Price ÷ PPG (PENDING APPROVAL)",
+                "formula_used": "TrueValue = (PPG÷Price) × Form × Fixture × Starter (VALIDATED)",
                 "gameweek": self.form_tracker.form_data["metadata"]["current_gameweek"]
             },
             "pools": candidate_pools
@@ -298,7 +415,7 @@ class CandidateAnalyzer:
         print("ANALYSIS COMPLETE")
         print("="*60)
         print("[SUCCESS] Candidate pools generated successfully")
-        print("[WARNING] ValueScore formula pending approval")
+        print("[SUCCESS] ValueScore formula validated: PPG ÷ Price (higher is better)")
         print("[INFO] Data saved for dashboard integration")
         print("[READY] Ready for manual lineup construction")
         

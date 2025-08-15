@@ -35,7 +35,16 @@
   <!-- Master Formula Display -->
   <div class="formula-display">
     <strong>True Value = ValueScore × BoostFactors</strong>
-    <small>Where BoostFactors = Form × Fixture × Starter × Custom</small>
+    <small>Where BoostFactors = Form × Fixture × Starter</small>
+  </div>
+  
+  <!-- Combined Multiplier Validation -->
+  <div class="multiplier-validation">
+    <label>Combined Multiplier Preview:</label>
+    <span id="combined-multiplier-display">1.00x</span>
+    <div class="validation-status" id="validation-status">
+      <span class="status-indicator optimal">✓ Optimal Range</span>
+    </div>
   </div>
   
   <!-- Form Boost -->
@@ -108,6 +117,15 @@
     <input type="number" id="baseline-switchover" value="10" min="1" max="38">
     <span>Switch to current season at Game Week</span>
     <small>Before GW 10: Use 2024-25 baseline | After GW 10: Use current season</small>
+  </div>
+  
+  <!-- Apply Changes Button -->
+  <div class="apply-changes-section">
+    <button id="apply-boost-changes" class="apply-btn" disabled>Apply Changes</button>
+    <button id="reset-defaults" class="secondary-btn">Reset to Defaults</button>
+    <div class="pending-changes" id="pending-changes" style="display: none;">
+      <small>⚠️ You have unsaved changes</small>
+    </div>
   </div>
 </div>
 ```
@@ -472,65 +490,175 @@ function addPlayerToSlot(slot, playerData) {
 
 ---
 
-## 🔄 **4. Real-Time Parameter Updates**
-**Requirement**: All changes immediately recalculate candidate pools and lineup validation
+## 🔄 **4. Apply Changes Parameter System**
+**Requirement**: Parameter changes are staged until user clicks "Apply Changes" button
 
-#### **JavaScript API Calls**
+#### **Parameter Validation & Apply System**
 ```javascript
-// Form Calculation Toggle
-function toggleFormCalculation(enabled) {
-  fetch('/api/form-calculation', {
-    method: 'POST',
-    body: JSON.stringify({ enabled: enabled }),
-    headers: { 'Content-Type': 'application/json' }
-  })
-  .then(response => response.json())
-  .then(data => {
-    updateTable(data.candidates);
-    updateStatus(`Form calculation ${enabled ? 'enabled' : 'disabled'}`);
-  });
+// Global state for pending changes
+let pendingChanges = {
+  form: {},
+  fixture: {},
+  starter: {},
+  pools: {},
+  hasChanges: false
+};
+
+// Combined Multiplier Validation
+function validateCombinedMultiplier() {
+  const formMultiplier = getCurrentFormMultiplier();
+  const fixtureMultiplier = getCurrentFixtureMultiplier();
+  const starterMultiplier = getCurrentStarterMultiplier();
+  
+  const combined = formMultiplier * fixtureMultiplier * starterMultiplier;
+  
+  // Update display
+  document.getElementById('combined-multiplier-display').textContent = `${combined.toFixed(2)}x`;
+  
+  // Update validation status
+  const statusElement = document.getElementById('validation-status');
+  const indicator = statusElement.querySelector('.status-indicator');
+  
+  if (combined > 2.5) {
+    indicator.className = 'status-indicator error';
+    indicator.innerHTML = '✗ Too High (>2.5x) - May break rankings';
+    return false;
+  } else if (combined > 2.0) {
+    indicator.className = 'status-indicator warning';
+    indicator.innerHTML = '⚠️ High Boost (>2.0x) - Check if realistic';
+    return true;
+  } else if (combined < 0.4) {
+    indicator.className = 'status-indicator warning';
+    indicator.innerHTML = '⚠️ Heavy Penalty (<0.4x) - Player may become unviable';
+    return true;
+  } else {
+    indicator.className = 'status-indicator optimal';
+    indicator.innerHTML = '✓ Optimal Range (0.4x - 2.0x)';
+    return true;
+  }
 }
 
-// Lookback Period Change
-function updateLookbackPeriod(period) {
-  fetch('/api/lookback-period', {
-    method: 'POST', 
-    body: JSON.stringify({ period: parseInt(period) }),
-    headers: { 'Content-Type': 'application/json' }
-  })
-  .then(response => response.json())
-  .then(data => {
-    updateTable(data.candidates);
-    updateWeightsDisplay(data.weights);
-  });
+// Track parameter changes
+function trackParameterChange(category, parameter, value) {
+  pendingChanges[category][parameter] = value;
+  pendingChanges.hasChanges = true;
+  
+  // Enable apply button and show pending indicator
+  document.getElementById('apply-boost-changes').disabled = false;
+  document.getElementById('pending-changes').style.display = 'block';
+  
+  // Validate on each change
+  validateCombinedMultiplier();
 }
 
-// Pool Size Updates
-function updatePoolSizes(sizes) {
-  fetch('/api/pool-sizes', {
-    method: 'POST',
-    body: JSON.stringify(sizes),
-    headers: { 'Content-Type': 'application/json' }
-  })
-  .then(response => response.json())
-  .then(data => {
-    updateTable(data.candidates);
-    updatePoolCounts(data.counts);
-  });
+// Apply all pending changes
+async function applyAllChanges() {
+  if (!pendingChanges.hasChanges) return;
+  
+  // Validate before applying
+  if (!validateCombinedMultiplier()) {
+    alert('Cannot apply changes: Combined multiplier exceeds safe limits (2.5x)');
+    return;
+  }
+  
+  try {
+    // Show loading state
+    const applyButton = document.getElementById('apply-boost-changes');
+    applyButton.disabled = true;
+    applyButton.textContent = 'Applying...';
+    
+    // Send all changes to backend
+    const response = await fetch('/api/apply-parameter-changes', {
+      method: 'POST',
+      body: JSON.stringify(pendingChanges),
+      headers: { 'Content-Type': 'application/json' }
+    });
+    
+    const result = await response.json();
+    
+    if (result.success) {
+      // Update table with new candidates
+      updateTable(result.candidates);
+      
+      // Reset pending changes
+      resetPendingChanges();
+      
+      updateStatus('Parameters applied successfully', 'success');
+    } else {
+      throw new Error(result.message || 'Failed to apply changes');
+    }
+  } catch (error) {
+    console.error('Error applying changes:', error);
+    updateStatus('Failed to apply changes: ' + error.message, 'error');
+  } finally {
+    // Reset button state
+    const applyButton = document.getElementById('apply-boost-changes');
+    applyButton.disabled = false;
+    applyButton.textContent = 'Apply Changes';
+  }
 }
 
-// Boost Factor Updates
-function updateBoostFactors(boostSettings) {
-  fetch('/api/boost-factors', {
-    method: 'POST',
-    body: JSON.stringify(boostSettings),
-    headers: { 'Content-Type': 'application/json' }
-  })
-  .then(response => response.json())
-  .then(data => {
-    updateTable(data.candidates);
-    updateBoostDisplay(data.active_boosts);
+// Reset pending changes
+function resetPendingChanges() {
+  pendingChanges = {
+    form: {},
+    fixture: {},
+    starter: {},
+    pools: {},
+    hasChanges: false
+  };
+  
+  document.getElementById('apply-boost-changes').disabled = true;
+  document.getElementById('pending-changes').style.display = 'none';
+}
+
+// Event listeners for parameter controls
+function initializeParameterControls() {
+  // Form controls
+  document.getElementById('form-boost-enabled').addEventListener('change', (e) => {
+    trackParameterChange('form', 'enabled', e.target.checked);
   });
+  
+  document.getElementById('form-lookback').addEventListener('change', (e) => {
+    trackParameterChange('form', 'lookback_period', parseInt(e.target.value));
+  });
+  
+  document.getElementById('form-intensity').addEventListener('input', (e) => {
+    trackParameterChange('form', 'intensity', parseFloat(e.target.value));
+  });
+  
+  // Fixture controls
+  document.getElementById('fixture-boost-enabled').addEventListener('change', (e) => {
+    trackParameterChange('fixture', 'enabled', e.target.checked);
+  });
+  
+  document.getElementById('fixture-easy-boost').addEventListener('input', (e) => {
+    trackParameterChange('fixture', 'easy_multiplier', parseFloat(e.target.value));
+  });
+  
+  // Starter controls
+  document.getElementById('starter-boost-enabled').addEventListener('change', (e) => {
+    trackParameterChange('starter', 'enabled', e.target.checked);
+  });
+  
+  // Apply changes button
+  document.getElementById('apply-boost-changes').addEventListener('click', applyAllChanges);
+  
+  // Reset defaults button
+  document.getElementById('reset-defaults').addEventListener('click', resetToDefaults);
+}
+
+// Reset to default values
+function resetToDefaults() {
+  if (confirm('Reset all parameters to default values?')) {
+    fetch('/api/reset-defaults', { method: 'POST' })
+      .then(response => response.json())
+      .then(data => {
+        if (data.success) {
+          location.reload(); // Reload page to reset all controls
+        }
+      });
+  }
 }
 
 // Filter Updates (Debounced)
@@ -593,34 +721,86 @@ from src.form_tracker import FormTracker
 app = Flask(__name__)
 analyzer = CandidateAnalyzer()
 
-@app.route('/api/form-calculation', methods=['POST'])
-def toggle_form_calculation():
-    enabled = request.json.get('enabled', False)
-    analyzer.form_tracker.toggle_form_calculation(enabled)
+@app.route('/api/apply-parameter-changes', methods=['POST'])
+def apply_parameter_changes():
+    """Apply all pending parameter changes at once"""
+    changes = request.json
     
-    # Regenerate candidates with new settings
-    candidate_pools = analyzer.generate_candidate_pools()
-    
-    return jsonify({
-        'success': True,
-        'form_enabled': enabled,
-        'candidates': candidate_pools,
-        'message': f'Form calculation {"enabled" if enabled else "disabled"}'
-    })
+    try:
+        # Validate combined multiplier before applying
+        validation_result = analyzer.validate_combined_multiplier(changes)
+        if not validation_result['valid']:
+            return jsonify({
+                'success': False,
+                'message': validation_result['error'],
+                'validation': validation_result
+            }), 400
+        
+        # Apply form changes
+        if 'form' in changes and changes['form']:
+            form_changes = changes['form']
+            if 'enabled' in form_changes:
+                analyzer.form_tracker.toggle_form_calculation(form_changes['enabled'])
+            if 'lookback_period' in form_changes:
+                analyzer.form_tracker.update_lookback_period(form_changes['lookback_period'])
+            if 'intensity' in form_changes:
+                analyzer.form_tracker.update_intensity_range(form_changes['intensity'])
+        
+        # Apply fixture changes
+        if 'fixture' in changes and changes['fixture']:
+            fixture_changes = changes['fixture']
+            if 'enabled' in fixture_changes:
+                analyzer.fixture_analyzer.toggle_difficulty_calculation(fixture_changes['enabled'])
+            if 'easy_multiplier' in fixture_changes:
+                analyzer.fixture_analyzer.update_multiplier('easy', fixture_changes['easy_multiplier'])
+        
+        # Apply starter prediction changes
+        if 'starter' in changes and changes['starter']:
+            starter_changes = changes['starter']
+            if 'enabled' in starter_changes:
+                analyzer.starter_predictor.toggle_prediction_system(starter_changes['enabled'])
+        
+        # Apply pool size changes
+        if 'pools' in changes and changes['pools']:
+            analyzer.update_pool_sizes(changes['pools'])
+        
+        # Regenerate candidates with all new settings
+        candidate_pools = analyzer.generate_candidate_pools()
+        
+        # Save configuration changes
+        analyzer.save_configuration()
+        
+        return jsonify({
+            'success': True,
+            'candidates': candidate_pools,
+            'applied_changes': changes,
+            'validation': validation_result,
+            'message': 'All parameters applied successfully'
+        })
+        
+    except Exception as e:
+        return jsonify({
+            'success': False,
+            'message': f'Failed to apply changes: {str(e)}'
+        }), 500
 
-@app.route('/api/lookback-period', methods=['POST']) 
-def update_lookback_period():
-    period = request.json.get('period', 3)
-    analyzer.form_tracker.update_lookback_period(period)
-    
-    candidate_pools = analyzer.generate_candidate_pools()
-    
-    return jsonify({
-        'success': True,
-        'lookback_period': period,
-        'weights': analyzer.form_tracker.recent_game_weights,
-        'candidates': candidate_pools
-    })
+@app.route('/api/reset-defaults', methods=['POST'])
+def reset_defaults():
+    """Reset all parameters to default values"""
+    try:
+        analyzer.reset_to_defaults()
+        candidate_pools = analyzer.generate_candidate_pools()
+        
+        return jsonify({
+            'success': True,
+            'candidates': candidate_pools,
+            'message': 'All parameters reset to defaults'
+        })
+    except Exception as e:
+        return jsonify({
+            'success': False,
+            'message': f'Failed to reset defaults: {str(e)}'
+        }), 500
 
 @app.route('/api/pool-sizes', methods=['POST'])
 def update_pool_sizes():
@@ -1011,6 +1191,103 @@ def save_lineup():
   background: #f8d7da;
   color: #721c24;
   border: 1px solid #f5c6cb;
+}
+
+/* Parameter Validation Styling */
+.multiplier-validation {
+  background: #f8f9fa;
+  padding: 10px;
+  border-radius: 5px;
+  margin: 10px 0;
+  border: 1px solid #dee2e6;
+}
+
+.multiplier-validation label {
+  font-weight: bold;
+  margin-right: 10px;
+}
+
+#combined-multiplier-display {
+  font-size: 18px;
+  font-weight: bold;
+  color: #495057;
+}
+
+.validation-status {
+  margin-top: 5px;
+}
+
+.status-indicator {
+  padding: 4px 8px;
+  border-radius: 3px;
+  font-size: 12px;
+  font-weight: bold;
+}
+
+.status-indicator.optimal {
+  background: #d4edda;
+  color: #155724;
+  border: 1px solid #c3e6cb;
+}
+
+.status-indicator.warning {
+  background: #fff3cd;
+  color: #856404;
+  border: 1px solid #ffeaa7;
+}
+
+.status-indicator.error {
+  background: #f8d7da;
+  color: #721c24;
+  border: 1px solid #f5c6cb;
+}
+
+/* Apply Changes Section */
+.apply-changes-section {
+  background: #e9ecef;
+  padding: 15px;
+  border-radius: 5px;
+  margin-top: 20px;
+  text-align: center;
+}
+
+.apply-btn {
+  background: #007bff;
+  color: white;
+  border: none;
+  padding: 10px 20px;
+  border-radius: 5px;
+  font-weight: bold;
+  cursor: pointer;
+  margin-right: 10px;
+}
+
+.apply-btn:disabled {
+  background: #6c757d;
+  cursor: not-allowed;
+}
+
+.apply-btn:hover:not(:disabled) {
+  background: #0056b3;
+}
+
+.secondary-btn {
+  background: #6c757d;
+  color: white;
+  border: none;
+  padding: 10px 20px;
+  border-radius: 5px;
+  cursor: pointer;
+}
+
+.secondary-btn:hover {
+  background: #545b62;
+}
+
+.pending-changes {
+  margin-top: 10px;
+  color: #856404;
+  font-weight: bold;
 }
 ```
 
