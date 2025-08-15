@@ -1,14 +1,14 @@
-# CLAUDE.md - AI Assistant Context
-# Fantrax Value Hunter Project
+# CLAUDE.md - AI Assistant Context  
+# Fantrax Value Hunter - Version 1.0
 
 This file contains essential context for AI assistants working on the Fantrax Value Hunter project.
 
 ---
 
-## 🎯 **Project Mission**
-Create a comprehensive fantasy football analytics platform with accurate value metrics, context-aware player analysis, and an interactive web dashboard for optimal $100 lineups.
+## 🎯 **Project Mission - Version 1.0**
+Build a **two-panel Flask dashboard** for parameter tuning across **all 633 Premier League players**. Focus on True Value discovery through real-time parameter adjustment, not automatic lineup generation.
 
-**🔄 Strategic Pivot**: Skip Game Week 1 to build a proper, reliable tool rather than rush a flawed MVP.
+**Version 1.0 Goal**: Parameter adjustment controls affecting True Value rankings for complete player database.
 
 ## 📋 **League Rules & Context**
 
@@ -239,23 +239,23 @@ python quick_lineup.py
 - **Easy tweaking required**: All calculations must be parameterized for post-launch adjustments
 - **Real sample validation**: Test with actual game week data once available
 
-### **📊 Dashboard Parameter Controls (Phase 3)**
-**Key Adjustable Parameters:**
-- **Form Calculation**: Enable/disable toggle (currently DISABLED for GW 1-3)
-- **Lookback Period**: 3-game vs 5-game analysis with weighted values
-- **Baseline Switchover**: When to switch from 2024 baseline to current season (default: GW 10)
-- **Pool Sizes**: Candidate pool sizes per position (8 GK, 20 DEF, 20 MID, 20 FWD)
-- **Differential Threshold**: Ownership percentage for differential status (<40%)
+### **📊 Version 1.0 Dashboard Features**
+**Core Parameter Controls:**
+- **Form Calculation**: Enable/disable toggle with 3/5 game lookback options
+- **Fixture Difficulty**: 5-tier multiplier system with adjustable sliders
+- **Starter Predictions**: Confidence multipliers for CSV-imported lineup data
+- **Display Filters**: Position, price range, ownership, team, name search
+- **Real-time Updates**: Parameter changes trigger True Value recalculation for all 633 players
 
-**Implementation Guide**: See `docs/DASHBOARD_IMPLEMENTATION.md` for complete specification
+**Implementation Guide**: See `docs/VERSION_1.0_SPECIFICATION.md` and `docs/PHASE_3_IMPLEMENTATION_PLAN.md`
 
-### **Testing Priorities**
-1. **Value calculation accuracy**: Per-game vs season metrics
-2. **Player data integrity**: All 633 players correctly parsed
-3. **Constraint validation**: Budget and position requirements
-4. **Real-world performance**: Recommendations vs actual results
+### **Database Foundation Complete (Day 1)**
+1. **PostgreSQL Setup**: Database operational with 633 players imported
+2. **True Value Formula**: PPG ÷ Price validated with real data
+3. **Multiplier Framework**: Form, fixture, starter calculations ready
+4. **MCP Integration**: Database queries working through Claude interface
 
 ---
 
-**Last Updated**: August 14, 2025  
-**Status**: Ready for systematic, tested development 🧪🎯
+**Last Updated**: August 15, 2025 - Day 1 Complete  
+**Status**: Database foundation ready, Flask dashboard development begins Day 2 🎯

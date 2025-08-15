@@ -1,29 +1,39 @@
 # Fantrax Value Hunter
-**Fantasy Football Analytics Platform**
+**Fantasy Football Analytics Platform - Version 1.0**
 
-Comprehensive tool for finding undervalued players and generating optimal $100 lineups for weekly Fantrax league competition.
+Two-panel dashboard for finding undervalued players through real-time parameter adjustment. Shows all 633 Premier League players with True Value calculations and advanced filtering.
 
 ---
 
-## 🚀 **Quick Start**
+## 🎯 **Version 1.0 Goal**
 
-### **1. Authentication Setup**
+Build a **two-panel Flask dashboard** that displays all 633 players with:
+- **Left Panel**: Parameter controls for adjusting True Value calculations
+- **Right Panel**: Filterable table showing all players ranked by True Value
+- **Core Feature**: Real-time parameter adjustment affecting rankings
+
+**NO auto-lineup selection, NO drag-and-drop, NO complex features** - focus on parameter tuning for value discovery.
+
+---
+
+## 🚀 **Quick Start (Version 1.0)**
+
+### **1. Database Setup (✅ Complete)**
 ```bash
-# Copy your browser cookies to config/fantrax_cookies.json
-# See ../Fantrax_Wrapper/WRAPPER_SUMMARY.md for cookie export guide
+# PostgreSQL is installed and populated with 633 players
+# Database: fantrax_value_hunter on port 5433
 ```
 
-### **2. Run Value Analysis**
+### **2. Launch Dashboard (Coming Days 2-8)**
 ```bash
 cd src/
-python candidate_analyzer.py  # Generates ranked candidate pools by position
+python app.py  # Flask dashboard with parameter controls
 ```
 
-### **3. Future: Launch Dashboard**
-```bash
-# Coming in Game Week 2-3
-python dashboard.py
-```
+### **3. Use Parameter Controls**
+- Adjust form, fixture, and starter multipliers in left panel
+- See immediate impact on True Value rankings in right panel
+- Filter players by position, price, ownership, team
 
 ---
 
@@ -31,37 +41,34 @@ python dashboard.py
 
 ```
 Fantrax_Value_Hunter/
-├── README.md                           # This file - Project overview
-├── .gitignore                          # Git ignore rules
+├── README.md                           # This file - v1.0 overview
 ├── requirements.txt                    # Python dependencies
-├── docs/                              # Documentation
-│   ├── PRD.md                         # Product requirements
-│   ├── PLAN.md                        # Development roadmap
-│   ├── CLAUDE.md                      # AI context file
-│   ├── DASHBOARD_IMPLEMENTATION.md    # Complete dashboard specification
-│   └── IDEAS.md                       # Enhancement ideas
-├── src/                               # Source code
-│   ├── candidate_analyzer.py          # Main candidate ranking system with True Value formula
-│   ├── form_tracker.py               # Form calculation with weighted games
-│   ├── fixture_difficulty.py         # Football-Data.org API integration
-│   ├── starter_predictor.py          # Dual-source starter prediction system
-│   ├── save_baseline.py              # 2024-25 baseline data preservation
-│   └── dashboard.py                   # Flask web dashboard (Phase 3)
-├── config/                            # Configuration
-│   ├── fantrax_cookies.json          # Authentication (not in git)
-│   ├── api_keys.json                 # External API keys (not in git)
-│   ├── api_keys.json.example         # API keys template
-│   └── system_parameters.json        # Adjustable parameters
-├── data/                              # Cache/historical data (not in git)
-│   ├── season_2024_baseline.json     # 2024-25 baseline for first 10 GW
-│   └── player_form_tracking.json     # Weekly form scores
-├── tests/                             # Unit tests
-│   ├── test_form_tracker.py          # Form calculation tests
-│   └── test_candidate_analyzer.py    # Value calculation tests
-└── static/                            # Dashboard assets (Phase 3)
-    ├── css/
-    ├── js/
-    └── templates/
+├── docs/
+│   ├── VERSION_1.0_SPECIFICATION.md   # Clear v1.0 definition
+│   ├── CURRENT_STATUS.md              # Day 1 completion status  
+│   ├── PHASE_3_IMPLEMENTATION_PLAN.md # Days 2-8 dashboard plan
+│   ├── FUTURE_IDEAS.md                # Post-v1.0 features
+│   ├── DATABASE_MCP_IMPLEMENTATION.md # Database setup guide
+│   └── CLAUDE.md                      # AI context file
+├── src/
+│   ├── app.py                         # Flask dashboard (Days 2-3)
+│   ├── db_manager.py                  # Database wrapper (✅ Complete)
+│   ├── candidate_analyzer.py          # True Value calculations
+│   ├── form_tracker.py               # Form multiplier logic
+│   ├── fixture_difficulty.py         # Fixture multiplier logic
+│   └── starter_predictor.py          # Starter multiplier logic
+├── templates/
+│   └── dashboard.html                 # Two-panel UI (Days 4-5)
+├── static/
+│   ├── css/dashboard.css             # Dashboard styling
+│   └── js/dashboard.js               # Parameter controls
+├── migrations/
+│   └── import_csv_data.py            # Database population (✅ Complete)
+├── config/
+│   └── system_parameters.json        # All adjustable parameters
+└── data/
+    ├── fpg_data_2024.csv            # 633 players with FP/G data
+    └── season_2024_baseline.json    # Historical baseline data
 ```
 
 ### **🔧 Development Setup**
@@ -102,47 +109,97 @@ python src/dashboard.py
 
 ---
 
-## 📊 **Current Status**
+## 📊 **Current Status (Day 1 Complete + Documentation)**
 
-### **✅ Phase 1 Complete: Foundation (August 14, 2025)**
-- ✅ Complete API access (633 players across 32 pages)
-- ✅ Authentication with exported browser cookies  
-- ✅ Candidate ranking system foundation
-- ✅ Comprehensive documentation suite
-- ✅ Form tracking system with weighted recent games
-- ✅ 2024-25 baseline data preservation
-- ✅ Complete dashboard specification (DASHBOARD_IMPLEMENTATION.md)
+### **✅ Database Foundation (August 15, 2025)**
+- ✅ **PostgreSQL Setup**: Database operational on port 5433
+- ✅ **Schema Created**: players, player_form, player_metrics tables
+- ✅ **Data Imported**: All 633 players with complete metrics
+- ✅ **True Value Formula**: PPG ÷ Price validated and working
+- ✅ **Multiplier System**: Form, fixture, starter calculations ready
+- ✅ **Form Calculation**: player_form table ready for 5 gameweek lookback
 
-### **✅ Phase 2 Complete: Enhanced Analytics (August 15, 2025)**
-- ✅ **Form Calculation Framework**: Weighted 3/5-game lookback with enable/disable
-- ✅ **Baseline Data System**: 2024-25 season data saved for first 10 games
-- ✅ **Configuration System**: JSON-based parameter management
-- ✅ **Fixture Difficulty Integration**: Football-Data.org API with 5-tier multiplier system
-- ✅ **Predicted Starter Data**: Dual-source consensus framework (FFS + RotoWire)
-- ✅ **True Value Formula**: `TrueValue = ValueScore × Form × Fixture × Starter`
-- ✅ **Formula Validation**: ValueScore = PPG ÷ Price validated with 633 real players
-- ✅ **Real FP/G Data**: Historical CSV integration with H/E tagging system
+### **✅ Documentation Updated (August 15, 2025)**
+- ✅ **Version 1.0 Scope**: Clearly defined in VERSION_1.0_SPECIFICATION.md
+- ✅ **Future Features**: Moved to FUTURE_IDEAS.md (out of v1.0 scope)
+- ✅ **Implementation Plan**: Updated for simplified two-panel dashboard
+- ✅ **AI Context**: CLAUDE.md consolidated in docs/ folder
 
-### **📋 Phase 3 Ready: Dashboard Development**
-- ✅ **Complete Specification**: Three-panel dashboard with all features defined
-- ✅ **API Endpoints**: Flask backend architecture documented
-- ✅ **UI/UX Design**: Drag-and-drop lineup builder, real-time controls
-- ✅ **Performance Optimization**: Virtual scrolling for 633+ players
-- 🎯 **Ready to Build**: Implementation can begin immediately
+### **📊 Database Contents**
+- **633 total players** with complete metrics for gameweek 1
+- **Position breakdown**: 74 GK, 213 DEF, 232 MID, 114 FWD  
+- **Value calculations**: PPG ÷ Price formula working correctly
+- **Multipliers**: All default to 1.0, ready for dashboard adjustment
 
-### **🚀 Next Immediate Actions**
-1. ✅ **Git Setup**: Repository initialized with proper structure
-2. ✅ **Phase 2 Completion**: Enhanced analytics system fully operational
-3. ✅ **Formula Validation**: PPG ÷ Price validated with real 2024-25 data
-4. **Phase 3 Start**: Begin Flask dashboard development (using Database MCP for data storage)
-5. **Web Scraping**: Implement Playwright MCP for real starter predictions
+### **🎯 Next Steps (Days 2-8)**
+1. **Day 2-3**: Flask backend with parameter adjustment endpoints
+2. **Day 4-5**: Two-panel dashboard UI with all controls
+3. **Day 6**: CSV import for starter predictions
+4. **Day 7-8**: Testing and validation
 
-### **🔧 MCP Server Integration**
-Project leverages available MCP servers for maximum efficiency:
-- **Playwright MCP**: Web scraping for fixture data and lineup predictions
-- **Database MCP**: PostgreSQL for structured player data and form tracking  
-- **Memory MCP**: Knowledge graph for player relationships and patterns
-- **Context7 MCP**: Latest documentation for Flask/JavaScript development
+---
+
+## 🎯 **Version 1.0 Features**
+
+### **Left Panel - Parameter Controls**
+All boost factors adjustable via dashboard UI:
+
+**Form Calculation**
+- ✅ Enable/disable toggle
+- Lookback period (3 or 5 games)
+- Minimum games threshold
+
+**Fixture Difficulty** 
+- ✅ Enable/disable toggle
+- 5-tier multiplier system with sliders
+- Very Easy (1.2x-1.5x) through Very Hard (0.6x-0.8x)
+
+**Starter Predictions**
+- ✅ Enable/disable toggle  
+- Confidence multipliers for consensus levels
+- CSV import for weekly lineup updates
+
+**Display Filters**
+- Position checkboxes (G/D/M/F)
+- Price range slider
+- Ownership % threshold
+- Team selector
+- Name search
+
+### **Right Panel - Player Table**
+- **All 633 players** (not limited to 68)
+- Sortable by True Value, Price, PPG, Ownership
+- Real-time updates when parameters change
+- Export filtered results to CSV
+
+### **Core Workflow**
+1. Adjust multipliers → True Value recalculates for all 633 players
+2. Apply filters → See subset matching criteria  
+3. Sort by True Value → Find best value opportunities
+4. Export selection → Use for lineup construction
+
+---
+
+## 🔧 **Technical Stack**
+
+- **Backend**: Flask + PostgreSQL with Database MCP integration
+- **Frontend**: HTML/CSS/JavaScript with real-time parameter controls
+- **Database**: 633 players with historical FP/G data
+- **Formula**: `TrueValue = (PPG ÷ Price) × Form × Fixture × Starter`
+
+---
+
+## 📝 **Development Philosophy**
+
+### **Version 1.0 Scope Discipline**
+- ✅ **Core Feature**: Parameter adjustment affecting True Value rankings
+- ✅ **Data Display**: All 633 players with filtering capabilities  
+- ❌ **Out of Scope**: Auto-selection, drag-and-drop, web scraping
+
+### **Quality First**
+- Every parameter change must trigger accurate recalculation
+- Database performance must handle 633 players smoothly
+- UI must be responsive and intuitive for parameter tuning
 
 ---
 
@@ -162,4 +219,4 @@ Project leverages available MCP servers for maximum efficiency:
 
 ---
 
-**Built for the 2025-26 Premier League season 🏆⚽**
+**Version 1.0: Focus on parameter tuning for value discovery 🎯⚽**
