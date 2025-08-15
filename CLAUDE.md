@@ -3,7 +3,7 @@
 
 ## 🎯 PROJECT OVERVIEW
 
-**Purpose**: Find undervalued fantasy football players using advanced analytics and generate optimal $100 lineups for weekly Fantrax league competition.
+**Purpose**: Find undervalued fantasy football players using validated value analysis and generate optimal $100 lineups for weekly Fantrax league competition.
 
 **Current Status**: Phase 2 Complete (Enhanced Analytics) - Ready for Phase 3 (Dashboard Development)
 
@@ -173,11 +173,11 @@ All parameter adjustments in `config/system_parameters.json` take effect immedia
 3. **Database MCP**: PostgreSQL integration for persistent data
 4. **Real Scraping**: Implement Playwright MCP for starter predictions
 
-### **Future Enhancements**
-- Advanced analytics (PPM, injury tracking, transfer analysis)
-- Machine learning integration
-- Historical performance validation
-- Mobile-responsive dashboard
+### **Realistic Future Enhancements (Optional)**
+- Real starter predictions via Playwright MCP (replace mock data)
+- Historical performance tracking (actual vs predicted results)
+- Price change monitoring between gameweeks
+- Simple injury status integration if data available
 
 ---
 
@@ -189,11 +189,10 @@ All parameter adjustments in `config/system_parameters.json` take effect immedia
 - **Dashboard-Configurable**: All parameters adjustable via UI
 - **Real Data**: Use live APIs wherever possible
 
-### **MCP Server Integration**
-- **Playwright MCP**: Web scraping for predictions and additional data
-- **Database MCP**: Structured data storage and retrieval
-- **Memory MCP**: Player relationship tracking
-- **Context7 MCP**: Latest framework documentation
+### **MCP Server Integration (Phase 3)**
+- **Database MCP**: PostgreSQL for player data and configuration storage
+- **Playwright MCP**: Real starter predictions (replace current mock data)
+- **Context7 MCP**: Flask/JavaScript documentation for dashboard development
 
 ---
 
