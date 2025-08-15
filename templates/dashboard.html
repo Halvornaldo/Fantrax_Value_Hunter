@@ -1,0 +1,272 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Fantrax Crusher 2000 - Dashboard</title>
+    <link rel="stylesheet" href="{{ url_for('static', filename='css/dashboard.css') }}">
+</head>
+<body>
+    <div class="container">
+        <!-- Header -->
+        <header class="header">
+            <h1>🔥 Fantrax Crusher 2000</h1>
+            <p>Real-time parameter tuning for Fantasy PL DESTROYING</p>
+            <div class="status-bar">
+                <span id="status-indicator">Ready</span>
+                <span id="player-count">633 players loaded</span>
+                <span id="last-updated">Last updated: --</span>
+            </div>
+        </header>
+
+        <!-- Main Dashboard Layout -->
+        <div class="dashboard">
+            <!-- Left Panel - Parameter Controls -->
+            <div class="left-panel">
+                <h2>Parameter Controls</h2>
+                
+                <!-- Form Calculation Section -->
+                <div class="parameter-section">
+                    <h3>
+                        <input type="checkbox" id="form-enabled" checked>
+                        <label for="form-enabled">Form Calculation</label>
+                    </h3>
+                    <div class="form-controls" id="form-controls">
+                        <div class="control-group">
+                            <label for="lookback-period">Lookback Period:</label>
+                            <select id="lookback-period">
+                                <option value="3">3 games</option>
+                                <option value="5" selected>5 games</option>
+                            </select>
+                        </div>
+                        <div class="control-group">
+                            <label for="min-games">Minimum Games:</label>
+                            <input type="number" id="min-games" value="3" min="1" max="10">
+                        </div>
+                        <div class="control-group">
+                            <label for="baseline-switchover">Baseline Switchover Gameweek:</label>
+                            <input type="number" id="baseline-switchover" value="10" min="1" max="38">
+                        </div>
+                        <div class="slider-group">
+                            <label for="form-strength-slider">Form Strength:</label>
+                            <input type="range" id="form-strength-slider" min="0.5" max="2.0" step="0.1" value="1.0">
+                            <span id="form-strength-display">1.00x</span>
+                        </div>
+                        <p class="help-text">Uses weighted average of recent games vs season average. Switches to historical data after switchover gameweek. Form strength adjusts how much form affects True Value.</p>
+                    </div>
+                </div>
+
+                <!-- Fixture Difficulty Section -->
+                <div class="parameter-section">
+                    <h3>
+                        <input type="checkbox" id="fixture-enabled" checked>
+                        <label for="fixture-enabled">Fixture Difficulty</label>
+                    </h3>
+                    <div class="fixture-controls" id="fixture-controls">
+                        <div class="control-group">
+                            <label>Mode:</label>
+                            <div class="radio-group">
+                                <input type="radio" id="mode-3tier" name="fixture-mode" value="3_tier">
+                                <label for="mode-3tier">3-tier</label>
+                                <input type="radio" id="mode-5tier" name="fixture-mode" value="5_tier" checked>
+                                <label for="mode-5tier">5-tier</label>
+                            </div>
+                        </div>
+                        
+                        <!-- 5-tier multiplier controls -->
+                        <div id="tier-5-controls" class="tier-controls">
+                            <div class="slider-group">
+                                <label for="very-easy-slider">Very Easy:</label>
+                                <input type="range" id="very-easy-slider" min="1.2" max="1.5" step="0.05" value="1.3">
+                                <span id="very-easy-display">1.30x</span>
+                            </div>
+                            <div class="slider-group">
+                                <label for="easy-slider">Easy:</label>
+                                <input type="range" id="easy-slider" min="1.05" max="1.25" step="0.05" value="1.15">
+                                <span id="easy-display">1.15x</span>
+                            </div>
+                            <div class="slider-group neutral">
+                                <label>Neutral:</label>
+                                <span class="locked-value">1.00x (locked)</span>
+                            </div>
+                            <div class="slider-group">
+                                <label for="hard-slider">Hard:</label>
+                                <input type="range" id="hard-slider" min="0.75" max="0.95" step="0.05" value="0.85">
+                                <span id="hard-display">0.85x</span>
+                            </div>
+                            <div class="slider-group">
+                                <label for="very-hard-slider">Very Hard:</label>
+                                <input type="range" id="very-hard-slider" min="0.6" max="0.8" step="0.05" value="0.7">
+                                <span id="very-hard-display">0.70x</span>
+                            </div>
+                        </div>
+                        
+                        <!-- 3-tier multiplier controls -->
+                        <div id="tier-3-controls" class="tier-controls" style="display: none;">
+                            <div class="slider-group">
+                                <label for="easy-3tier-slider">Easy:</label>
+                                <input type="range" id="easy-3tier-slider" min="1.1" max="1.4" step="0.05" value="1.2">
+                                <span id="easy-3tier-display">1.20x</span>
+                            </div>
+                            <div class="slider-group neutral">
+                                <label>Neutral:</label>
+                                <span class="locked-value">1.00x (locked)</span>
+                            </div>
+                            <div class="slider-group">
+                                <label for="hard-3tier-slider">Hard:</label>
+                                <input type="range" id="hard-3tier-slider" min="0.7" max="0.9" step="0.05" value="0.8">
+                                <span id="hard-3tier-display">0.80x</span>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Starter Predictions Section -->
+                <div class="parameter-section">
+                    <h3>
+                        <input type="checkbox" id="starter-enabled" checked>
+                        <label for="starter-enabled">Starter Predictions</label>
+                    </h3>
+                    <div class="starter-controls" id="starter-controls">
+                        <div class="slider-group">
+                            <label for="rotation-penalty-slider">Auto Rotation Penalty:</label>
+                            <input type="range" id="rotation-penalty-slider" min="0.5" max="0.8" step="0.05" value="0.65">
+                            <span id="rotation-penalty-display">0.65x</span>
+                        </div>
+                        <div class="slider-group">
+                            <label for="bench-penalty-slider">Force Bench Penalty:</label>
+                            <input type="range" id="bench-penalty-slider" min="0.4" max="0.8" step="0.05" value="0.6">
+                            <span id="bench-penalty-display">0.60x</span>
+                        </div>
+                        <p class="help-text">CSV import identifies predicted starters. Others receive rotation penalty.</p>
+                    </div>
+                </div>
+
+                <!-- Action Buttons -->
+                <div class="action-buttons">
+                    <button id="apply-changes" class="btn-primary" disabled>
+                        Apply Changes
+                    </button>
+                    <button id="reset-defaults" class="btn-secondary">
+                        Reset to Defaults
+                    </button>
+                    <button id="import-lineups" class="btn-secondary">
+                        Import Lineups CSV
+                    </button>
+                </div>
+
+                <!-- Pending Changes Indicator -->
+                <div id="pending-changes" class="pending-changes" style="display: none;">
+                    <span>⏳ Changes pending...</span>
+                </div>
+            </div>
+
+            <!-- Right Panel - Player Table -->
+            <div class="right-panel">
+                <h2>All 633 Premier League Players</h2>
+                
+                <!-- Filters Section -->
+                <div class="filters-section">
+                    <div class="filter-row">
+                        <div class="filter-group">
+                            <label>Position:</label>
+                            <div class="checkbox-group">
+                                <input type="checkbox" id="pos-g" value="G" checked>
+                                <label for="pos-g">G</label>
+                                <input type="checkbox" id="pos-d" value="D" checked>
+                                <label for="pos-d">D</label>
+                                <input type="checkbox" id="pos-m" value="M" checked>
+                                <label for="pos-m">M</label>
+                                <input type="checkbox" id="pos-f" value="F" checked>
+                                <label for="pos-f">F</label>
+                            </div>
+                        </div>
+                        
+                        <div class="filter-group">
+                            <label for="price-min">Price Range:</label>
+                            <input type="number" id="price-min" value="5.0" step="0.1" min="5.0" max="25.0">
+                            <span>to</span>
+                            <input type="number" id="price-max" value="25.0" step="0.1" min="5.0" max="25.0">
+                        </div>
+                    </div>
+                    
+                    <div class="filter-row">
+                        <div class="filter-group">
+                            <label for="team-select">Team:</label>
+                            <select id="team-select" multiple>
+                                <option value="">All Teams</option>
+                                <!-- Teams will be populated by JavaScript -->
+                            </select>
+                        </div>
+                        
+                        <div class="filter-group">
+                            <label for="player-search">Search Player:</label>
+                            <input type="text" id="player-search" placeholder="Enter player name...">
+                        </div>
+                    </div>
+                    
+                    <div class="filter-summary">
+                        <span id="filter-count">Showing 633 players</span>
+                        <button id="export-csv" class="btn-secondary">Export CSV</button>
+                    </div>
+                </div>
+
+                <!-- Player Table -->
+                <div class="table-container">
+                    <table id="player-table" class="player-table">
+                        <thead>
+                            <tr>
+                                <th data-sort="name">Name <span class="sort-indicator"></span></th>
+                                <th data-sort="team">Team <span class="sort-indicator"></span></th>
+                                <th data-sort="position">Pos <span class="sort-indicator"></span></th>
+                                <th data-sort="price">Price <span class="sort-indicator"></span></th>
+                                <th data-sort="ppg">PPG <span class="sort-indicator"></span></th>
+                                <th data-sort="true_value" class="default-sort">True Value <span class="sort-indicator">▼</span></th>
+                                <th data-sort="form_multiplier">Form <span class="sort-indicator"></span></th>
+                                <th data-sort="fixture_multiplier">Fixture <span class="sort-indicator"></span></th>
+                                <th data-sort="starter_multiplier">Starter <span class="sort-indicator"></span></th>
+                                <th class="manual-override-header">Manual Override</th>
+                            </tr>
+                        </thead>
+                        <tbody id="player-table-body">
+                            <!-- Player rows will be populated by JavaScript -->
+                            <tr class="loading-row">
+                                <td colspan="10">Loading 633 players...</td>
+                            </tr>
+                        </tbody>
+                    </table>
+                </div>
+
+                <!-- Pagination -->
+                <div class="pagination">
+                    <button id="prev-page" class="btn-secondary" disabled>Previous</button>
+                    <span id="page-info">Page 1 of 1</span>
+                    <button id="next-page" class="btn-secondary" disabled>Next</button>
+                    <div class="page-size">
+                        <label for="page-size-select">Per page:</label>
+                        <select id="page-size-select">
+                            <option value="50">50</option>
+                            <option value="100" selected>100</option>
+                            <option value="200">200</option>
+                        </select>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Loading Overlay -->
+    <div id="loading-overlay" class="loading-overlay" style="display: none;">
+        <div class="loading-content">
+            <div class="spinner"></div>
+            <p>Recalculating True Values...</p>
+        </div>
+    </div>
+
+    <!-- File Input for CSV Import (Hidden) -->
+    <input type="file" id="csv-file-input" accept=".csv" style="display: none;">
+
+    <!-- JavaScript -->
+    <script src="{{ url_for('static', filename='js/dashboard.js') }}"></script>
+</body>
+</html>

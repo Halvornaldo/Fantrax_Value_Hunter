@@ -469,4 +469,29 @@ document.addEventListener('DOMContentLoaded', () => {
 
 ---
 
+## 🧹 Post-Implementation Cleanup Tasks
+
+### Legacy Parameter Removal
+After dashboard implementation is complete and tested, the following unused parameters should be removed from `config/system_parameters.json`:
+
+1. **`"estimated_games_played": 20`** (line 42)
+   - **Reason**: Replaced by FPG/Points calculation from actual CSV data
+   - **Impact**: Safe to remove - not used in current system
+
+2. **`"differential_threshold": 44`** (line 44) 
+   - **Reason**: Legacy from ownership percentage tracking system
+   - **Impact**: Safe to remove - current system doesn't use ownership data
+
+3. **`"pool_sizes": {"G": 8, "D": 20, "M": 20, "F": 20}`** (lines 47-52)
+   - **Reason**: Replaced by filterable all-players table approach
+   - **Impact**: Safe to remove - candidate pools no longer used
+
+4. **Update `dashboard_controls.adjustable_parameters`** (lines 231-243)
+   - Remove: `"estimated_games_played"`, `"differential_threshold"`, `"pool_sizes"`
+   - Keep only active parameters used by dashboard
+
+**⚠️ Testing Required**: Verify removal doesn't break existing functionality before deployment.
+
+---
+
 This plan focuses on the CORE features with parameter tuning as the primary goal!

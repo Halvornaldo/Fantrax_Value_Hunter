@@ -12,7 +12,9 @@ import os
 from typing import Dict, List, Optional, Any
 import time
 
-app = Flask(__name__)
+app = Flask(__name__, 
+            template_folder='../templates',
+            static_folder='../static')
 CORS(app)
 
 # Database configuration
@@ -197,18 +199,8 @@ def recalculate_true_values(gameweek: int = 1):
 
 @app.route('/')
 def dashboard():
-    """Main dashboard UI (placeholder for now)"""
-    return jsonify({
-        'message': 'Fantrax Value Hunter Dashboard API',
-        'version': '1.0',
-        'endpoints': [
-            'GET /api/players - Get all players with filtering',
-            'POST /api/update-parameters - Update system parameters',
-            'GET /api/config - Get current system parameters',
-            'POST /api/import-lineups - Import CSV lineup data (future)',
-            'GET /api/export - Export filtered results (future)'
-        ]
-    })
+    """Main dashboard UI"""
+    return render_template('dashboard.html')
 
 @app.route('/api/players', methods=['GET'])
 def get_players():
