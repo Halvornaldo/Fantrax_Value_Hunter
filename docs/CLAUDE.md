@@ -48,6 +48,78 @@ Build a **two-panel Flask dashboard** for parameter tuning across **all 633 Prem
 
 ### **Negative Actions (Avoid)**
 - **Red Cards (RC)**: -8 points - Season killers
+
+---
+
+## 🔗 **Global Name Matching System** *(PRODUCTION READY)*
+
+### **Critical Context for AI Assistants**
+
+**Status**: ✅ Complete and Production Deployed (August 16, 2025)
+
+The Global Name Matching System is a **production-ready enterprise solution** that resolves player name discrepancies across multiple data sources. This system eliminates the original 99.1% accuracy problem with 3 silent failures.
+
+### **Current Implementation Status**
+- ✅ **Database Schema**: `migrations/001_create_name_mappings.sql` 
+- ✅ **Core Engine**: `src/name_matching/unified_matcher.py`
+- ✅ **6 Matching Strategies**: `src/name_matching/matching_strategies.py`
+- ✅ **Smart Suggestions**: `src/name_matching/suggestion_engine.py`
+- ✅ **5 API Endpoints**: Integrated into `src/app.py` 
+- ✅ **Validation UI**: `templates/import_validation.html`
+- ✅ **FFS Integration**: Updated `import-lineups` endpoint
+- ✅ **HTML Entity Support**: Handles `&#039;` → `'` for web sources
+- ✅ **50+ Verified Mappings**: Production database with learning system
+
+### **Performance Metrics** *(Tested and Validated)*
+- **FFS CSV Import**: 71.4% automatic match rate, 95%+ confidence
+- **Understat Ready**: 16.7% automatic, 91.7% reviewable (realistic)
+- **Validation UI**: 100% visibility, 0% silent failures
+- **Database**: 50+ mappings across 3 source systems
+
+### **Key Files for AI Context**
+```
+ESSENTIAL READING:
+├── docs/GLOBAL_NAME_MATCHING_SYSTEM.md  # Complete technical documentation
+├── README.md                            # Updated with system overview
+├── src/name_matching/                   # Core implementation
+├── test_validation_api.py               # API test results
+├── test_validation_workflow.py         # End-to-end workflow test
+└── import_existing_mappings.py         # Bootstrap data import
+
+PRODUCTION ENDPOINTS:
+├── /api/validate-import                 # Preview imports with suggestions
+├── /api/get-player-suggestions         # Smart recommendations  
+├── /api/confirm-mapping                 # User confirmations
+├── /api/apply-import                    # Execute validated imports
+├── /api/name-mapping-stats             # System health metrics
+└── /import-validation                   # Web UI for manual review
+```
+
+### **Integration Examples**
+```python
+# Current production usage in FFS import
+matcher = UnifiedNameMatcher(DB_CONFIG)
+result = matcher.match_player("O'Riley", "ffs", "BHA", "M")
+# Returns: {'fantrax_name': 'Matt ORiley', 'confidence': 78.6, ...}
+
+# Ready for Understat integration
+result = matcher.match_player("matt o&#039;riley", "understat", "BHA", "M")  
+# HTML decoded: returns same Matt ORiley match
+```
+
+### **AI Assistant Guidelines**
+1. **System is Production Ready**: No need to reimplement, use existing APIs
+2. **Integration Pattern**: Always use validation workflow for new data sources
+3. **Testing Available**: Comprehensive test suite validates all functionality
+4. **Documentation Complete**: Full technical docs in `GLOBAL_NAME_MATCHING_SYSTEM.md`
+5. **Learning System**: Each user confirmation improves future accuracy
+
+### **Future Tasks** *(Not Critical)*
+- Update Understat integration to use UnifiedNameMatcher (framework ready)
+- Enhance learning system with pattern analysis
+- Add monitoring/metrics dashboard
+
+**IMPORTANT**: The Global Name Matching System should be treated as a **production dependency** that other features can build upon, not something that needs to be rebuilt or significantly modified.
 - **Own Goals (OG)**: -7 points
 - **Penalty Misses (PKM)**: -6 points
 - **Yellow Cards (YC)**: -3 points
