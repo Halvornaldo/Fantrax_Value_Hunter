@@ -17,6 +17,10 @@ import sys
 sys.path.append(os.path.dirname(__file__))
 from name_matching import UnifiedNameMatcher
 
+# Add integration package to path
+sys.path.append('C:/Users/halvo/.claude/Fantrax_Expected_Stats')
+from integration_package import IntegrationPipeline, UnderstatIntegrator, ValueHunterExtension
+
 app = Flask(__name__, 
             template_folder='../templates',
             static_folder='../static')
@@ -139,6 +143,7 @@ def recalculate_true_values(gameweek: int = 1):
         # Get all players with current metrics
         cursor.execute("""
             SELECT p.id, p.name, p.team, p.position,
+                   p.xgi90,
                    pm.price, pm.ppg, pm.value_score,
                    pm.form_multiplier, pm.fixture_multiplier, pm.starter_multiplier
             FROM players p
@@ -160,11 +165,27 @@ def recalculate_true_values(gameweek: int = 1):
             fixture_mult = float(player.get('fixture_multiplier', 1.0))
             starter_mult = float(player.get('starter_multiplier', 1.0))
             
-            # Calculate True Value: (PPG ÷ Price) × Form × Fixture × Starter
+            # Calculate xGI multiplier if enabled
+            xgi_mult = 1.0
+            if params.get('xgi_integration', {}).get('enabled', False):
+                xgi_mode = params['xgi_integration'].get('multiplier_mode', 'direct')
+                strength = params['xgi_integration'].get('multiplier_strength', 1.0)
+                xgi90 = float(player.get('xgi90', 0))
+                
+                if xgi_mode == 'direct':
+                    xgi_mult = xgi90 * strength if xgi90 > 0 else 1.0
+                elif xgi_mode == 'adjusted':
+                    xgi_mult = 1 + (xgi90 * strength)
+                elif xgi_mode == 'capped':
+                    capped_min = params['xgi_integration']['multiplier_modes']['capped'].get('min', 0.5)
+                    capped_max = params['xgi_integration']['multiplier_modes']['capped'].get('max', 1.5)
+                    xgi_mult = max(capped_min, min(capped_max, xgi90 * strength)) if xgi90 > 0 else 1.0
+            
+            # Calculate True Value: (PPG ÷ Price) × Form × Fixture × Starter × xGI
             ppg = float(player['ppg']) if player['ppg'] else 0
             price = float(player['price']) if player['price'] else 0
             base_value = ppg / price if price > 0 else 0
-            true_value = base_value * form_mult * fixture_mult * starter_mult
+            true_value = base_value * form_mult * fixture_mult * starter_mult * xgi_mult
             
             # Update player metrics
             cursor.execute("""
@@ -233,6 +254,7 @@ def get_players():
         base_query = """
             SELECT 
                 p.id, p.name, p.team, p.position,
+                p.minutes, p.xg90, p.xa90, p.xgi90,
                 pm.price, pm.ppg, pm.value_score, pm.true_value,
                 pm.form_multiplier, pm.fixture_multiplier, pm.starter_multiplier,
                 pm.last_updated
@@ -361,6 +383,9 @@ def update_parameters():
                 
         if 'starter_prediction' in data:
             current_params['starter_prediction'].update(data['starter_prediction'])
+            
+        if 'xgi_integration' in data:
+            current_params['xgi_integration'].update(data['xgi_integration'])
         
         # Save updated parameters
         if not save_system_parameters(current_params):
@@ -1227,6 +1252,145 @@ def get_monitoring_metrics():
             'error': str(e),
             'timestamp': time.time()
         }), 500
+
+# ===============================
+# UNDERSTAT INTEGRATION API
+# ===============================
+
+@app.route('/api/understat/sync', methods=['POST'])
+def sync_understat_data():
+    """Sync Understat data with database"""
+    try:
+        # Initialize pipeline
+        pipeline = IntegrationPipeline(DB_CONFIG, dry_run=False)
+        
+        # Run integration with current season 2025/2026
+        matched_df, unmatched_df, multiplier_table, stats = pipeline.integrator.generate_integration_data(
+            season="2025/2026",  # Current season
+            leagues=["EPL"]
+        )
+        
+        if matched_df is None:
+            return jsonify({'error': 'No data extracted from Understat'}), 500
+        
+        # Update database
+        conn = get_db_connection()
+        cursor = conn.cursor()
+        
+        for idx, player in matched_df.iterrows():
+            cursor.execute("""
+                UPDATE players 
+                SET minutes = %s, xg90 = %s, xa90 = %s, xgi90 = %s,
+                    last_understat_update = CURRENT_TIMESTAMP
+                WHERE id = %s
+            """, [
+                player['minutes'], 
+                round(player['xG90'], 3),
+                round(player['xA90'], 3), 
+                round(player['xGI90'], 3),
+                player['fantrax_id']
+            ])
+        
+        conn.commit()
+        
+        # Update config
+        system_params = load_system_parameters()
+        system_params['xgi_integration']['last_sync'] = time.time()
+        system_params['xgi_integration']['matched_players'] = len(matched_df)
+        system_params['xgi_integration']['unmatched_players'] = len(unmatched_df)
+        save_system_parameters(system_params)
+        
+        return jsonify({
+            'success': True,
+            'total_understat_players': stats['total_understat_players'],
+            'successfully_matched': len(matched_df),
+            'unmatched_players': len(unmatched_df),
+            'match_rate': stats['match_rate'],
+            'avg_xGI90': stats['avg_xGI90'],
+            'top_xGI90_player': stats['top_xGI90_player'],
+            'max_xGI90': stats['max_xGI90'],
+            'players_updated': len(matched_df)
+        })
+        
+    except Exception as e:
+        return jsonify({'error': str(e)}), 500
+
+@app.route('/api/understat/unmatched', methods=['GET'])
+def get_unmatched_understat():
+    """Get list of unmatched Understat players for review"""
+    try:
+        integrator = UnderstatIntegrator(DB_CONFIG)
+        understat_df = integrator.extract_understat_per90_stats()
+        
+        if understat_df.empty:
+            return jsonify({'players': []})
+        
+        matched_df, unmatched_df = integrator.match_fantrax_names(understat_df)
+        
+        # Add suggestions for unmatched
+        unmatched_with_suggestions = []
+        for idx, player in unmatched_df.iterrows():
+            player_dict = player.to_dict()
+            player_dict['suggestions'] = player.get('suggested_matches', [])
+            unmatched_with_suggestions.append(player_dict)
+        
+        return jsonify({
+            'players': unmatched_with_suggestions,
+            'total': len(unmatched_df)
+        })
+        
+    except Exception as e:
+        return jsonify({'error': str(e)}), 500
+
+@app.route('/api/understat/stats', methods=['GET'])
+def get_understat_stats():
+    """Get Understat integration statistics"""
+    try:
+        conn = get_db_connection()
+        cursor = conn.cursor(cursor_factory=psycopg2.extras.RealDictCursor)
+        
+        cursor.execute("""
+            SELECT 
+                COUNT(*) FILTER (WHERE xgi90 > 0) as players_with_xgi,
+                COUNT(*) as total_players,
+                AVG(xgi90) FILTER (WHERE xgi90 > 0) as avg_xgi90,
+                MAX(xgi90) as max_xgi90,
+                MIN(last_understat_update) as oldest_update,
+                MAX(last_understat_update) as newest_update
+            FROM players
+        """)
+        
+        stats = dict(cursor.fetchone())
+        
+        # Get top xGI players
+        cursor.execute("""
+            SELECT name, team, position, xgi90, xg90, xa90, minutes
+            FROM players
+            WHERE xgi90 > 0
+            ORDER BY xgi90 DESC
+            LIMIT 10
+        """)
+        
+        top_players = [dict(row) for row in cursor.fetchall()]
+        
+        conn.close()
+        
+        system_params = load_system_parameters()
+        xgi_config = system_params.get('xgi_integration', {})
+        
+        return jsonify({
+            'stats': stats,
+            'top_players': top_players,
+            'config': {
+                'enabled': xgi_config.get('enabled', False),
+                'mode': xgi_config.get('multiplier_mode', 'direct'),
+                'strength': xgi_config.get('multiplier_strength', 1.0),
+                'last_sync': xgi_config.get('last_sync')
+            }
+        })
+        
+    except Exception as e:
+        return jsonify({'error': str(e)}), 500
 
 if __name__ == '__main__':
     print("Starting Fantrax Value Hunter Flask Backend...")

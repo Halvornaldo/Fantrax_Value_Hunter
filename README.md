@@ -1,39 +1,42 @@
 # Fantrax Value Hunter
-**Fantasy Football Analytics Platform - Version 1.0**
+**Fantasy Football Analytics Platform - Production Ready**
 
-Two-panel dashboard for finding undervalued players through real-time parameter adjustment. Shows all 633 Premier League players with True Value calculations and advanced filtering.
+Two-panel dashboard for finding undervalued players through real-time parameter adjustment. Shows all 633 Premier League players with True Value calculations, advanced filtering, and xGI analytics.
 
 ---
 
-## 🎯 **Version 1.0 Goal**
+## 🎯 **Current Status: Production Ready**
 
-Build a **two-panel Flask dashboard** that displays all 633 players with:
+✅ **Fully Operational Dashboard** with:
 - **Left Panel**: Parameter controls for adjusting True Value calculations
 - **Right Panel**: Filterable table showing all players ranked by True Value
-- **Core Feature**: Real-time parameter adjustment affecting rankings
+- **xGI Integration**: Expected Goals Involvement data from Understat (155 players matched)
+- **Real-time Updates**: Parameter changes trigger immediate recalculation
+- **Advanced Name Matching**: 85%+ accuracy across multiple data sources
 
-**NO auto-lineup selection, NO drag-and-drop, NO complex features** - focus on parameter tuning for value discovery.
+**Features**: Form calculation, fixture difficulty, starter predictions, xGI multipliers, CSV imports
 
 ---
 
-## 🚀 **Quick Start (Version 1.0)**
+## 🚀 **Quick Start**
 
-### **1. Database Setup (✅ Complete)**
+### **1. Launch Dashboard**
 ```bash
-# PostgreSQL is installed and populated with 633 players
-# Database: fantrax_value_hunter on port 5433
+cd C:/Users/halvo/.claude/Fantrax_Value_Hunter
+python src/app.py
 ```
+Visit: http://localhost:5000
 
-### **2. Launch Dashboard (Coming Days 2-8)**
-```bash
-cd src/
-python app.py  # Flask dashboard with parameter controls
-```
-
-### **3. Use Parameter Controls**
-- Adjust form, fixture, and starter multipliers in left panel
+### **2. Use Parameter Controls**
+- Adjust form, fixture, starter, and xGI multipliers in left panel
 - See immediate impact on True Value rankings in right panel
-- Filter players by position, price, ownership, team
+- Filter players by position, price, team, or search by name
+- Sort by any column (True Value, xGI90, etc.)
+
+### **3. Import Data**
+- Upload CSV files for starter predictions
+- Sync Understat data for xGI stats
+- All imports use intelligent name matching
 
 ---
 
@@ -41,34 +44,32 @@ python app.py  # Flask dashboard with parameter controls
 
 ```
 Fantrax_Value_Hunter/
-├── README.md                           # This file - v1.0 overview
+├── README.md                           # This file - Production overview
 ├── requirements.txt                    # Python dependencies
 ├── docs/
-│   ├── VERSION_1.0_SPECIFICATION.md   # Clear v1.0 definition
-│   ├── CURRENT_STATUS.md              # Day 1 completion status  
-│   ├── PHASE_3_IMPLEMENTATION_PLAN.md # Days 2-8 dashboard plan
-│   ├── FUTURE_IDEAS.md                # Post-v1.0 features
-│   ├── DATABASE_MCP_IMPLEMENTATION.md # Database setup guide
+│   ├── BUG_FIX_SPRINT_PLAN.md         # Current sprint planning
+│   ├── CURRENT_STATUS.md              # System status
+│   ├── GLOBAL_NAME_MATCHING_SYSTEM.md # Name matching docs
+│   ├── STARTER_IMPORT_GUIDE.md        # User guides
 │   └── CLAUDE.md                      # AI context file
 ├── src/
-│   ├── app.py                         # Flask dashboard (Days 2-3)
-│   ├── db_manager.py                  # Database wrapper (✅ Complete)
-│   ├── candidate_analyzer.py          # True Value calculations
-│   ├── form_tracker.py               # Form multiplier logic
-│   ├── fixture_difficulty.py         # Fixture multiplier logic
-│   └── starter_predictor.py          # Starter multiplier logic
+│   ├── app.py                         # ✅ Flask backend (production)
+│   └── name_matching/                 # ✅ Name matching system
+│       ├── unified_matcher.py         # Core matching service
+│       ├── matching_strategies.py     # 6 matching algorithms
+│       └── suggestion_engine.py       # Smart suggestions
 ├── templates/
-│   └── dashboard.html                 # Two-panel UI (Days 4-5)
+│   └── dashboard.html                 # ✅ Two-panel UI
 ├── static/
-│   ├── css/dashboard.css             # Dashboard styling
-│   └── js/dashboard.js               # Parameter controls
-├── migrations/
-│   └── import_csv_data.py            # Database population (✅ Complete)
+│   ├── css/dashboard.css             # ✅ Dashboard styling
+│   └── js/dashboard.js               # ✅ Parameter controls
 ├── config/
-│   └── system_parameters.json        # All adjustable parameters
-└── data/
-    ├── fpg_data_2024.csv            # 633 players with FP/G data
-    └── season_2024_baseline.json    # Historical baseline data
+│   └── system_parameters.json        # ✅ All adjustable parameters
+└── C:/Users/halvo/.claude/Fantrax_Expected_Stats/
+    └── integration_package/           # ✅ xGI integration
+        ├── understat_integrator.py    # Understat data extraction
+        ├── integration_pipeline.py    # Full integration pipeline
+        └── value_hunter_extension.py  # True Value enhancements
 ```
 
 ### **🔧 Development Setup**

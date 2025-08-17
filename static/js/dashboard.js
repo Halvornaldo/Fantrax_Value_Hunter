@@ -149,6 +149,13 @@ function updateUIFromConfig() {
     updateSlider('rotation-penalty-slider', starterPred.auto_rotation_penalty || 0.65);
     updateSlider('bench-penalty-slider', starterPred.force_bench_penalty || 0.6);
     
+    // xGI Integration controls
+    const xgiIntegration = currentConfig.xgi_integration || {};
+    document.getElementById('xgiEnabled').checked = xgiIntegration.enabled || false;
+    document.getElementById('xgiMode').value = xgiIntegration.multiplier_mode || 'direct';
+    document.getElementById('xgiStrength').value = xgiIntegration.multiplier_strength || 1.0;
+    document.getElementById('xgiStrengthValue').textContent = xgiIntegration.multiplier_strength || 1.0;
+    
     // Update control section visibility
     updateControlVisibility();
     
@@ -178,6 +185,10 @@ function updateControlVisibility() {
     // Starter controls
     const starterEnabled = document.getElementById('starter-enabled').checked;
     document.getElementById('starter-controls').style.opacity = starterEnabled ? '1' : '0.5';
+    
+    // xGI controls
+    const xgiEnabled = document.getElementById('xgiEnabled').checked;
+    document.getElementById('xgiContent').style.opacity = xgiEnabled ? '1' : '0.5';
 }
 
 function toggleTierMode() {
@@ -194,7 +205,7 @@ function updatePlayerTable() {
     const tbody = document.getElementById('player-table-body');
     
     if (!playersData || playersData.length === 0) {
-        tbody.innerHTML = '<tr class="loading-row"><td colspan="10">No players found</td></tr>';
+        tbody.innerHTML = '<tr class="loading-row"><td colspan="13">No players found</td></tr>';
         return;
     }
     
@@ -211,6 +222,10 @@ function updatePlayerTable() {
                 <td>$${parseFloat(player.price || 0).toFixed(1)}</td>
                 <td>${parseFloat(player.ppg || 0).toFixed(1)}</td>
                 <td class="${valueClass}">${trueValue.toFixed(3)}</td>
+                <td>${player.minutes || 0}</td>
+                <td>${parseFloat(player.xg90 || 0).toFixed(3)}</td>
+                <td>${parseFloat(player.xa90 || 0).toFixed(3)}</td>
+                <td>${parseFloat(player.xgi90 || 0).toFixed(3)}</td>
                 <td>${parseFloat(player.form_multiplier || 1.0).toFixed(2)}x</td>
                 <td>${parseFloat(player.fixture_multiplier || 1.0).toFixed(2)}x</td>
                 <td>${parseFloat(player.starter_multiplier || 1.0).toFixed(2)}x</td>
@@ -315,6 +330,15 @@ function setupParameterControls() {
     document.getElementById('starter-enabled').addEventListener('change', handleParameterChange);
     setupSlider('rotation-penalty-slider');
     setupSlider('bench-penalty-slider');
+    
+    // xGI Integration controls
+    document.getElementById('xgiEnabled').addEventListener('change', handleParameterChange);
+    document.getElementById('xgiMode').addEventListener('change', handleParameterChange);
+    document.getElementById('xgiStrength').addEventListener('input', function() {
+        document.getElementById('xgiStrengthValue').textContent = this.value;
+        handleParameterChange();
+    });
+    document.getElementById('syncUnderstat').addEventListener('click', syncUnderstatData);
     
     // Action buttons
     document.getElementById('apply-changes').addEventListener('click', applyChanges);
@@ -435,6 +459,21 @@ function buildParameterChanges() {
             enabled: starterEnabled,
             auto_rotation_penalty: rotationPenalty,
             force_bench_penalty: benchPenalty
+        };
+    }
+    
+    // xGI Integration changes
+    const xgiEnabled = document.getElementById('xgiEnabled').checked;
+    const xgiMode = document.getElementById('xgiMode').value;
+    const xgiStrength = parseFloat(document.getElementById('xgiStrength').value);
+    
+    if (xgiEnabled !== (currentConfig.xgi_integration?.enabled || false) ||
+        xgiMode !== (currentConfig.xgi_integration?.multiplier_mode || 'direct') ||
+        Math.abs(xgiStrength - (currentConfig.xgi_integration?.multiplier_strength || 1.0)) > 0.01) {
+        changes.xgi_integration = {
+            enabled: xgiEnabled,
+            multiplier_mode: xgiMode,
+            multiplier_strength: xgiStrength
         };
     }
     
@@ -734,6 +773,50 @@ function exportToCSV() {
     console.log('📊 Player data exported to CSV');
 }
 
+// =================================================================
+// UNDERSTAT INTEGRATION FUNCTIONS
+// =================================================================
+
+async function syncUnderstatData() {
+    const statusEl = document.getElementById('syncStatus');
+    statusEl.textContent = 'Syncing...';
+    statusEl.className = 'syncing';
+    
+    try {
+        const response = await fetch('/api/understat/sync', { method: 'POST' });
+        const data = await response.json();
+        
+        if (data.success) {
+            statusEl.textContent = `✓ Synced ${data.matched} players (${data.match_rate.toFixed(1)}% match rate)`;
+            statusEl.className = 'success';
+            loadUnderstatStats();
+            loadPlayersData(); // Refresh table
+        } else {
+            statusEl.textContent = `✗ Sync failed: ${data.error}`;
+            statusEl.className = 'error';
+        }
+    } catch (error) {
+        statusEl.textContent = `✗ Error: ${error.message}`;
+        statusEl.className = 'error';
+    }
+}
+
+async function loadUnderstatStats() {
+    try {
+        const response = await fetch('/api/understat/stats');
+        const data = await response.json();
+        
+        const statsEl = document.getElementById('xgiStats');
+        statsEl.innerHTML = `
+            <strong>Coverage:</strong> ${data.stats.players_with_xgi}/${data.stats.total_players} players |
+            <strong>Avg xGI90:</strong> ${(data.stats.avg_xgi90 || 0).toFixed(3)} |
+            <strong>Last sync:</strong> ${data.config.last_sync ? new Date(data.config.last_sync * 1000).toLocaleDateString() : 'Never'}
+        `;
+    } catch (error) {
+        console.error('Failed to load Understat stats:', error);
+    }
+}
+
 // Initialize CSV file input handler
 document.addEventListener('DOMContentLoaded', function() {
     document.getElementById('csv-file-input').addEventListener('change', function(e) {
@@ -744,4 +827,7 @@ document.addEventListener('DOMContentLoaded', function() {
             showError('CSV import functionality coming in Day 6');
         }
     });
+    
+    // Load Understat stats on page load
+    loadUnderstatStats();
 });

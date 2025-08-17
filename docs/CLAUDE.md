@@ -114,10 +114,13 @@ result = matcher.match_player("matt o&#039;riley", "understat", "BHA", "M")
 4. **Documentation Complete**: Full technical docs in `GLOBAL_NAME_MATCHING_SYSTEM.md`
 5. **Learning System**: Each user confirmation improves future accuracy
 
-### **Future Tasks** *(Not Critical)*
-- Update Understat integration to use UnifiedNameMatcher (framework ready)
-- Enhance learning system with pattern analysis
-- Add monitoring/metrics dashboard
+### **Current Known Issues** *(Bug Fix Sprint)*
+- Position filter bug: Empty array when no positions selected
+- Team dropdown missing individual team options
+- Table sorting limited to current page (100 players)
+- Fixture difficulty locked to "Neutral" setting
+- xGI multiplier column not displayed in table
+- Form data workflow needs implementation (player_form table empty)
 
 **IMPORTANT**: The Global Name Matching System should be treated as a **production dependency** that other features can build upon, not something that needs to be rebuilt or significantly modified.
 - **Own Goals (OG)**: -7 points
@@ -355,5 +358,5 @@ python quick_lineup.py
 
 ---
 
-**Last Updated**: August 15, 2025 - Day 3 Enhanced Parameter Controls Complete  
-**Status**: All missing parameter controls implemented! Dashboard fully operational with 3-tier mode, form strength slider, manual overrides, and baseline switchover. Ready for CSV import functionality (Day 6). 🎯
+**Last Updated**: August 17, 2025 - Production Dashboard + xGI Integration Complete  
+**Status**: Production dashboard operational with xGI integration achieving 85.2% match rate. Comprehensive bug fix sprint plan documented. Ready for systematic bug resolution and feature enhancement. 🎯

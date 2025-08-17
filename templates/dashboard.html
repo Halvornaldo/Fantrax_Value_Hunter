@@ -142,6 +142,36 @@
                     </div>
                 </div>
 
+                <!-- xGI Integration -->
+                <div class="parameter-section">
+                    <h3>
+                        <input type="checkbox" id="xgiEnabled">
+                        <label for="xgiEnabled">xGI Integration (Understat)</label>
+                    </h3>
+                    <div class="xgi-controls" id="xgiContent">
+                        <div class="control-group">
+                            <label for="xgiMode">Multiplier Mode:</label>
+                            <select id="xgiMode">
+                                <option value="direct">Direct (xGI90 × strength)</option>
+                                <option value="adjusted">Adjusted (1 + xGI90 × strength)</option>
+                                <option value="capped">Capped (0.5 - 1.5 range)</option>
+                            </select>
+                        </div>
+                        <div class="slider-group">
+                            <label for="xgiStrength">Multiplier Strength:</label>
+                            <input type="range" id="xgiStrength" min="0" max="2" step="0.1" value="1.0">
+                            <span id="xgiStrengthValue">1.0</span>
+                        </div>
+                        <div class="control-group">
+                            <button id="syncUnderstat" class="btn-sync">Sync Understat Data</button>
+                            <span id="syncStatus"></span>
+                        </div>
+                        <div class="stats-display">
+                            <span id="xgiStats">Loading stats...</span>
+                        </div>
+                    </div>
+                </div>
+
                 <!-- Action Buttons -->
                 <div class="action-buttons">
                     <button id="apply-changes" class="btn-primary" disabled>
@@ -222,6 +252,10 @@
                                 <th data-sort="price">Price <span class="sort-indicator"></span></th>
                                 <th data-sort="ppg">PPG <span class="sort-indicator"></span></th>
                                 <th data-sort="true_value" class="default-sort">True Value <span class="sort-indicator">▼</span></th>
+                                <th data-sort="minutes">Minutes <span class="sort-indicator"></span></th>
+                                <th data-sort="xg90">xG90 <span class="sort-indicator"></span></th>
+                                <th data-sort="xa90">xA90 <span class="sort-indicator"></span></th>
+                                <th data-sort="xgi90">xGI90 <span class="sort-indicator"></span></th>
                                 <th data-sort="form_multiplier">Form <span class="sort-indicator"></span></th>
                                 <th data-sort="fixture_multiplier">Fixture <span class="sort-indicator"></span></th>
                                 <th data-sort="starter_multiplier">Starter <span class="sort-indicator"></span></th>
@@ -231,7 +265,7 @@
                         <tbody id="player-table-body">
                             <!-- Player rows will be populated by JavaScript -->
                             <tr class="loading-row">
-                                <td colspan="10">Loading 633 players...</td>
+                                <td colspan="13">Loading 633 players...</td>
                             </tr>
                         </tbody>
                     </table>
