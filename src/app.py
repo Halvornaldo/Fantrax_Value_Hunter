@@ -231,8 +231,8 @@ def dashboard():
 @app.route('/api/players', methods=['GET'])
 def get_players():
     """
-    Get all 633 players with filtering options
-    Query parameters: position, min_price, max_price, team, search
+    Get all 633 players with filtering and sorting options
+    Query parameters: position, min_price, max_price, team, search, sort_by, sort_direction
     """
     start_time = time.time()
     
@@ -245,6 +245,32 @@ def get_players():
     gameweek = request.args.get('gameweek', 1, type=int)
     limit = request.args.get('limit', 100, type=int)
     offset = request.args.get('offset', 0, type=int)
+    sort_by = request.args.get('sort_by', 'true_value')
+    sort_direction = request.args.get('sort_direction', 'desc')
+    
+    # Validate sorting parameters
+    valid_sort_fields = {
+        'name': 'p.name',
+        'team': 'p.team', 
+        'position': 'p.position',
+        'price': 'pm.price',
+        'ppg': 'pm.ppg',
+        'value_score': 'pm.value_score',
+        'true_value': 'pm.true_value',
+        'minutes': 'p.minutes',
+        'xg90': 'p.xg90',
+        'xa90': 'p.xa90',
+        'xgi90': 'p.xgi90',
+        'form_multiplier': 'pm.form_multiplier',
+        'fixture_multiplier': 'pm.fixture_multiplier',
+        'starter_multiplier': 'pm.starter_multiplier'
+    }
+    
+    if sort_by not in valid_sort_fields:
+        sort_by = 'true_value'
+    
+    if sort_direction.lower() not in ['asc', 'desc']:
+        sort_direction = 'desc'
     
     conn = get_db_connection()
     try:
@@ -268,8 +294,10 @@ def get_players():
         
         # Add filters
         if position:
-            conditions.append("p.position = %s")
-            params.append(position)
+            positions = [p.strip() for p in position.split(',')]
+            placeholders = ','.join(['%s'] * len(positions))
+            conditions.append(f"p.position IN ({placeholders})")
+            params.extend(positions)
             
         if min_price is not None:
             conditions.append("pm.price >= %s")
@@ -280,8 +308,10 @@ def get_players():
             params.append(max_price)
             
         if team:
-            conditions.append("p.team = %s")
-            params.append(team)
+            teams = [t.strip() for t in team.split(',')]
+            placeholders = ','.join(['%s'] * len(teams))
+            conditions.append(f"p.team IN ({placeholders})")
+            params.extend(teams)
             
         if search:
             conditions.append("p.name ILIKE %s")
@@ -297,7 +327,8 @@ def get_players():
         total_count = cursor.fetchone()['total']
         
         # Add ordering and pagination
-        final_query = base_query + " ORDER BY pm.true_value DESC LIMIT %s OFFSET %s"
+        sort_column = valid_sort_fields[sort_by]
+        final_query = base_query + f" ORDER BY {sort_column} {sort_direction.upper()} LIMIT %s OFFSET %s"
         params.extend([limit, offset])
         
         cursor.execute(final_query, params)
@@ -331,6 +362,10 @@ def get_players():
                 'team': team,
                 'search': search,
                 'gameweek': gameweek
+            },
+            'sort_applied': {
+                'sort_by': sort_by,
+                'sort_direction': sort_direction
             }
         })
         
@@ -414,6 +449,58 @@ def update_parameters():
             'error': str(e)
         }), 500
 
+@app.route('/api/teams', methods=['GET'])
+def get_teams():
+    """Get list of all teams"""
+    try:
+        conn = get_db_connection()
+        cursor = conn.cursor()
+        cursor.execute("SELECT DISTINCT team FROM players ORDER BY team")
+        teams = [row[0] for row in cursor.fetchall()]
+        conn.close()
+        
+        return jsonify({
+            'teams': teams,
+            'count': len(teams)
+        })
+    except Exception as e:
+        return jsonify({'error': str(e)}), 500
+
+@app.route('/api/players-by-team', methods=['GET'])
+def get_players_by_team():
+    """Get list of players for a specific team"""
+    try:
+        team = request.args.get('team')
+        if not team:
+            return jsonify({'error': 'Team parameter is required'}), 400
+            
+        conn = get_db_connection()
+        cursor = conn.cursor()
+        
+        # Get players from the specified team, ordered by name
+        cursor.execute("""
+            SELECT id, name, team, position 
+            FROM players 
+            WHERE team = %s 
+            ORDER BY name
+        """, (team,))
+        
+        players = []
+        for row in cursor.fetchall():
+            players.append({
+                'fantrax_id': row[0],  # Using 'id' column but keeping 'fantrax_id' key for frontend compatibility
+                'name': row[1],
+                'team': row[2],
+                'position': row[3]
+            })
+        
+        conn.close()
+        
+        return jsonify(players)
+        
+    except Exception as e:
+        return jsonify({'error': str(e)}), 500
+
 @app.route('/api/health', methods=['GET'])
 def health_check():
     """Health check endpoint for monitoring"""
@@ -455,30 +542,63 @@ def import_lineups():
         if not file.filename.lower().endswith('.csv'):
             return jsonify({'error': 'File must be a CSV'}), 400
         
-        # Read CSV content
+        # Read CSV content and parse properly with quotes
+        import csv
+        from io import StringIO
+        
         csv_content = file.read().decode('utf-8')
         lines = csv_content.strip().split('\n')
         
         if len(lines) < 2:
             return jsonify({'error': 'CSV must have header and data rows'}), 400
         
-        # Parse header
-        header = lines[0].strip().split(',')
-        expected_headers = ['Team', 'Player Name', 'Position', 'Predicted Status']
+        # Parse header using CSV reader to handle quotes properly
+        csv_reader = csv.reader(StringIO(lines[0]))
+        header = next(csv_reader)
         
-        # Normalize headers for comparison
+        # Check for individual player format (original)
+        expected_individual_headers = ['Team', 'Player Name', 'Position', 'Predicted Status']
         header_normalized = [h.strip().lower().replace(' ', '_') for h in header]
-        expected_normalized = [h.strip().lower().replace(' ', '_') for h in expected_headers]
+        expected_individual_normalized = [h.strip().lower().replace(' ', '_') for h in expected_individual_headers]
         
-        if header_normalized != expected_normalized:
+        is_individual_format = header_normalized == expected_individual_normalized
+        
+        # Check for formation matrix format (FFS scraping)
+        first_col_clean = header[0].strip().lower().strip('"')
+        
+        # Check if it's formation format: either starts with !m-0 OR has 12 columns with "player" pattern
+        is_formation_format = (
+            len(header) >= 12 and  # At least team + 11 players
+            (first_col_clean in ['team', '!m-0'] or  # Known team identifiers
+             (first_col_clean == '!m-0' and  # FFS format specifically
+              all('player' in h.lower() for h in header[1:12])))  # Player columns 1-11
+        )
+        
+        # Alternative detection: if we have 12 columns and the pattern looks like FFS format
+        if not is_formation_format and len(header) == 12:
+            is_formation_format = (
+                first_col_clean == '!m-0' and
+                header[1].lower().startswith('player') and
+                header[2].lower().startswith('player')
+            )
+        
+        # Debug logging (optional)
+        # print(f"CSV format detection: {is_formation_format}, teams will be mapped")
+        
+        if not is_individual_format and not is_formation_format:
             return jsonify({
-                'error': f'Invalid CSV format. Expected headers: {expected_headers}, got: {header}'
+                'error': f'Invalid CSV format. Expected either:\n' +
+                        f'1. Individual format: {expected_individual_headers}\n' +
+                        f'2. Formation format: Team + 11 player columns\n' +
+                        f'Got: {header}\n' +
+                        f'First column detected as: "{first_col_clean}"'
             }), 400
         
         # Parse data rows
         starters = []
         non_starters = []
         unmatched_players = []
+        position_conflicts = []
         
         conn = get_db_connection()
         cursor = conn.cursor(cursor_factory=psycopg2.extras.RealDictCursor)
@@ -490,15 +610,30 @@ def import_lineups():
         # Initialize UnifiedNameMatcher for improved name matching
         matcher = UnifiedNameMatcher(DB_CONFIG)
         
-        for line_num, line in enumerate(lines[1:], 2):
-            if not line.strip():
+        if is_formation_format:
+            # Process formation matrix format (FFS scraping)
+            players_to_process = parse_formation_csv(lines[1:], cursor)  # Skip header
+        else:
+            # Process individual player format (original)
+            players_to_process = parse_individual_csv(lines[1:])  # Skip header
+        
+        for line_num, player_info in enumerate(players_to_process, 1):
+            player_name = player_info['name']
+            team = player_info['team']
+            position = player_info['position']
+            status = player_info['status']
+            formation_position = player_info.get('formation_position')
+            
+            # Check for position conflicts from formation parsing
+            if player_info.get('position_conflict'):
+                position_conflicts.append({
+                    'name': player_name,
+                    'team': team,
+                    'formation_position': formation_position,
+                    'database_position': position,
+                    'conflict_reason': f"Formation pos {formation_position} suggests {'D/M' if 5 <= formation_position <= 8 else 'M/F'}, but database shows {position}"
+                })
                 continue
-                
-            parts = [p.strip() for p in line.split(',')]
-            if len(parts) < 4:
-                continue
-                
-            team, player_name, position, status = parts[:4]
             
             # Use UnifiedNameMatcher for improved matching
             match_result = matcher.match_player(
@@ -509,7 +644,9 @@ def import_lineups():
             )
             
             # Check if we have a good match (fantrax_id exists and high confidence or verified)
-            if match_result['fantrax_id'] and (not match_result['needs_review'] or match_result['confidence'] >= 90.0):
+            # Use lower threshold for formation imports since names are often shortened
+            confidence_threshold = 80.0 if is_formation_format else 90.0
+            if match_result['fantrax_id'] and (not match_result['needs_review'] or match_result['confidence'] >= confidence_threshold):
                 # We have a confident match
                 if status.lower() in ['starter', 'starting', 'start']:
                     starters.append({
@@ -633,18 +770,21 @@ def import_lineups():
             return jsonify({
                 'success': True,
                 'matching_system': 'UnifiedNameMatcher',
+                'csv_format': 'formation_matrix' if is_formation_format else 'individual_players',
                 'total_players': total_players,
                 'matched_players': matched_players,
                 'starters_identified': len(starters),
                 'rotation_risk': len(non_starters),
                 'unmatched_players': len(unmatched_players),
+                'position_conflicts': len(position_conflicts),
                 'match_rate': round(match_rate, 1),
                 'confidence_breakdown': {
                     'high_confidence_95plus': high_confidence,
                     'medium_confidence_85_94': medium_confidence,
                     'needs_review': len(unmatched_players)
                 },
-                'unmatched_details': unmatched_players[:10],  # First 10 for debugging
+                'unmatched_details': unmatched_players,  # All unmatched players for validation
+                'position_conflicts_details': position_conflicts,  # All conflicts for manual review
                 'updated_starters': updated_count,
                 'recalculation_time': recalc_result.get('elapsed_time', 0),
                 'rotation_penalty_applied': rotation_penalty,
@@ -698,7 +838,7 @@ def export_players():
         
         # Add filters
         if position:
-            positions = position.split(',')
+            positions = [p.strip() for p in position.split(',')]
             placeholders = ','.join(['%s'] * len(positions))
             conditions.append(f"p.position IN ({placeholders})")
             params.extend(positions)
@@ -712,8 +852,10 @@ def export_players():
             params.append(max_price)
             
         if team:
-            conditions.append("p.team = %s")
-            params.append(team)
+            teams = [t.strip() for t in team.split(',')]
+            placeholders = ','.join(['%s'] * len(teams))
+            conditions.append(f"p.team IN ({placeholders})")
+            params.extend(teams)
             
         if search:
             conditions.append("p.name ILIKE %s")
@@ -952,6 +1094,7 @@ def apply_import():
     """
     try:
         data = request.get_json()
+        print(f"Apply import called with data keys: {list(data.keys()) if data else 'None'}")
         
         if not data:
             return jsonify({'error': 'No data provided'}), 400
@@ -962,31 +1105,52 @@ def apply_import():
         dry_run = data.get('dry_run', False)
         players = data.get('players', [])
         
-        matcher = UnifiedNameMatcher(DB_CONFIG)
+        print(f"confirmed_mappings count: {len(confirmed_mappings)}")
+        print(f"players count: {len(players)}")
+        print(f"dry_run: {dry_run}")
         
-        # Save all confirmed mappings (unless dry run)
+        # Handle dry run case - just count confirmed mappings
+        if dry_run:
+            import_count = len(confirmed_mappings)
+            return jsonify({
+                'success': True,
+                'import_count': import_count,
+                'message': f'Would import {import_count} players with {len(confirmed_mappings)} manual mappings'
+            })
+        
+        # Only create matcher for actual imports (not dry runs)
+        try:
+            matcher = UnifiedNameMatcher(DB_CONFIG)
+            print("UnifiedNameMatcher created successfully")
+        except Exception as e:
+            print(f"Error creating UnifiedNameMatcher: {e}")
+            return jsonify({
+                'success': False,
+                'error': f'UnifiedNameMatcher initialization failed: {str(e)}'
+            }), 500
+        
+        # Save all confirmed mappings
         saved_count = 0
         failed_mappings = []
         import_count = 0
         
-        if not dry_run:
-            for source_name, mapping_info in confirmed_mappings.items():
-                try:
-                    success = matcher.confirm_mapping(
-                        source_name=source_name,
-                        source_system=source_system,
-                        fantrax_id=mapping_info['fantrax_id'],
-                        user_id=user_id,
-                        confidence_override=mapping_info.get('confidence', 100.0)
-                    )
+        for source_name, mapping_info in confirmed_mappings.items():
+            try:
+                success = matcher.confirm_mapping(
+                    source_name=source_name,
+                    source_system=source_system,
+                    fantrax_id=mapping_info['fantrax_id'],
+                    user_id=user_id,
+                    confidence_override=mapping_info.get('confidence', 100.0)
+                )
+                
+                if success:
+                    saved_count += 1
+                else:
+                    failed_mappings.append(source_name)
                     
-                    if success:
-                        saved_count += 1
-                    else:
-                        failed_mappings.append(source_name)
-                        
-                except Exception as e:
-                    failed_mappings.append(f"{source_name}: {str(e)}")
+            except Exception as e:
+                failed_mappings.append(f"{source_name}: {str(e)}")
         
         # Count how many players would be imported
         for player in players:
@@ -1006,24 +1170,38 @@ def apply_import():
                 if match_result['fantrax_id'] and not match_result['needs_review']:
                     import_count += 1
         
-        if dry_run:
-            return jsonify({
-                'success': True,
-                'import_count': import_count,
-                'message': f'Would import {import_count} players with {len(confirmed_mappings)} manual mappings'
-            })
-        else:
-            return jsonify({
-                'success': True,
-                'import_count': import_count,
-                'mappings_saved': saved_count,
-                'failed_mappings': failed_mappings,
-                'message': f'Successfully imported {import_count} players with {saved_count} new mappings'
-            })
+        return jsonify({
+            'success': True,
+            'import_count': import_count,
+            'mappings_saved': saved_count,
+            'failed_mappings': failed_mappings,
+            'message': f'Successfully imported {import_count} players with {saved_count} new mappings'
+        })
         
     except Exception as e:
         return jsonify({
             'success': False,
+            'error': str(e)
+        }), 500
+
+@app.route('/api/recent-unmatched-players', methods=['GET'])
+def get_recent_unmatched_players():
+    """
+    Get recently unmatched players from last import for validation page
+    """
+    try:
+        # For now, return empty - this is a placeholder for future session storage
+        # In a full implementation, you'd store unmatched players in Redis/session
+        return jsonify({
+            'has_unmatched': False,
+            'unmatched_count': 0,
+            'validation_data': None,
+            'message': 'No recent import data available'
+        })
+        
+    except Exception as e:
+        return jsonify({
+            'has_unmatched': False,
             'error': str(e)
         }), 500
 
@@ -1391,6 +1569,175 @@ def get_understat_stats():
         
     except Exception as e:
         return jsonify({'error': str(e)}), 500
+
+def parse_formation_csv(lines, cursor):
+    """
+    Parse formation matrix CSV format from FFS scraping.
+    Returns list of player dictionaries with position constraint checking.
+    """
+    import csv
+    from io import StringIO
+    
+    # Team name mapping from CSV (full names) to database (abbreviations)
+    # Based on TEAM_CODE_MAPPING.md 
+    team_name_mapping = {
+        'arsenal': 'ARS',
+        'aston villa': 'AVL', 
+        'bournemouth': 'BOU',
+        'brentford': 'BRF',  # Using BRF as per current database
+        'brighton and hove albion': 'BHA',
+        'brighton & hove albion': 'BHA',
+        'burnley': 'BUR',
+        'chelsea': 'CHE',
+        'crystal palace': 'CRY',
+        'everton': 'EVE',
+        'fulham': 'FUL',
+        'leeds united': 'LEE',
+        'liverpool': 'LIV',
+        'manchester city': 'MCI',
+        'manchester united': 'MUN',
+        'newcastle united': 'NEW',
+        'nottingham forest': 'NOT',  # Using NOT as per current database
+        'sunderland': 'SUN',
+        'tottenham hotspur': 'TOT',
+        'west ham united': 'WHU',
+        'wolverhampton wanderers': 'WOL'
+    }
+    
+    players_to_process = []
+    
+    for line in lines:
+        if not line.strip():
+            continue
+        # Use CSV reader to properly handle quotes
+        csv_reader = csv.reader(StringIO(line))
+        line_data = next(csv_reader)
+        team_raw = line_data[0].strip().strip('"')
+        
+        # Map team name from full name to database abbreviation
+        team = team_name_mapping.get(team_raw.lower(), team_raw)
+        
+        # Process each formation position (skip team column)
+        for pos_idx, player_name in enumerate(line_data[1:12], 1):  # Positions 1-11
+            player_name = player_name.strip()
+            if not player_name:
+                continue
+                
+            # Apply position constraints
+            predicted_position = None
+            position_conflict = False
+            
+            if pos_idx == 1:
+                # Position 1: Always Goalkeeper
+                predicted_position = 'G'
+            elif 2 <= pos_idx <= 4:
+                # Positions 2-4: Always Defenders (confirmed by user)
+                predicted_position = 'D'
+            elif 5 <= pos_idx <= 8:
+                # Positions 5-8: Could be D or M, prefer database lookup but default to M
+                db_position = lookup_player_position(cursor, player_name, team)
+                if db_position and db_position in ['D', 'M']:
+                    predicted_position = db_position
+                elif db_position and db_position not in ['D', 'M']:
+                    # Database shows F or G, but formation says D/M - conflict!
+                    predicted_position = 'M'  # Default to midfielder for positions 5-8
+                    position_conflict = True
+                else:
+                    # No database match, default to midfielder for positions 5-8
+                    predicted_position = 'M'
+            elif 9 <= pos_idx <= 11:
+                # Positions 9-11: Could be M or F, prefer database lookup but default to F
+                db_position = lookup_player_position(cursor, player_name, team)
+                if db_position and db_position in ['M', 'F']:
+                    predicted_position = db_position
+                elif db_position and db_position == 'D':
+                    # Database shows D, but formation says M/F - conflict!
+                    predicted_position = 'F'  # Default to forward for positions 9-11
+                    position_conflict = True
+                else:
+                    # No database match, default to forward for positions 9-11
+                    predicted_position = 'F'
+            
+            player_info = {
+                'name': player_name,
+                'team': team,
+                'position': predicted_position or 'Unknown',
+                'status': 'starter',  # All players in formation are starters
+                'formation_position': pos_idx,
+                'position_conflict': position_conflict
+            }
+            
+            players_to_process.append(player_info)
+    
+    return players_to_process
+
+def parse_individual_csv(lines):
+    """
+    Parse individual player CSV format (original format).
+    Returns list of player dictionaries.
+    """
+    import csv
+    from io import StringIO
+    
+    players_to_process = []
+    
+    for line in lines:
+        if not line.strip():
+            continue
+        # Use CSV reader to properly handle quotes
+        csv_reader = csv.reader(StringIO(line))
+        line_data = next(csv_reader)
+        if len(line_data) < 4:
+            continue
+            
+        team = line_data[0].strip()
+        player_name = line_data[1].strip()
+        position = line_data[2].strip()
+        status = line_data[3].strip()
+        
+        player_info = {
+            'name': player_name,
+            'team': team,
+            'position': position,
+            'status': status,
+            'formation_position': None,
+            'position_conflict': False
+        }
+        
+        players_to_process.append(player_info)
+    
+    return players_to_process
+
+def lookup_player_position(cursor, player_name, team):
+    """
+    Look up player position in database for position constraint checking.
+    Returns position from database or None if not found.
+    """
+    try:
+        # Try exact name match first
+        cursor.execute("""
+            SELECT position FROM players 
+            WHERE LOWER(name) = LOWER(%s) AND LOWER(team) = LOWER(%s)
+            LIMIT 1
+        """, [player_name, team])
+        
+        result = cursor.fetchone()
+        if result:
+            return result[0]
+            
+        # Try partial name match if exact fails
+        cursor.execute("""
+            SELECT position FROM players 
+            WHERE LOWER(name) LIKE LOWER(%s) AND LOWER(team) = LOWER(%s)
+            LIMIT 1
+        """, [f'%{player_name}%', team])
+        
+        result = cursor.fetchone()
+        return result[0] if result else None
+        
+    except Exception as e:
+        print(f"Database lookup error for {player_name}: {e}")
+        return None
 
 if __name__ == '__main__':
     print("Starting Fantrax Value Hunter Flask Backend...")

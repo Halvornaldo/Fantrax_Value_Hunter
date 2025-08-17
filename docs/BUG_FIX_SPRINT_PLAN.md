@@ -37,60 +37,152 @@ This document outlines identified bugs and feature enhancements for the Fantrax 
 
 ## 📋 SPRINT PLAN
 
-### **SPRINT 1: Critical Filter Fixes**
-**Duration**: 2-3 hours  
-**Goal**: Fix all filtering issues affecting player display
+### **SPRINT 1: Critical Filter Fixes** ✅ **COMPLETED**
+**Duration**: 2-3 hours (Actual: 2.5 hours)  
+**Goal**: Fix all filtering issues affecting player display  
+**Status**: ✅ **COMPLETED** - August 17, 2025
 
 #### Tasks:
-1. **Fix Position Filter Logic**
+1. **✅ Fix Position Filter Logic** 
    - **Issue**: When no positions selected, sends empty array causing no results
-   - **Root Cause**: Condition `if (currentFilters.positions.length < 4)` doesn't handle length=0 properly
-   - **Fix**: Change to `if (currentFilters.positions.length > 0 && currentFilters.positions.length < 4)`
-   - **File**: `static/js/dashboard.js` line ~65
+   - **Root Cause**: Condition `if (currentFilters.positions.length < 4)` didn't handle length=0 properly
+   - **Fix Applied**: Changed to `if (currentFilters.positions.length > 0 && currentFilters.positions.length < 4)`
+   - **Files Fixed**: `static/js/dashboard.js` line 111 + `src/app.py` lines 270-274, 722-726
+   - **Verification**: Tested G+D filter (287 players), single position filters, and empty position handling
 
-2. **Implement Team Filter Population**
-   - **Issue**: Team dropdown not populated with actual teams
-   - **Investigation Needed**: 
-     - Check if teams are loaded from backend
-     - Verify HTML select element ID matches JavaScript
-   - **Files**: `templates/dashboard.html`, `static/js/dashboard.js`
+2. **✅ Implement Team Filter Population**
+   - **Issue**: Team dropdown not populated with actual teams, backend didn't handle multiple teams
+   - **Solutions Implemented**: 
+     - Created `/api/teams` endpoint returning all 20 EPL teams
+     - Added `loadTeams()` and `populateTeamDropdown()` functions
+     - Fixed backend team filtering to handle comma-separated multiple teams with `IN` clause
+     - Updated `handleFilterChange()` to read multiple selected teams from dropdown
+   - **Files Modified**: `src/app.py` (new endpoint + team filter fix), `static/js/dashboard.js` (team handling)
+   - **Verification**: Tested single team (ARS: 29 players), multiple teams (ARS,MCI: 62 players)
 
-3. **Test Filter Combinations**
-   - Verify position + team + price filters work together
-   - Ensure "All" selections work properly
-   - Test edge cases (no filters, all filters)
+3. **✅ Test Filter Combinations**
+   - **Complex Tests Passed**:
+     - Position + Team: Arsenal goalkeepers (4 players, all G+ARS)
+     - Position + Team + Price: Arsenal/City forwards $8-15 (3 players)
+     - Search + Position: "son" in M,F positions (24 players: Jackson, Nelson, Wilson)
+   - **Edge Cases Verified**: Empty filters, all filters, partial selections
 
-**Acceptance Criteria**:
-- ✅ Unchecking all positions shows all players
-- ✅ Team dropdown shows all 20 EPL teams
-- ✅ Multiple filter combinations work correctly
+**Acceptance Criteria**: ✅ **ALL COMPLETED**
+- ✅ Unchecking all positions shows all players (633 total)
+- ✅ Team dropdown shows all 20 EPL teams (populated via `/api/teams`)
+- ✅ Multiple filter combinations work correctly (verified with complex tests)
+
+**Key Fixes Applied**:
+- Frontend: Fixed empty array condition in position filter logic
+- Backend: Added multiple team support with `IN` clause for both `/api/players` and `/api/export`
+- Integration: Complete team filter implementation with dropdown population and event handling
 
 ---
 
-### **SPRINT 2: Table Sorting Fix**
+### **SPRINT 2: Import Validation Critical Fixes** ✅ **COMPLETED**
+**Duration**: 4-5 hours (Actual: 4 hours)  
+**Goal**: Fix critical 500 errors and validation system issues  
+**Status**: ✅ **COMPLETED** - August 17, 2025
+
+#### Tasks:
+1. **✅ Fixed 500 Error on Dry Run**
+   - **Issue**: Syntax error with malformed `else` statement in `/api/apply-import` endpoint
+   - **Root Cause**: `else` clause incorrectly attached to `for` loop after function body
+   - **Fix Applied**: Removed problematic `else` clause and simplified dry run logic
+   - **File**: `src/app.py` lines 1172-1179
+
+2. **✅ Fixed "Only 10 Players Showing" Bug**
+   - **Issue**: Import validation only showed 10 unmatched players instead of all 190
+   - **Root Cause**: Debug limitation `[:10]` left in production code
+   - **Fix Applied**: Changed `'unmatched_details': unmatched_players[:10]` to `'unmatched_details': unmatched_players`
+   - **File**: `src/app.py` line 751
+
+3. **✅ Fixed Empty Team Dropdowns**
+   - **Issue**: Manual player selection dropdowns showed "Select a player from X..." but no actual players
+   - **Root Cause**: Database column naming issue (`fantrax_id` vs `id`)
+   - **Fix Applied**: Changed SQL query from `SELECT fantrax_id` to `SELECT id` while keeping 'fantrax_id' key for frontend
+   - **File**: `src/app.py` lines 481-495 (`/api/players-by-team` endpoint)
+
+4. **✅ Verified Global Name Matching Learning**
+   - **Test Result**: Match rate improved from 13.6% → 17.3% (30 → 38 automatic matches)
+   - **Learning Confirmed**: System successfully saved and applied 8 additional automatic matches after manual confirmations
+   - **User Impact**: Future imports will be progressively easier as system learns
+
+**Acceptance Criteria**:
+- ✅ Dry run functionality works without 500 errors
+- ✅ All 190 unmatched players visible for review (not just 10)
+- ✅ Team-filtered dropdowns populated with actual players
+- ✅ Global Name Matching System learns from manual confirmations
+- ✅ No skipping allowed - mandatory player mapping ensures 100% data quality
+
+**Key Fixes Applied**:
+- Backend: Fixed syntax error, removed debug limitation, corrected database column references
+- Learning System: Verified that manual mappings improve future import accuracy
+- Data Quality: Enforced mandatory mapping for all unmatched players
+
+---
+
+### **SPRINT 3: Table Sorting Fix** 📋 **PENDING**
 **Duration**: 3-4 hours  
-**Goal**: Implement server-side sorting for full dataset
+**Goal**: Implement server-side sorting for full dataset  
+**Status**: 📋 **PENDING** - Next Priority
 
 #### Tasks:
 1. **Backend API Enhancement**
    - Add `sort_by` and `sort_direction` parameters to `/api/players`
-   - Modify SQL query to include `ORDER BY` clause
+   - Modify SQL query to include dynamic `ORDER BY` clause
+   - Add validation for sortable fields
    - **File**: `src/app.py` (get_players function)
 
 2. **Frontend Integration**
    - Modify `handleSort()` to make API call instead of client-side sort
    - Update `loadPlayersData()` to include sort parameters
-   - Remove `sortPlayersData()` function (no longer needed)
    - **File**: `static/js/dashboard.js`
 
 3. **Performance Testing**
-   - Ensure sorting is fast with 633 players
-   - Verify pagination works with sorting
+   - Verify sorting performance for 633 players
+   - Confirm pagination maintains sort order
 
 **Acceptance Criteria**:
 - ✅ Sorting affects entire dataset, not just current page
-- ✅ Sort state persists through pagination
+- ✅ Sort state persists through pagination  
 - ✅ Performance remains acceptable (<1s response)
+
+---
+
+### **SPRINT 3.5: Starter Multiplier Investigation** 🔍 **INVESTIGATION NEEDED**
+**Duration**: 1-2 hours  
+**Goal**: Investigate and fix starter multiplier anomaly  
+**Status**: 📋 **PENDING** - Newly Identified Issue
+
+#### Issue Description:
+Only 2 players (Matt ORiley, David Raya) have 1.00x starter multipliers instead of expected pattern:
+- **Expected**: Either 0 players with 1.00x OR 220 players (20 full starting lineups × 11 players each)
+- **Current**: Only 2 players with 1.00x, rest at 0.650x rotation penalty
+- **Likely Cause**: Related to Global Name Matching System implementation
+
+#### Tasks:
+1. **Database Investigation**
+   - Query `player_metrics` table for starter_multiplier distribution
+   - Check if Matt ORiley and David Raya have special mappings in `name_mappings` table
+   - Verify connection to Global Name Matching System fixes
+
+2. **Root Cause Analysis**
+   - Review starter prediction logic in `src/app.py` (import_lineups endpoint)
+   - Check manual override system implementation
+   - Investigate if names were processed during name matching system development
+
+3. **Fix Implementation**
+   - Reset all players to proper rotation penalty (0.650x) as baseline
+   - Ensure consistent starter multiplier application
+   - Update documentation of expected behavior
+
+**Acceptance Criteria**:
+- ✅ Understand why only 2 players have 1.00x multipliers
+- ✅ All players have consistent starter multipliers (either baseline or proper starters)
+- ✅ Starter prediction system works as designed
+
+**Investigation Priority**: HIGH - Data integrity issue affecting value calculations
 
 ---
 
@@ -254,8 +346,9 @@ This document outlines identified bugs and feature enhancements for the Fantrax 
 
 | Priority | Sprint | Impact | Effort | Status |
 |----------|--------|--------|--------|--------|
-| 🔴 HIGH | Sprint 1 | Critical | Low | Pending |
-| 🔴 HIGH | Sprint 2 | High | Medium | Pending |
+| 🔴 HIGH | Sprint 1 | Critical | Low | ✅ **COMPLETED** |
+| 🔴 HIGH | Sprint 2 | High | Medium | ✅ **COMPLETED** |
+| 🔴 HIGH | Sprint 2.5 | High | Low | 📋 **PENDING** |
 | 🟡 MEDIUM | Sprint 3 | Medium | Low | Pending |
 | 🟡 MEDIUM | Sprint 4 | High | High | Pending |
 | 🟢 LOW | Sprint 5 | Medium | Medium | Pending |
