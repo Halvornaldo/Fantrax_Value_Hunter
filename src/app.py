@@ -1068,6 +1068,166 @@ def import_validation_ui():
     """Serve the import validation UI"""
     return render_template('import_validation.html')
 
+@app.route('/monitoring')
+def monitoring_ui():
+    """Serve the monitoring dashboard UI"""
+    return render_template('monitoring.html')
+
+@app.route('/api/monitoring/metrics', methods=['GET'])
+def get_monitoring_metrics():
+    """
+    Get comprehensive monitoring metrics for the name matching system
+    """
+    try:
+        conn = get_db_connection()
+        cursor = conn.cursor(cursor_factory=psycopg2.extras.RealDictCursor)
+        
+        # Get overall mapping statistics
+        cursor.execute("""
+            SELECT 
+                COUNT(*) as total_mappings,
+                COUNT(*) FILTER (WHERE verified = true) as verified_mappings,
+                COUNT(*) FILTER (WHERE verified = false) as unverified_mappings,
+                AVG(confidence_score) as avg_confidence,
+                COUNT(DISTINCT source_system) as source_systems,
+                SUM(usage_count) as total_usage
+            FROM name_mappings
+        """)
+        overall_stats = dict(cursor.fetchone())
+        
+        # Get statistics by source system
+        cursor.execute("""
+            SELECT 
+                source_system,
+                COUNT(*) as total_mappings,
+                COUNT(*) FILTER (WHERE verified = true) as verified,
+                AVG(confidence_score) as avg_confidence,
+                SUM(usage_count) as usage_count,
+                COUNT(*) FILTER (WHERE confidence_score >= 90) as high_confidence,
+                COUNT(*) FILTER (WHERE confidence_score < 50) as low_confidence
+            FROM name_mappings
+            GROUP BY source_system
+            ORDER BY total_mappings DESC
+        """)
+        source_system_stats = [dict(row) for row in cursor.fetchall()]
+        
+        # Get recent mapping activity (last 7 days)
+        cursor.execute("""
+            SELECT 
+                DATE(created_at) as date,
+                COUNT(*) as new_mappings,
+                COUNT(*) FILTER (WHERE verified = true) as verified_on_date
+            FROM name_mappings
+            WHERE created_at >= CURRENT_DATE - INTERVAL '7 days'
+            GROUP BY DATE(created_at)
+            ORDER BY date DESC
+        """)
+        recent_activity = [dict(row) for row in cursor.fetchall()]
+        
+        # Get match quality distribution
+        cursor.execute("""
+            SELECT 
+                CASE 
+                    WHEN confidence_score >= 95 THEN '95-100%'
+                    WHEN confidence_score >= 85 THEN '85-94%'
+                    WHEN confidence_score >= 70 THEN '70-84%'
+                    WHEN confidence_score >= 50 THEN '50-69%'
+                    ELSE '<50%'
+                END as confidence_range,
+                COUNT(*) as count
+            FROM name_mappings
+            GROUP BY 
+                CASE 
+                    WHEN confidence_score >= 95 THEN '95-100%'
+                    WHEN confidence_score >= 85 THEN '85-94%'
+                    WHEN confidence_score >= 70 THEN '70-84%'
+                    WHEN confidence_score >= 50 THEN '50-69%'
+                    ELSE '<50%'
+                END
+            ORDER BY 
+                CASE 
+                    WHEN confidence_score >= 95 THEN 1
+                    WHEN confidence_score >= 85 THEN 2
+                    WHEN confidence_score >= 70 THEN 3
+                    WHEN confidence_score >= 50 THEN 4
+                    ELSE 5
+                END
+        """)
+        confidence_distribution = [dict(row) for row in cursor.fetchall()]
+        
+        # Get top performers (most used mappings)
+        cursor.execute("""
+            SELECT 
+                source_name,
+                fantrax_name,
+                source_system,
+                usage_count,
+                confidence_score,
+                verified
+            FROM name_mappings
+            ORDER BY usage_count DESC
+            LIMIT 10
+        """)
+        top_performers = [dict(row) for row in cursor.fetchall()]
+        
+        # Get problem mappings (low confidence, unverified)
+        cursor.execute("""
+            SELECT 
+                source_name,
+                fantrax_name,
+                source_system,
+                confidence_score,
+                usage_count,
+                created_at
+            FROM name_mappings
+            WHERE verified = false AND confidence_score < 70
+            ORDER BY usage_count DESC, confidence_score ASC
+            LIMIT 10
+        """)
+        problem_mappings = [dict(row) for row in cursor.fetchall()]
+        
+        # Get match type distribution
+        cursor.execute("""
+            SELECT 
+                match_type,
+                COUNT(*) as count,
+                AVG(confidence_score) as avg_confidence
+            FROM name_mappings
+            GROUP BY match_type
+            ORDER BY count DESC
+        """)
+        match_type_stats = [dict(row) for row in cursor.fetchall()]
+        
+        conn.close()
+        
+        # Calculate derived metrics
+        verification_rate = (overall_stats['verified_mappings'] / overall_stats['total_mappings'] * 100) if overall_stats['total_mappings'] > 0 else 0
+        
+        return jsonify({
+            'timestamp': time.time(),
+            'overall_stats': {
+                **overall_stats,
+                'verification_rate': round(verification_rate, 2)
+            },
+            'source_system_breakdown': source_system_stats,
+            'recent_activity': recent_activity,
+            'confidence_distribution': confidence_distribution,
+            'top_performers': top_performers,
+            'problem_mappings': problem_mappings,
+            'match_type_distribution': match_type_stats,
+            'health_indicators': {
+                'high_confidence_rate': (sum(1 for s in source_system_stats for _ in range(s['high_confidence'])) / overall_stats['total_mappings'] * 100) if overall_stats['total_mappings'] > 0 else 0,
+                'low_confidence_rate': (sum(1 for s in source_system_stats for _ in range(s['low_confidence'])) / overall_stats['total_mappings'] * 100) if overall_stats['total_mappings'] > 0 else 0,
+                'avg_confidence': round(overall_stats['avg_confidence'], 2) if overall_stats['avg_confidence'] else 0
+            }
+        })
+        
+    except Exception as e:
+        return jsonify({
+            'error': str(e),
+            'timestamp': time.time()
+        }), 500
+
 if __name__ == '__main__':
     print("Starting Fantrax Value Hunter Flask Backend...")
     print(f"Database: {DB_CONFIG['database']} on port {DB_CONFIG['port']}")
