@@ -100,7 +100,7 @@ def calculate_form_multiplier(player_id: str, current_gameweek: int, lookback_pe
         weight_total = 0
         for i, row in enumerate(form_data):
             if i < len(weights):
-                weighted_sum += row['points'] * weights[i]
+                weighted_sum += float(row['points']) * weights[i]
                 weight_total += weights[i]
                 
         if weight_total == 0:
@@ -115,7 +115,7 @@ def calculate_form_multiplier(player_id: str, current_gameweek: int, lookback_pe
         """, [player_id])
         
         result = cursor.fetchone()
-        season_avg = result['season_avg'] if result and result['season_avg'] else weighted_avg
+        season_avg = float(result['season_avg']) if result and result['season_avg'] else weighted_avg
         
         # Convert to multiplier (constrained between 0.5x and 1.5x)
         if season_avg > 0:
@@ -1263,6 +1263,157 @@ def get_name_mapping_stats():
         }), 500
 
 # ===============================
+# FORM DATA IMPORT
+# ===============================
+
+@app.route('/api/import-form-data', methods=['POST'])
+def import_form_data():
+    """
+    Import gameweek form data from Fantrax CSV export
+    Expects CSV with columns: ID, Player, Team, Position, RkOv, Opponent, Salary, FPts, etc.
+    Extracts player ID and FPts for storage in player_form table
+    """
+    try:
+        # Get parameters
+        gameweek = request.form.get('gameweek')
+        if not gameweek:
+            return jsonify({
+                'success': False,
+                'error': 'Gameweek number is required'
+            }), 400
+            
+        try:
+            gameweek = int(gameweek)
+        except ValueError:
+            return jsonify({
+                'success': False,
+                'error': 'Gameweek must be a number'
+            }), 400
+        
+        # Check for uploaded file
+        if 'file' not in request.files:
+            return jsonify({
+                'success': False,
+                'error': 'No file uploaded'
+            }), 400
+        
+        file = request.files['file']
+        if file.filename == '':
+            return jsonify({
+                'success': False,
+                'error': 'No file selected'
+            }), 400
+        
+        # Read CSV file
+        import pandas as pd
+        import io
+        
+        # Read the CSV content
+        stream = io.StringIO(file.stream.read().decode("UTF8"), newline=None)
+        csv_input = pd.read_csv(stream)
+        
+        # Validate required columns
+        required_columns = ['ID', 'Player', 'FPts']
+        missing_columns = [col for col in required_columns if col not in csv_input.columns]
+        if missing_columns:
+            return jsonify({
+                'success': False,
+                'error': f'Missing required columns: {missing_columns}'
+            }), 400
+        
+        # Process the data
+        conn = get_db_connection()
+        cursor = conn.cursor()
+        
+        imported_count = 0
+        error_count = 0
+        errors = []
+        skipped_players = []
+        
+        # Get all existing player IDs to check against
+        cursor.execute("SELECT id FROM players")
+        existing_player_ids = set(row[0] for row in cursor.fetchall())
+        new_players_added = []
+        
+        for index, row in csv_input.iterrows():
+            try:
+                # Extract player ID (remove asterisks from ID column)
+                player_id = str(row['ID']).strip('*')
+                player_name = row.get('Player', 'Unknown')
+                team = row.get('Team', 'UNK')
+                position = row.get('Position', 'UNK')
+                
+                # Check if player exists in our database
+                if player_id not in existing_player_ids:
+                    # Auto-add new player to database
+                    try:
+                        cursor.execute("""
+                            INSERT INTO players (id, name, team, position, updated_at, minutes, xg90, xa90, xgi90, last_understat_update)
+                            VALUES (%s, %s, %s, %s, NOW(), %s, %s, %s, %s, NOW())
+                        """, (player_id, player_name, team, position, 0, 0.000, 0.000, 0.000))
+                        
+                        existing_player_ids.add(player_id)  # Add to our tracking set
+                        new_players_added.append(f"{player_name} ({team}, {position})")
+                        print(f"Auto-added new player: {player_name} - {team} ({position}) [ID: {player_id}]")
+                        
+                    except Exception as add_error:
+                        error_count += 1
+                        skipped_players.append(f"{player_name} (ID: {player_id}) - Failed to add: {add_error}")
+                        continue
+                
+                # Get fantasy points
+                fpts = float(row['FPts'])
+                
+                # Insert/update player form data
+                cursor.execute("""
+                    INSERT INTO player_form (player_id, gameweek, points, timestamp)
+                    VALUES (%s, %s, %s, NOW())
+                    ON CONFLICT (player_id, gameweek) 
+                    DO UPDATE SET points = EXCLUDED.points, timestamp = NOW()
+                """, [player_id, gameweek, fpts])
+                
+                imported_count += 1
+                
+            except Exception as e:
+                error_count += 1
+                player_name = row.get('Player', 'Unknown')
+                errors.append(f"Row {index + 1} ({player_name}): {str(e)}")
+                
+                # Don't fail completely for individual row errors
+                continue
+        
+        # Commit all changes
+        conn.commit()
+        conn.close()
+        
+        # Enable form calculations in system parameters if not already enabled
+        try:
+            params = load_system_parameters()
+            if not params.get('form_calculation', {}).get('enabled', False):
+                params['form_calculation']['enabled'] = True
+                save_system_parameters(params)
+        except Exception as e:
+            print(f"Warning: Could not update system parameters: {e}")
+        
+        return jsonify({
+            'success': True,
+            'message': f'Form data import completed for gameweek {gameweek}',
+            'imported_count': imported_count,
+            'error_count': error_count,
+            'errors': errors[:10],  # Limit errors shown
+            'skipped_players': skipped_players[:20],  # Show first 20 skipped players
+            'new_players_added': new_players_added[:20],  # Show first 20 auto-added players
+            'total_new_players': len(new_players_added),
+            'gameweek': gameweek
+        })
+        
+    except Exception as e:
+        return jsonify({
+            'success': False,
+            'error': f'Import failed: {str(e)}'
+        }), 500
+
+# ===============================
 # VALIDATION UI ROUTES
 # ===============================
 
@@ -1270,6 +1421,11 @@ def get_name_mapping_stats():
 def import_validation_ui():
     """Serve the import validation UI"""
     return render_template('import_validation.html')
+
+@app.route('/form-upload')
+def form_upload_ui():
+    """Serve the form data upload UI"""
+    return render_template('form_upload.html')
 
 @app.route('/monitoring')
 def monitoring_ui():

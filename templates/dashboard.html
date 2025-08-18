@@ -8,14 +8,18 @@
 </head>
 <body>
     <div class="container">
-        <!-- Header -->
+        <!-- Header with Epic Banner -->
         <header class="header">
-            <h1>🔥 Fantrax Crusher 2000</h1>
-            <p>Real-time parameter tuning for Fantasy PL DESTROYING</p>
-            <div class="status-bar">
-                <span id="status-indicator">Ready</span>
-                <span id="player-count">633 players loaded</span>
-                <span id="last-updated">Last updated: --</span>
+            <div class="banner-container">
+                <img src="{{ url_for('static', filename='images/fantrax-dominator-banner.png') }}" alt="The Fantrax Dominator" class="banner-image">
+                <button class="theme-toggle" id="theme-toggle">🌙 Dark Mode</button>
+                <div class="banner-overlay">
+                    <div class="status-info">
+                        <span id="status-indicator" class="status-ready">⚡ Ready</span>
+                        <span id="player-count" class="player-count">🎯 633 players loaded</span>
+                        <span id="last-updated" class="last-updated">🕐 Last updated: --</span>
+                    </div>
+                </div>
             </div>
         </header>
 
@@ -182,6 +186,9 @@
                     </button>
                     <button id="import-lineups" class="btn-secondary">
                         Import Lineups CSV
+                    </button>
+                    <button id="form-upload" class="btn-secondary" onclick="window.open('/form-upload', '_blank')">
+                        📊 Upload Form Data
                     </button>
                 </div>
 

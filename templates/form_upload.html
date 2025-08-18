@@ -1,0 +1,364 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Form Data Upload - Fantrax Value Hunter</title>
+    <style>
+        body {
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+            margin: 0;
+            padding: 20px;
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            min-height: 100vh;
+        }
+        
+        .container {
+            max-width: 800px;
+            margin: 0 auto;
+            background: white;
+            border-radius: 10px;
+            padding: 30px;
+            box-shadow: 0 10px 30px rgba(0,0,0,0.2);
+        }
+        
+        h1 {
+            color: #333;
+            text-align: center;
+            margin-bottom: 30px;
+            font-size: 2.2em;
+        }
+        
+        .upload-section {
+            background: #f8f9fa;
+            border-radius: 8px;
+            padding: 25px;
+            margin-bottom: 25px;
+            border: 2px dashed #dee2e6;
+        }
+        
+        .form-group {
+            margin-bottom: 20px;
+        }
+        
+        label {
+            display: block;
+            margin-bottom: 8px;
+            font-weight: 600;
+            color: #495057;
+        }
+        
+        input[type="file"] {
+            width: 100%;
+            padding: 12px;
+            border: 2px solid #dee2e6;
+            border-radius: 6px;
+            font-size: 16px;
+            background: white;
+        }
+        
+        input[type="number"] {
+            width: 200px;
+            padding: 12px;
+            border: 2px solid #dee2e6;
+            border-radius: 6px;
+            font-size: 16px;
+        }
+        
+        .upload-btn {
+            background: linear-gradient(135deg, #28a745, #20c997);
+            color: white;
+            border: none;
+            padding: 15px 30px;
+            font-size: 16px;
+            border-radius: 6px;
+            cursor: pointer;
+            transition: all 0.3s ease;
+            margin-top: 10px;
+        }
+        
+        .upload-btn:hover {
+            transform: translateY(-2px);
+            box-shadow: 0 5px 15px rgba(40, 167, 69, 0.4);
+        }
+        
+        .upload-btn:disabled {
+            background: #6c757d;
+            cursor: not-allowed;
+            transform: none;
+            box-shadow: none;
+        }
+        
+        .result {
+            padding: 20px;
+            border-radius: 6px;
+            margin-top: 20px;
+            display: none;
+        }
+        
+        .result.success {
+            background: #d4edda;
+            border: 1px solid #c3e6cb;
+            color: #155724;
+        }
+        
+        .result.error {
+            background: #f8d7da;
+            border: 1px solid #f5c6cb;
+            color: #721c24;
+        }
+        
+        .info-box {
+            background: #e3f2fd;
+            border-left: 4px solid #2196F3;
+            padding: 15px;
+            margin-bottom: 20px;
+            border-radius: 4px;
+        }
+        
+        .fantrax-link {
+            background: #fff3cd;
+            border-left: 4px solid #ffc107;
+            padding: 15px;
+            margin-bottom: 20px;
+            border-radius: 4px;
+        }
+        
+        .fantrax-btn {
+            background: #17a2b8;
+            color: white;
+            border: none;
+            padding: 10px 20px;
+            border-radius: 6px;
+            text-decoration: none;
+            display: inline-block;
+            margin-top: 8px;
+            transition: background 0.3s ease;
+        }
+        
+        .fantrax-btn:hover {
+            background: #138496;
+            color: white;
+            text-decoration: none;
+        }
+        
+        .stats-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+            gap: 15px;
+            margin-top: 15px;
+        }
+        
+        .stat-item {
+            background: #f8f9fa;
+            padding: 15px;
+            border-radius: 6px;
+            text-align: center;
+            border: 1px solid #dee2e6;
+        }
+        
+        .stat-number {
+            font-size: 1.8em;
+            font-weight: bold;
+            color: #28a745;
+        }
+        
+        .stat-label {
+            color: #6c757d;
+            font-size: 0.9em;
+            margin-top: 5px;
+        }
+        
+        .back-link {
+            display: inline-block;
+            margin-bottom: 20px;
+            color: #667eea;
+            text-decoration: none;
+            font-weight: 500;
+        }
+        
+        .back-link:hover {
+            text-decoration: underline;
+        }
+        
+        .loading {
+            display: none;
+            text-align: center;
+            padding: 20px;
+        }
+        
+        .loading-spinner {
+            border: 3px solid #f3f3f3;
+            border-top: 3px solid #667eea;
+            border-radius: 50%;
+            width: 30px;
+            height: 30px;
+            animation: spin 1s linear infinite;
+            margin: 0 auto 10px;
+        }
+        
+        @keyframes spin {
+            0% { transform: rotate(0deg); }
+            100% { transform: rotate(360deg); }
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <a href="/" class="back-link">← Back to Dashboard</a>
+        
+        <h1>📊 Form Data Upload</h1>
+        
+        <div class="fantrax-link">
+            <strong>📥 Step 1: Get CSV from Fantrax</strong>
+            <p>Go to your Fantrax league players page and export the current gameweek data to CSV:</p>
+            <a href="https://www.fantrax.com/fantasy/league/gjbogdx2mcmcvzqa/players" 
+               target="_blank" 
+               class="fantrax-btn">
+                🔗 Open Fantrax Players Page
+            </a>
+            <small style="display: block; margin-top: 5px; color: #6c757d;">
+                Tip: Set filters to show all players and export to CSV after the gameweek ends
+            </small>
+        </div>
+        
+        <div class="info-box">
+            <strong>📤 Step 2: Upload Instructions</strong>
+            <ul>
+                <li>Upload the CSV file from Fantrax with the correct gameweek number</li>
+                <li>Safe to re-upload - system will update existing data if gameweek already exists</li>
+                <li>All new players from transfers will be automatically added to the database</li>
+                <li>Expected format: ID, Player, Team, Position, FPts, etc.</li>
+            </ul>
+        </div>
+        
+        <div class="upload-section">
+            <form id="uploadForm" enctype="multipart/form-data">
+                <div class="form-group">
+                    <label for="csvFile">Fantrax CSV Export File:</label>
+                    <input type="file" id="csvFile" name="file" accept=".csv" required>
+                    <small style="color: #6c757d;">Select the CSV file downloaded from Fantrax</small>
+                </div>
+                
+                <div class="form-group">
+                    <label for="gameweek">Gameweek Number:</label>
+                    <input type="number" id="gameweek" name="gameweek" min="1" max="38" required placeholder="e.g. 1">
+                    <small style="color: #6c757d;">Premier League gameweek (1-38)</small>
+                </div>
+                
+                <button type="submit" class="upload-btn">
+                    📤 Upload Form Data
+                </button>
+            </form>
+        </div>
+        
+        <div class="loading" id="loading">
+            <div class="loading-spinner"></div>
+            <div>Processing upload...</div>
+        </div>
+        
+        <div class="result" id="result"></div>
+    </div>
+
+    <script>
+        document.getElementById('uploadForm').addEventListener('submit', async function(e) {
+            e.preventDefault();
+            
+            const formData = new FormData(this);
+            const uploadBtn = document.querySelector('.upload-btn');
+            const loading = document.getElementById('loading');
+            const result = document.getElementById('result');
+            
+            // Show loading state
+            uploadBtn.disabled = true;
+            uploadBtn.textContent = 'Uploading...';
+            loading.style.display = 'block';
+            result.style.display = 'none';
+            
+            try {
+                const response = await fetch('/api/import-form-data', {
+                    method: 'POST',
+                    body: formData
+                });
+                
+                const data = await response.json();
+                
+                // Hide loading
+                loading.style.display = 'none';
+                
+                if (data.success) {
+                    result.className = 'result success';
+                    result.innerHTML = `
+                        <h3>✅ Upload Successful!</h3>
+                        <p>${data.message}</p>
+                        
+                        <div class="stats-grid">
+                            <div class="stat-item">
+                                <div class="stat-number">${data.imported_count}</div>
+                                <div class="stat-label">Players Imported</div>
+                            </div>
+                            <div class="stat-item">
+                                <div class="stat-number">${data.total_new_players || 0}</div>
+                                <div class="stat-label">New Players Added</div>
+                            </div>
+                            <div class="stat-item">
+                                <div class="stat-number">${data.error_count || 0}</div>
+                                <div class="stat-label">Errors</div>
+                            </div>
+                            <div class="stat-item">
+                                <div class="stat-number">GW${data.gameweek}</div>
+                                <div class="stat-label">Gameweek</div>
+                            </div>
+                        </div>
+                        
+                        ${data.total_new_players > 0 ? `
+                            <div style="margin-top: 15px; padding: 15px; background: #fff3cd; border-radius: 6px;">
+                                <strong>🆕 New Players Added:</strong><br>
+                                ${data.new_players_added.slice(0, 10).join('<br>')}
+                                ${data.total_new_players > 10 ? `<br><em>... and ${data.total_new_players - 10} more</em>` : ''}
+                            </div>
+                        ` : ''}
+                        
+                        ${data.skipped_players && data.skipped_players.length > 0 ? `
+                            <div style="margin-top: 15px; padding: 15px; background: #f8d7da; border-radius: 6px;">
+                                <strong>⚠️ Issues:</strong><br>
+                                ${data.skipped_players.slice(0, 5).join('<br>')}
+                            </div>
+                        ` : ''}
+                    `;
+                } else {
+                    result.className = 'result error';
+                    result.innerHTML = `
+                        <h3>❌ Upload Failed</h3>
+                        <p><strong>Error:</strong> ${data.error}</p>
+                    `;
+                }
+                
+                result.style.display = 'block';
+                
+            } catch (error) {
+                loading.style.display = 'none';
+                result.className = 'result error';
+                result.innerHTML = `
+                    <h3>❌ Upload Failed</h3>
+                    <p><strong>Network Error:</strong> ${error.message}</p>
+                `;
+                result.style.display = 'block';
+            } finally {
+                // Reset button
+                uploadBtn.disabled = false;
+                uploadBtn.textContent = '📤 Upload Form Data';
+            }
+        });
+        
+        // File input validation
+        document.getElementById('csvFile').addEventListener('change', function(e) {
+            const file = e.target.files[0];
+            if (file && !file.name.toLowerCase().endsWith('.csv')) {
+                alert('Please select a CSV file');
+                this.value = '';
+            }
+        });
+    </script>
+</body>
+</html>

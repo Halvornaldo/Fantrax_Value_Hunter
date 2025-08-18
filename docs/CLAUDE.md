@@ -130,19 +130,26 @@ result = matcher.match_player("matt o&#039;riley", "understat", "BHA", "M")
   - Match rate improved from 13.6% → 17.3% (30 → 38 automatic matches)
   - 8 additional players automatically matched after learning from manual confirmations
 
-**🔄 SPRINT 3 IN PROGRESS - Table Sorting Fix**
-- 🔄 Table sorting: Currently limited to current page (100 players), implementing server-side sorting
+**✅ SPRINT 3 COMPLETED - Table Sorting Fix**
+- ✅ Table sorting: Fixed to work on full dataset (server-side) instead of current page only
+
+**✅ SPRINT 4 COMPLETED - xGI Multiplier Display**  
+- ✅ xGI multiplier column now displayed in table alongside other multipliers
+
+**✅ SPRINT 5 COMPLETED - Form Data Infrastructure** 
+- ✅ **Complete form data system**: `/api/import-form-data` endpoint with auto-add functionality
+- ✅ **Web upload UI**: Complete interface at `/form-upload` with step-by-step workflow
+- ✅ **Dashboard integration**: Navigation button added to main dashboard
+- ✅ **100% import success**: Auto-add missing players from transfer window
+- ✅ **Safe duplicate handling**: ON CONFLICT DO UPDATE for weekly uploads
+- ✅ **Documentation**: Complete technical documentation in FORM_DATA_INFRASTRUCTURE.md
 
 **📋 REMAINING ISSUES**
-- xGI multiplier column not displayed in table (Sprint 4)
-- Fixture difficulty locked to "Neutral" setting (Sprint 5)  
-- Form data workflow needs implementation (player_form table empty) (Sprint 6)
+- Fixture difficulty locked to "Neutral" setting needs investigation (Sprint 6)  
+- Data validation dashboard for quality checks (Sprint 7)
+- Complete workflow documentation and user guides (Sprint 8)
 
-**🎯 KEY ACHIEVEMENT**: Import validation system now fully functional with mandatory player mapping and learning capabilities. No skipping allowed - ensures 100% data quality.
-- **Own Goals (OG)**: -7 points
-- **Penalty Misses (PKM)**: -6 points
-- **Yellow Cards (YC)**: -3 points
-- **Errors Leading to Goal (ErG)**: -3 points
+**🎯 KEY ACHIEVEMENT**: Form data infrastructure complete with 100% import success rate and full UI integration. System now handles weekly uploads seamlessly with auto-add functionality for new transfers.
 
 ---
 
@@ -374,5 +381,5 @@ python quick_lineup.py
 
 ---
 
-**Last Updated**: August 17, 2025 - Production Dashboard + xGI Integration Complete  
-**Status**: Production dashboard operational with xGI integration achieving 85.2% match rate. Comprehensive bug fix sprint plan documented. Ready for systematic bug resolution and feature enhancement. 🎯
+**Last Updated**: August 18, 2025 - Sprint 5 Form Data Infrastructure Complete  
+**Status**: Production dashboard operational with complete form data system (5 sprints complete). Weekly CSV upload workflow implemented with 100% import success rate and full UI integration. Next: Sprint 6 fixture difficulty investigation. 🎯
