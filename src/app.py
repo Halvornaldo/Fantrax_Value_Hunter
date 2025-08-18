@@ -127,6 +127,97 @@ def calculate_form_multiplier(player_id: str, current_gameweek: int, lookback_pe
     finally:
         conn.close()
 
+def calculate_fixture_difficulty_multiplier(team_code: str, position: str, gameweek: int, params: dict):
+    """
+    Calculate fixture difficulty multiplier based on odds data and position weights
+    Returns 1.0 if no fixture data available
+    """
+    # Check if fixture difficulty is enabled
+    fixture_config = params.get('fixture_difficulty', {})
+    if not fixture_config.get('enabled', False):
+        return 1.0
+    
+    conn = get_db_connection()
+    try:
+        cursor = conn.cursor(cursor_factory=psycopg2.extras.RealDictCursor)
+        
+        # Get fixture difficulty score for this team and gameweek
+        cursor.execute("""
+            SELECT difficulty_score FROM team_fixtures 
+            WHERE team_code = %s AND gameweek = %s
+        """, [team_code, gameweek])
+        
+        result = cursor.fetchone()
+        if not result:
+            return 1.0  # No fixture data available
+            
+        difficulty_score = float(result['difficulty_score'])
+        
+        # Get base multiplier strength from parameters
+        base_strength = fixture_config.get('multiplier_strength', 0.2)  # Default 20%
+        
+        # Apply position-specific weights
+        position_weights = fixture_config.get('position_weights', {
+            'G': 1.10,  # Goalkeepers: 110% (more saves vs stronger teams)
+            'D': 1.20,  # Defenders: 120% (clean sheets vs weaker teams)
+            'M': 1.00,  # Midfielders: 100% (baseline)
+            'F': 1.05   # Forwards: 105% (goals vs weaker teams)
+        })
+        
+        position_weight = position_weights.get(position, 1.0)
+        
+        # Convert difficulty score (-10 to +10) to multiplier
+        # Negative scores = easier fixtures = higher multiplier
+        # Positive scores = harder fixtures = lower multiplier
+        multiplier_adjustment = (difficulty_score / 10.0) * base_strength * position_weight
+        
+        # Final multiplier: 1.0 + adjustment (constrained between 0.5x and 1.5x)
+        final_multiplier = 1.0 - multiplier_adjustment
+        return max(0.5, min(1.5, final_multiplier))
+        
+    except Exception as e:
+        print(f"Error calculating fixture difficulty for {team_code}: {e}")
+        return 1.0
+    finally:
+        conn.close()
+
+def calculate_fixture_difficulty_multiplier_cached(team_code: str, position: str, params: dict, fixture_cache: dict):
+    """
+    OPTIMIZED: Calculate fixture difficulty multiplier using cached fixture data
+    No database queries - uses pre-loaded fixture_cache dictionary
+    """
+    # Check if fixture difficulty is enabled
+    fixture_config = params.get('fixture_difficulty', {})
+    if not fixture_config.get('enabled', False):
+        return 1.0
+    
+    # Get difficulty score from cache
+    difficulty_score = fixture_cache.get(team_code)
+    if difficulty_score is None:
+        return 1.0  # No fixture data available
+    
+    # Get base multiplier strength from parameters
+    base_strength = fixture_config.get('multiplier_strength', 0.2)  # Default 20%
+    
+    # Apply position-specific weights
+    position_weights = fixture_config.get('position_weights', {
+        'G': 1.10,  # Goalkeepers: 110% (more saves vs stronger teams)
+        'D': 1.20,  # Defenders: 120% (clean sheets vs weaker teams)
+        'M': 1.00,  # Midfielders: 100% (baseline)
+        'F': 1.05   # Forwards: 105% (goals vs weaker teams)
+    })
+    
+    position_weight = position_weights.get(position, 1.0)
+    
+    # Convert difficulty score (-10 to +10) to multiplier
+    # Negative scores = easier fixtures = higher multiplier
+    # Positive scores = harder fixtures = lower multiplier
+    multiplier_adjustment = (difficulty_score / 10.0) * base_strength * position_weight
+    
+    # Final multiplier: 1.0 + adjustment (constrained between 0.5x and 1.5x)
+    final_multiplier = 1.0 - multiplier_adjustment
+    return max(0.5, min(1.5, final_multiplier))
+
 def recalculate_true_values(gameweek: int = 1):
     """
     Recalculate True Value for all players based on current parameters
@@ -139,6 +230,19 @@ def recalculate_true_values(gameweek: int = 1):
     
     try:
         cursor = conn.cursor(cursor_factory=psycopg2.extras.RealDictCursor)
+        
+        # OPTIMIZATION: Pre-load all fixture data into memory
+        fixture_cache = {}
+        cursor.execute("""
+            SELECT team_code, difficulty_score 
+            FROM team_fixtures 
+            WHERE gameweek = %s
+        """, [gameweek])
+        
+        for row in cursor.fetchall():
+            fixture_cache[row['team_code']] = float(row['difficulty_score'])
+        
+        print(f"Loaded {len(fixture_cache)} team fixtures into cache")
         
         # Get all players with current metrics
         cursor.execute("""
@@ -154,6 +258,9 @@ def recalculate_true_values(gameweek: int = 1):
         players = cursor.fetchall()
         updated_count = 0
         
+        # OPTIMIZATION: Collect all updates for batch processing
+        batch_updates = []
+        
         for player in players:
             # Calculate form multiplier if enabled
             form_mult = 1.0
@@ -161,8 +268,10 @@ def recalculate_true_values(gameweek: int = 1):
                 lookback = params['form_calculation'].get('lookback_period', 3)
                 form_mult = calculate_form_multiplier(player['id'], gameweek, lookback)
             
-            # Fixture and starter multipliers come from external systems (default 1.0)
-            fixture_mult = float(player.get('fixture_multiplier', 1.0))
+            # Calculate fixture difficulty multiplier from cached data
+            fixture_mult = calculate_fixture_difficulty_multiplier_cached(
+                player['team'], player['position'], params, fixture_cache
+            )
             starter_mult = float(player.get('starter_multiplier', 1.0))
             
             # Calculate xGI multiplier if enabled
@@ -187,20 +296,57 @@ def recalculate_true_values(gameweek: int = 1):
             base_value = ppg / price if price > 0 else 0
             true_value = base_value * form_mult * fixture_mult * starter_mult * xgi_mult
             
-            # Update player metrics
-            cursor.execute("""
-                UPDATE player_metrics 
-                SET value_score = %s, 
-                    true_value = %s,
-                    form_multiplier = %s,
-                    fixture_multiplier = %s,
-                    starter_multiplier = %s,
-                    last_updated = CURRENT_TIMESTAMP
-                WHERE player_id = %s AND gameweek = %s
-            """, [base_value, true_value, form_mult, fixture_mult, starter_mult, 
-                  player['id'], gameweek])
+            # OPTIMIZATION: Add to batch instead of individual UPDATE
+            batch_updates.append({
+                'player_id': player['id'],
+                'value_score': base_value,
+                'true_value': true_value,
+                'form_multiplier': form_mult,
+                'fixture_multiplier': fixture_mult,
+                'starter_multiplier': starter_mult
+            })
             
             updated_count += 1
+        
+        # OPTIMIZATION: Execute batch update for all players
+        if batch_updates:
+            print(f"Executing batch update for {len(batch_updates)} players...")
+            batch_start = time.time()
+            
+            # Use psycopg2's execute_values for efficient bulk update
+            
+            update_data = [
+                (
+                    update['value_score'],
+                    update['true_value'], 
+                    update['form_multiplier'],
+                    update['fixture_multiplier'],
+                    update['starter_multiplier'],
+                    update['player_id'],
+                    gameweek
+                ) for update in batch_updates
+            ]
+            
+            cursor.execute("BEGIN")
+            psycopg2.extras.execute_values(
+                cursor,
+                """
+                UPDATE player_metrics 
+                SET value_score = data.value_score,
+                    true_value = data.true_value,
+                    form_multiplier = data.form_mult,
+                    fixture_multiplier = data.fixture_mult,
+                    starter_multiplier = data.starter_mult,
+                    last_updated = CURRENT_TIMESTAMP
+                FROM (VALUES %s) AS data(value_score, true_value, form_mult, fixture_mult, starter_mult, player_id, gameweek)
+                WHERE player_metrics.player_id = data.player_id AND player_metrics.gameweek = data.gameweek
+                """,
+                update_data,
+                template=None
+            )
+            
+            batch_time = time.time() - batch_start
+            print(f"Batch update completed in {batch_time:.3f}s")
         
         conn.commit()
         
@@ -1414,6 +1560,194 @@ def import_form_data():
         }), 500
 
 # ===============================
+# ODDS IMPORT ENDPOINT (Sprint 6)
+# ===============================
+
+@app.route('/api/import-odds', methods=['POST'])
+def import_odds():
+    """
+    Import betting odds data from oddsportal.com CSV
+    Expected format: Date, Time, Home Team, Away Team, Home Odds, Draw Odds, Away Odds
+    """
+    try:
+        # Check if file was uploaded
+        if 'file' not in request.files:
+            return jsonify({'success': False, 'error': 'No file uploaded'}), 400
+            
+        file = request.files['file']
+        if file.filename == '':
+            return jsonify({'success': False, 'error': 'No file selected'}), 400
+            
+        # Get gameweek from form
+        gameweek = request.form.get('gameweek', type=int)
+        if not gameweek or gameweek < 1:
+            return jsonify({'success': False, 'error': 'Valid gameweek number required'}), 400
+            
+        # Team name mapping dictionary
+        ODDS_TO_FANTRAX = {
+            "Arsenal": "ARS", "Aston Villa": "AVL", "Bournemouth": "BOU",
+            "Brentford": "BRE", "Brighton": "BHA", "Burnley": "BUR", 
+            "Chelsea": "CHE", "Crystal Palace": "CRY", "Everton": "EVE",
+            "Fulham": "FUL", "Leeds": "LEE", "Liverpool": "LIV",
+            "Manchester City": "MCI", "Manchester Utd": "MUN", "Newcastle": "NEW",
+            "Nottingham": "NFO", "Sunderland": "SUN", "Tottenham": "TOT",
+            "West Ham": "WHU", "Wolves": "WOL"
+        }
+        
+        # Parse CSV content
+        import csv, io
+        from datetime import datetime
+        
+        csv_content = file.read().decode('utf-8')
+        csv_reader = csv.reader(io.StringIO(csv_content))
+        
+        # Skip header row
+        next(csv_reader, None)
+        
+        processed_matches = 0
+        skipped_matches = 0
+        current_date = None
+        
+        conn = get_db_connection()
+        cursor = conn.cursor()
+        
+        # Clear existing odds for this gameweek
+        cursor.execute("DELETE FROM fixture_odds WHERE gameweek = %s", [gameweek])
+        cursor.execute("DELETE FROM team_fixtures WHERE gameweek = %s", [gameweek])
+        
+        for row in csv_reader:
+            if len(row) < 7:
+                continue
+                
+            # Parse row data
+            date_str = row[0].strip().strip('"')
+            time_str = row[1].strip().strip('"') 
+            home_team = row[2].strip().strip('"')
+            away_team = row[3].strip().strip('"')
+            
+            try:
+                home_odds = float(row[4].strip().strip('"'))
+                draw_odds = float(row[5].strip().strip('"'))
+                away_odds = float(row[6].strip().strip('"'))
+            except (ValueError, IndexError):
+                skipped_matches += 1
+                continue
+                
+            # Handle date continuation (empty date means same as previous)
+            if date_str:
+                current_date = date_str
+            elif current_date:
+                date_str = current_date
+            else:
+                skipped_matches += 1
+                continue
+                
+            # Parse date (handle different formats)
+            try:
+                if date_str.startswith('Today'):
+                    match_date = datetime.now().date()
+                else:
+                    # Try parsing "22 Aug 2025" format
+                    match_date = datetime.strptime(date_str, '%d %b %Y').date()
+            except ValueError:
+                try:
+                    # Try alternative formats if needed
+                    match_date = datetime.strptime(date_str, '%Y-%m-%d').date()
+                except ValueError:
+                    skipped_matches += 1
+                    continue
+                    
+            # Map team names to codes
+            home_code = ODDS_TO_FANTRAX.get(home_team)
+            away_code = ODDS_TO_FANTRAX.get(away_team)
+            
+            if not home_code or not away_code:
+                skipped_matches += 1
+                continue
+                
+            # Insert odds data
+            try:
+                cursor.execute("""
+                    INSERT INTO fixture_odds 
+                    (gameweek, match_date, home_team, away_team, home_odds, draw_odds, away_odds)
+                    VALUES (%s, %s, %s, %s, %s, %s, %s)
+                    ON CONFLICT (gameweek, home_team, away_team) DO UPDATE SET
+                        match_date = EXCLUDED.match_date,
+                        home_odds = EXCLUDED.home_odds,
+                        draw_odds = EXCLUDED.draw_odds,
+                        away_odds = EXCLUDED.away_odds
+                """, [gameweek, match_date, home_code, away_code, home_odds, draw_odds, away_odds])
+                
+                # Calculate difficulty scores
+                def calculate_difficulty_score(home_odds, away_odds, is_home_team):
+                    # Calculate implied probabilities (simplified - not accounting for overround)
+                    home_prob = 1 / home_odds
+                    away_prob = 1 / away_odds
+                    total_prob = home_prob + away_prob + (1/draw_odds)
+                    
+                    # Normalize probabilities
+                    home_prob_norm = home_prob / total_prob
+                    away_prob_norm = away_prob / total_prob
+                    
+                    # Get opponent strength
+                    opponent_strength = away_prob_norm if is_home_team else home_prob_norm
+                    
+                    # Map to -10 to +10 scale (0.5 = neutral)
+                    difficulty_score = (opponent_strength - 0.5) * 20
+                    return round(difficulty_score, 1)
+                
+                home_difficulty = calculate_difficulty_score(home_odds, away_odds, True)
+                away_difficulty = calculate_difficulty_score(home_odds, away_odds, False)
+                
+                # Insert fixture difficulty data
+                cursor.execute("""
+                    INSERT INTO team_fixtures 
+                    (gameweek, team_code, opponent_code, is_home, difficulty_score)
+                    VALUES (%s, %s, %s, %s, %s)
+                    ON CONFLICT (gameweek, team_code) DO UPDATE SET
+                        opponent_code = EXCLUDED.opponent_code,
+                        is_home = EXCLUDED.is_home,
+                        difficulty_score = EXCLUDED.difficulty_score
+                """, [gameweek, home_code, away_code, True, home_difficulty])
+                
+                cursor.execute("""
+                    INSERT INTO team_fixtures 
+                    (gameweek, team_code, opponent_code, is_home, difficulty_score)
+                    VALUES (%s, %s, %s, %s, %s)
+                    ON CONFLICT (gameweek, team_code) DO UPDATE SET
+                        opponent_code = EXCLUDED.opponent_code,
+                        is_home = EXCLUDED.is_home,
+                        difficulty_score = EXCLUDED.difficulty_score
+                """, [gameweek, away_code, home_code, False, away_difficulty])
+                
+                processed_matches += 1
+                
+            except Exception as e:
+                print(f"Error processing match {home_team} vs {away_team}: {e}")
+                skipped_matches += 1
+                continue
+                
+        # Commit all changes
+        conn.commit()
+        cursor.close()
+        conn.close()
+        
+        # Return success response
+        return jsonify({
+            'success': True,
+            'processed_matches': processed_matches,
+            'skipped_matches': skipped_matches,
+            'gameweek': gameweek,
+            'message': f'Successfully imported {processed_matches} matches for gameweek {gameweek}'
+        })
+        
+    except Exception as e:
+        return jsonify({
+            'success': False,
+            'error': f'Import failed: {str(e)}'
+        }), 500
+
+# ===============================
 # VALIDATION UI ROUTES
 # ===============================
 
@@ -1426,6 +1760,11 @@ def import_validation_ui():
 def form_upload_ui():
     """Serve the form data upload UI"""
     return render_template('form_upload.html')
+
+@app.route('/odds-upload')
+def odds_upload_ui():
+    """Serve the fixture odds upload UI"""
+    return render_template('odds_upload.html')
 
 @app.route('/monitoring')
 def monitoring_ui():

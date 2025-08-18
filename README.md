@@ -14,7 +14,7 @@ Two-panel dashboard for finding undervalued players through real-time parameter 
 - **Real-time Updates**: Parameter changes trigger immediate recalculation
 - **Advanced Name Matching**: 85%+ accuracy across multiple data sources
 
-**Features**: Form calculation, fixture difficulty, starter predictions, xGI multipliers, CSV imports
+**Features**: Odds-based fixture difficulty, form calculation, starter predictions, xGI multipliers, CSV imports, upload page integration
 
 ---
 
@@ -34,9 +34,10 @@ Visit: http://localhost:5000
 - Sort by any column (True Value, xGI90, etc.)
 
 ### **3. Import Data**
-- Upload CSV files for starter predictions
-- Sync Understat data for xGI stats
-- All imports use intelligent name matching
+- **📊 Upload Form Data**: Weekly Fantrax performance CSV via `/form-upload`
+- **⚽ Upload Fixture Odds**: OddsPortal betting data via `/odds-upload`
+- **CSV Import**: Upload starter predictions with intelligent name matching
+- **Sync xGI**: Understat data integration for expected goals involvement
 
 ---
 
@@ -47,9 +48,11 @@ Fantrax_Value_Hunter/
 ├── README.md                           # This file - Production overview
 ├── requirements.txt                    # Python dependencies
 ├── docs/
-│   ├── BUG_FIX_SPRINT_PLAN.md         # Current sprint planning
+│   ├── BUG_FIX_SPRINT_PLAN.md         # Sprint planning documentation
 │   ├── CURRENT_STATUS.md              # System status
-│   ├── GLOBAL_NAME_MATCHING_SYSTEM.md # Name matching docs
+│   ├── GLOBAL_NAME_MATCHING_SYSTEM.md # Name matching system docs
+│   ├── FORM_DATA_INFRASTRUCTURE.md    # Form data system guide
+│   ├── FIXTURE_DIFFICULTY_SYSTEM.md   # Odds-based fixture difficulty docs  
 │   ├── STARTER_IMPORT_GUIDE.md        # User guides
 │   └── CLAUDE.md                      # AI context file
 ├── src/
@@ -59,7 +62,9 @@ Fantrax_Value_Hunter/
 │       ├── matching_strategies.py     # 6 matching algorithms
 │       └── suggestion_engine.py       # Smart suggestions
 ├── templates/
-│   └── dashboard.html                 # ✅ Two-panel UI
+│   ├── dashboard.html                 # ✅ Two-panel UI with upload page links
+│   ├── form_upload.html               # ✅ Form data CSV upload interface
+│   └── odds_upload.html               # ✅ Fixture odds CSV upload interface
 ├── static/
 │   ├── css/dashboard.css             # ✅ Dashboard styling
 │   └── js/dashboard.js               # ✅ Parameter controls

@@ -22,12 +22,14 @@ document.addEventListener('DOMContentLoaded', function() {
     
     // Load initial configuration and data
     loadSystemConfig();
+    loadTeams();
     loadPlayersData();
     
     // Set up event listeners
     setupParameterControls();
     setupTableControls();
     setupFilterControls();
+    setupThemeToggle();
     
     console.log('✅ Dashboard initialization complete');
 });
@@ -55,6 +57,45 @@ async function loadSystemConfig() {
     }
 }
 
+async function loadTeams() {
+    try {
+        console.log('📡 Loading teams list...');
+        const response = await fetch('/api/teams');
+        const result = await response.json();
+        
+        if (response.ok) {
+            populateTeamDropdown(result.teams);
+            console.log(`✅ Loaded ${result.count} teams`);
+        } else {
+            throw new Error(result.error || 'Failed to load teams');
+        }
+    } catch (error) {
+        console.error('❌ Error loading teams:', error);
+        showError('Failed to load teams: ' + error.message);
+    }
+}
+
+function populateTeamDropdown(teams) {
+    const teamSelect = document.getElementById('team-select');
+    if (!teamSelect) {
+        console.warn('⚠️ Team dropdown not found');
+        return;
+    }
+    
+    // Clear existing options except "All Teams"
+    teamSelect.innerHTML = '<option value="">All Teams</option>';
+    
+    // Add each team as an option
+    teams.forEach(team => {
+        const option = document.createElement('option');
+        option.value = team;
+        option.textContent = team;
+        teamSelect.appendChild(option);
+    });
+    
+    console.log(`✅ Team dropdown populated with ${teams.length} teams`);
+}
+
 async function loadPlayersData() {
     try {
         console.log('📡 Loading 633 players data...');
@@ -64,11 +105,13 @@ async function loadPlayersData() {
         const params = new URLSearchParams({
             gameweek: 1,
             limit: pageSize,
-            offset: currentPage * pageSize
+            offset: currentPage * pageSize,
+            sort_by: currentSort.field,
+            sort_direction: currentSort.direction
         });
         
         // Add filters
-        if (currentFilters.positions.length < 4) {
+        if (currentFilters.positions.length > 0 && currentFilters.positions.length < 4) {
             params.append('position', currentFilters.positions.join(','));
         }
         if (currentFilters.priceMin > 5.0) {
@@ -79,6 +122,9 @@ async function loadPlayersData() {
         }
         if (currentFilters.search) {
             params.append('search', currentFilters.search);
+        }
+        if (currentFilters.teams.length > 0) {
+            params.append('team', currentFilters.teams.join(','));
         }
         
         const response = await fetch(`/api/players?${params.toString()}`);
@@ -121,27 +167,32 @@ function updateUIFromConfig() {
     document.getElementById('baseline-switchover').value = formCalc.baseline_switchover_gameweek || 10;
     updateSlider('form-strength-slider', formCalc.form_strength || 1.0);
     
-    // Fixture difficulty controls
+    // Fixture difficulty controls (odds-based)
     const fixtureDiff = currentConfig.fixture_difficulty || {};
     document.getElementById('fixture-enabled').checked = fixtureDiff.enabled || false;
     
-    if (fixtureDiff.mode === '3_tier') {
-        document.getElementById('mode-3tier').checked = true;
+    // Set preset
+    const presetSelect = document.getElementById('fixture-preset');
+    const currentStrength = fixtureDiff.multiplier_strength || 0.2;
+    if (currentStrength === 0.1) {
+        presetSelect.value = 'conservative';
+    } else if (currentStrength === 0.3) {
+        presetSelect.value = 'aggressive';
+    } else if (currentStrength === 0.2) {
+        presetSelect.value = 'balanced';
     } else {
-        document.getElementById('mode-5tier').checked = true;
+        presetSelect.value = 'custom';
     }
     
-    // Update 5-tier sliders
-    const tier5 = fixtureDiff['5_tier_multipliers'] || {};
-    updateSlider('very-easy-slider', tier5.very_easy?.multiplier || 1.3);
-    updateSlider('easy-slider', tier5.easy?.multiplier || 1.15);
-    updateSlider('hard-slider', tier5.hard?.multiplier || 0.85);
-    updateSlider('very-hard-slider', tier5.very_hard?.multiplier || 0.7);
+    // Update multiplier strength
+    updateSlider('multiplier-strength-slider', currentStrength);
     
-    // Update 3-tier sliders
-    const tier3 = fixtureDiff['3_tier_multipliers'] || {};
-    updateSlider('easy-3tier-slider', tier3.easy?.multiplier || 1.2);
-    updateSlider('hard-3tier-slider', tier3.hard?.multiplier || 0.8);
+    // Update position weights
+    const positionWeights = fixtureDiff.position_weights || {};
+    updateSlider('goalkeeper-weight-slider', positionWeights.G || 1.10);
+    updateSlider('defender-weight-slider', positionWeights.D || 1.20);
+    updateSlider('midfielder-weight-slider', positionWeights.M || 1.00);
+    updateSlider('forward-weight-slider', positionWeights.F || 1.05);
     
     // Starter prediction controls
     const starterPred = currentConfig.starter_prediction || {};
@@ -159,8 +210,6 @@ function updateUIFromConfig() {
     // Update control section visibility
     updateControlVisibility();
     
-    // Update tier mode visibility
-    toggleTierMode();
 }
 
 function updateSlider(sliderId, value) {
@@ -169,7 +218,31 @@ function updateSlider(sliderId, value) {
     
     if (slider && display) {
         slider.value = value;
-        display.textContent = value.toFixed(2) + 'x';
+        // Handle different display formats
+        if (sliderId.includes('multiplier-strength')) {
+            display.textContent = `±${(value * 100).toFixed(0)}%`;
+        } else if (sliderId.includes('weight')) {
+            display.textContent = `${(value * 100).toFixed(0)}%`;
+        } else {
+            display.textContent = value.toFixed(2) + 'x';
+        }
+    }
+}
+
+function handleFixturePresetChange() {
+    const preset = document.getElementById('fixture-preset').value;
+    
+    if (preset !== 'custom') {
+        const presets = {
+            'conservative': { strength: 0.1 },
+            'balanced': { strength: 0.2 },
+            'aggressive': { strength: 0.3 }
+        };
+        
+        if (presets[preset]) {
+            updateSlider('multiplier-strength-slider', presets[preset].strength);
+            handleParameterChange();
+        }
     }
 }
 
@@ -191,11 +264,6 @@ function updateControlVisibility() {
     document.getElementById('xgiContent').style.opacity = xgiEnabled ? '1' : '0.5';
 }
 
-function toggleTierMode() {
-    const tier3Selected = document.getElementById('mode-3tier').checked;
-    document.getElementById('tier-5-controls').style.display = tier3Selected ? 'none' : 'block';
-    document.getElementById('tier-3-controls').style.display = tier3Selected ? 'block' : 'none';
-}
 
 // =================================================================
 // PLAYER TABLE FUNCTIONS
@@ -307,24 +375,16 @@ function setupParameterControls() {
     document.getElementById('baseline-switchover').addEventListener('change', handleParameterChange);
     setupSlider('form-strength-slider');
     
-    // Fixture difficulty controls
+    // Fixture difficulty controls (odds-based)
     document.getElementById('fixture-enabled').addEventListener('change', handleParameterChange);
-    document.getElementById('mode-3tier').addEventListener('change', handleParameterChange);
-    document.getElementById('mode-5tier').addEventListener('change', handleParameterChange);
+    document.getElementById('fixture-preset').addEventListener('change', handleFixturePresetChange);
     
-    // 5-tier sliders
-    setupSlider('very-easy-slider');
-    setupSlider('easy-slider');
-    setupSlider('hard-slider');
-    setupSlider('very-hard-slider');
-    
-    // 3-tier sliders  
-    setupSlider('easy-3tier-slider');
-    setupSlider('hard-3tier-slider');
-    
-    // Tier mode switching
-    document.getElementById('mode-3tier').addEventListener('change', toggleTierMode);
-    document.getElementById('mode-5tier').addEventListener('change', toggleTierMode);
+    // Fixture sliders
+    setupSlider('multiplier-strength-slider');
+    setupSlider('goalkeeper-weight-slider');
+    setupSlider('defender-weight-slider');
+    setupSlider('midfielder-weight-slider');
+    setupSlider('forward-weight-slider');
     
     // Starter prediction controls
     document.getElementById('starter-enabled').addEventListener('change', handleParameterChange);
@@ -394,57 +454,35 @@ function buildParameterChanges() {
         };
     }
     
-    // Fixture difficulty changes
+    // Fixture difficulty changes (odds-based)
     const fixtureEnabled = document.getElementById('fixture-enabled').checked;
-    const mode = document.getElementById('mode-5tier').checked ? '5_tier' : '3_tier';
+    const multiplierStrength = parseFloat(document.getElementById('multiplier-strength-slider').value);
+    const goalkeeperWeight = parseFloat(document.getElementById('goalkeeper-weight-slider').value);
+    const defenderWeight = parseFloat(document.getElementById('defender-weight-slider').value);
+    const midfielderWeight = parseFloat(document.getElementById('midfielder-weight-slider').value);
+    const forwardWeight = parseFloat(document.getElementById('forward-weight-slider').value);
     
-    const tier5Multipliers = {};
-    const tier3Multipliers = {};
-    const currentTier5 = currentConfig.fixture_difficulty?.['5_tier_multipliers'] || {};
-    const currentTier3 = currentConfig.fixture_difficulty?.['3_tier_multipliers'] || {};
+    const currentFixture = currentConfig.fixture_difficulty || {};
+    const currentPositionWeights = currentFixture.position_weights || {};
     
-    // Handle 5-tier multipliers
-    ['very-easy', 'easy', 'hard', 'very-hard'].forEach(tier => {
-        const slider = document.getElementById(`${tier}-slider`);
-        const newValue = parseFloat(slider.value);
-        const currentValue = currentTier5[tier.replace('-', '_')]?.multiplier || 
-                            (tier === 'very-easy' ? 1.3 : tier === 'easy' ? 1.15 : 
-                             tier === 'hard' ? 0.85 : 0.7);
+    if (fixtureEnabled !== (currentFixture.enabled || false) ||
+        Math.abs(multiplierStrength - (currentFixture.multiplier_strength || 0.2)) > 0.01 ||
+        Math.abs(goalkeeperWeight - (currentPositionWeights.G || 1.10)) > 0.01 ||
+        Math.abs(defenderWeight - (currentPositionWeights.D || 1.20)) > 0.01 ||
+        Math.abs(midfielderWeight - (currentPositionWeights.M || 1.00)) > 0.01 ||
+        Math.abs(forwardWeight - (currentPositionWeights.F || 1.05)) > 0.01) {
         
-        if (Math.abs(newValue - currentValue) > 0.01) {
-            tier5Multipliers[tier.replace('-', '_')] = { multiplier: newValue };
-        }
-    });
-    
-    // Handle 3-tier multipliers
-    ['easy', 'hard'].forEach(tier => {
-        const slider = document.getElementById(`${tier}-3tier-slider`);
-        const newValue = parseFloat(slider.value);
-        const currentValue = currentTier3[tier]?.multiplier || 
-                            (tier === 'easy' ? 1.2 : 0.8);
-        
-        if (Math.abs(newValue - currentValue) > 0.01) {
-            tier3Multipliers[tier] = { multiplier: newValue };
-        }
-    });
-    
-    // Build fixture difficulty changes object
-    const fixtureChanges = {
-        enabled: fixtureEnabled,
-        mode: mode
-    };
-    
-    if (mode === '5_tier' && Object.keys(tier5Multipliers).length > 0) {
-        fixtureChanges['5_tier_multipliers'] = tier5Multipliers;
-    } else if (mode === '3_tier' && Object.keys(tier3Multipliers).length > 0) {
-        fixtureChanges['3_tier_multipliers'] = tier3Multipliers;
-    }
-    
-    if (fixtureEnabled !== (currentConfig.fixture_difficulty?.enabled || false) ||
-        mode !== (currentConfig.fixture_difficulty?.mode || '5_tier') ||
-        Object.keys(tier5Multipliers).length > 0 ||
-        Object.keys(tier3Multipliers).length > 0) {
-        changes.fixture_difficulty = fixtureChanges;
+        changes.fixture_difficulty = {
+            enabled: fixtureEnabled,
+            mode: 'odds_based',
+            multiplier_strength: multiplierStrength,
+            position_weights: {
+                G: goalkeeperWeight,
+                D: defenderWeight,
+                M: midfielderWeight,
+                F: forwardWeight
+            }
+        };
     }
     
     // Starter prediction changes
@@ -613,9 +651,9 @@ function handleSort(field) {
     const indicator = document.querySelector(`[data-sort="${field}"] .sort-indicator`);
     indicator.textContent = currentSort.direction === 'asc' ? '▲' : '▼';
     
-    // Sort current data and update table
-    sortPlayersData();
-    updatePlayerTable();
+    // Reset to first page and reload data with new sort
+    currentPage = 0;
+    loadPlayersData();
 }
 
 function sortPlayersData() {
@@ -654,6 +692,9 @@ function setupFilterControls() {
     document.getElementById('price-min').addEventListener('change', handleFilterChange);
     document.getElementById('price-max').addEventListener('change', handleFilterChange);
     
+    // Team filter
+    document.getElementById('team-select').addEventListener('change', handleFilterChange);
+    
     // Search
     document.getElementById('player-search').addEventListener('input', 
         debounce(handleFilterChange, 500));
@@ -671,6 +712,17 @@ function handleFilterChange() {
     currentFilters.priceMin = parseFloat(document.getElementById('price-min').value) || 5.0;
     currentFilters.priceMax = parseFloat(document.getElementById('price-max').value) || 25.0;
     currentFilters.search = document.getElementById('player-search').value.trim();
+    
+    // Update team filter - handle multiple select dropdown
+    const teamSelect = document.getElementById('team-select');
+    currentFilters.teams = [];
+    if (teamSelect) {
+        Array.from(teamSelect.selectedOptions).forEach(option => {
+            if (option.value) { // Skip empty "All Teams" option
+                currentFilters.teams.push(option.value);
+            }
+        });
+    }
     
     // Reset to first page
     currentPage = 0;
@@ -710,6 +762,17 @@ function showError(message) {
     console.error('❌', message);
     updateStatus(message, 'error');
     alert('Error: ' + message);
+}
+
+function showSuccess(message) {
+    console.log('✅', message);
+    updateStatus(message, 'success');
+    alert(message);
+}
+
+function showMessage(message, type = 'info') {
+    console.log('ℹ️', message);
+    updateStatus(message, type);
 }
 
 function escapeHtml(text) {
@@ -819,15 +882,124 @@ async function loadUnderstatStats() {
 
 // Initialize CSV file input handler
 document.addEventListener('DOMContentLoaded', function() {
-    document.getElementById('csv-file-input').addEventListener('change', function(e) {
-        const file = e.target.files[0];
-        if (file) {
-            console.log('📁 CSV file selected:', file.name);
-            // TODO: Implement CSV upload to /api/import-lineups
-            showError('CSV import functionality coming in Day 6');
-        }
-    });
+    const csvInput = document.getElementById('csv-file-input');
+    console.log('🔧 CSV input element found:', csvInput);
+    
+    if (csvInput) {
+        csvInput.addEventListener('change', function(e) {
+            const file = e.target.files[0];
+            console.log('📁 File change event triggered, file:', file);
+            if (file) {
+                console.log('📁 CSV file selected:', file.name);
+            
+            // Validate file type
+            if (!file.name.toLowerCase().endsWith('.csv')) {
+                showError('Please select a CSV file');
+                return;
+            }
+            
+            // Show upload progress
+            const uploadMessage = `Uploading ${file.name}...`;
+            showMessage(uploadMessage, 'info');
+            
+            // Create form data for upload
+            const formData = new FormData();
+            formData.append('lineups_csv', file);
+            
+            // Upload to backend API
+            fetch('/api/import-lineups', {
+                method: 'POST',
+                body: formData
+            })
+            .then(response => response.json())
+            .then(data => {
+                if (data.success) {
+                    // Show detailed success message
+                    const successMsg = `✅ CSV imported successfully!\n` +
+                        `📊 Total players: ${data.total_players}\n` +
+                        `✓ Matched: ${data.matched_players} (${data.match_rate.toFixed(1)}%)\n` +
+                        `⚠ Needs review: ${data.unmatched_players || 0}`;
+                    
+                    showSuccess(successMsg);
+                    
+                    // Refresh the table to show updated multipliers
+                    loadPlayersData();
+                    
+                    // Show additional details if available
+                    if (data.confidence_breakdown) {
+                        console.log('📈 Confidence breakdown:', data.confidence_breakdown);
+                    }
+                    
+                    if (data.unmatched_players > 0) {
+                        console.log('⚠ Some players need manual review. Check /import-validation for details.');
+                        
+                        // Store unmatched data in sessionStorage for validation page
+                        const validationData = {
+                            unmatched_count: data.unmatched_players,
+                            total_players: data.total_players,
+                            matched_players: data.matched_players,
+                            unmatched_details: data.unmatched_details || [],
+                            csv_format: data.csv_format,
+                            timestamp: Date.now()
+                        };
+                        sessionStorage.setItem('pendingValidation', JSON.stringify(validationData));
+                        
+                        // Redirect to manual validation page after showing success message
+                        setTimeout(() => {
+                            window.location.href = '/import-validation';
+                        }, 2000); // 2 second delay to let user read the success message
+                    }
+                } else {
+                    showError(`Import failed: ${data.error || 'Unknown error'}`);
+                }
+            })
+            .catch(error => {
+                console.error('Upload error:', error);
+                showError(`Upload failed: ${error.message}`);
+            });
+            }
+        });
+    } else {
+        console.error('❌ CSV input element not found!');
+    }
     
     // Load Understat stats on page load
     loadUnderstatStats();
 });
+
+// =================================================================
+// THEME TOGGLE FUNCTIONS
+// =================================================================
+
+function setupThemeToggle() {
+    const themeToggle = document.getElementById('theme-toggle');
+    
+    // Load saved theme preference or default to light
+    const savedTheme = localStorage.getItem('theme') || 'light';
+    setTheme(savedTheme);
+    
+    // Set up click handler
+    themeToggle.addEventListener('click', function() {
+        const currentTheme = document.documentElement.getAttribute('data-theme') || 'light';
+        const newTheme = currentTheme === 'light' ? 'dark' : 'light';
+        setTheme(newTheme);
+    });
+}
+
+function setTheme(theme) {
+    // Apply theme to document
+    document.documentElement.setAttribute('data-theme', theme);
+    
+    // Update button text and icon
+    const themeToggle = document.getElementById('theme-toggle');
+    if (theme === 'dark') {
+        themeToggle.textContent = '☀️ Light Mode';
+    } else {
+        themeToggle.textContent = '🌙 Dark Mode';
+    }
+    
+    // Save preference
+    localStorage.setItem('theme', theme);
+    
+    console.log(`🎨 Theme switched to: ${theme}`);
+}

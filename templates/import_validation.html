@@ -301,6 +301,7 @@
             <div class="file-input">
                 <label for="csvFile"><strong>Select CSV File:</strong></label>
                 <input type="file" id="csvFile" accept=".csv" />
+                <div id="selectedFileName" style="margin-top: 8px; color: #666; font-size: 14px;">No file chosen</div>
             </div>
             <div>
                 <label for="sourceSystem"><strong>Source System:</strong></label>
@@ -371,6 +372,75 @@
     <script>
         let validationData = null;
         let confirmedMappings = {};
+        
+        // Initialize page
+        document.addEventListener('DOMContentLoaded', function() {
+            // Handle file input change
+            document.getElementById('csvFile').addEventListener('change', function(e) {
+                const fileName = e.target.files[0] ? e.target.files[0].name : 'No file chosen';
+                document.getElementById('selectedFileName').textContent = fileName;
+            });
+            
+            // Check if we have unmatched players from a recent import
+            checkForRecentImport();
+        });
+        
+        async function checkForRecentImport() {
+            try {
+                // Check for pending validation data in sessionStorage
+                const pendingData = sessionStorage.getItem('pendingValidation');
+                if (pendingData) {
+                    const importData = JSON.parse(pendingData);
+                    const ageMinutes = (Date.now() - importData.timestamp) / (1000 * 60);
+                    
+                    // Only use data if it's less than 10 minutes old
+                    if (ageMinutes < 10) {
+                        showMessage(`Found ${importData.unmatched_count} unmatched players from recent import. Loading for review...`, 'success');
+                        
+                        // Convert import data to validation data format
+                        validationData = {
+                            summary: {
+                                total: importData.total_players,
+                                matched: importData.matched_players,
+                                needs_review: importData.unmatched_count,
+                                failed: 0,
+                                match_rate: (importData.matched_players / importData.total_players * 100)
+                            },
+                            players: importData.unmatched_details.map(player => ({
+                                original_name: player.name,
+                                original_team: player.team,
+                                original_position: player.position,
+                                needs_review: true,
+                                match_result: {
+                                    fantrax_name: player.suggested_match || null,
+                                    confidence: player.confidence || 0,
+                                    suggested_matches: player.suggestions || []
+                                }
+                            })),
+                            position_breakdown: {},
+                            source_system: 'ffs'
+                        };
+                        
+                        if (validationData) {
+                            displayValidationResults();
+                        }
+                        
+                        // Clear the session data after using it
+                        sessionStorage.removeItem('pendingValidation');
+                        return;
+                    } else {
+                        // Data is too old, remove it
+                        sessionStorage.removeItem('pendingValidation');
+                    }
+                }
+                
+                console.log('No recent import data available');
+            } catch (error) {
+                console.log('Error checking for recent import:', error);
+                // Clean up potentially corrupted session data
+                sessionStorage.removeItem('pendingValidation');
+            }
+        }
         
         function showMessage(message, type = 'error') {
             const messageArea = document.getElementById('messageArea');
@@ -547,6 +617,16 @@
                         <div id="suggestions-${index}">
                             ${suggestions.length > 0 ? '' : '<div class="no-suggestions">No suggestions available. This player may not exist in the database.</div>'}
                         </div>
+                        <div style="margin-top: 10px;">
+                            <div style="margin-bottom: 10px;">
+                                <label for="manual-select-${index}" style="font-weight: bold;">Manual Selection (${player.original_team} players):</label>
+                                <select id="manual-select-${index}" style="width: 100%; margin-top: 5px; padding: 8px;">
+                                    <option value="">Select a player from ${player.original_team}...</option>
+                                </select>
+                            </div>
+                            <button class="btn" onclick="confirmManualSelection(${index})" style="background: #28a745; color: white;">Confirm Selection</button>
+                            <span id="status-${index}" style="margin-left: 10px; font-weight: bold;"></span>
+                        </div>
                     </div>
                 `;
                 
@@ -572,6 +652,9 @@
                         suggestionsContainer.appendChild(suggestionItem);
                     });
                 }
+                
+                // Populate team-filtered dropdown
+                populateTeamDropdown(index, player.original_team);
             });
         }
         
@@ -593,6 +676,29 @@
                 confidence: suggestion.confidence
             };
             
+            // Show confirmation status
+            const statusElement = document.getElementById(`status-${playerIndex}`);
+            statusElement.textContent = `✓ Selected: ${suggestion.name}`;
+            statusElement.style.color = '#28a745';
+            
+            updateApplySection();
+        }
+        
+        function skipPlayer(playerIndex) {
+            // Remove any selections for this player
+            const allSuggestions = document.querySelectorAll(`#suggestions-${playerIndex} .suggestion-item`);
+            allSuggestions.forEach(item => item.classList.remove('selected'));
+            
+            // Remove from confirmed mappings
+            const reviewPlayers = validationData.players.filter(p => p.needs_review);
+            const player = reviewPlayers[playerIndex];
+            delete confirmedMappings[player.original_name];
+            
+            // Show skip status
+            const statusElement = document.getElementById(`status-${playerIndex}`);
+            statusElement.textContent = '⏭️ Skipped';
+            statusElement.style.color = '#6c757d';
+            
             updateApplySection();
         }
         
@@ -600,15 +706,103 @@
             const applySection = document.getElementById('applySection');
             const reviewPlayers = validationData.players.filter(p => p.needs_review);
             const confirmedCount = Object.keys(confirmedMappings).length;
+            const totalReviewNeeded = reviewPlayers.length;
             
-            if (reviewPlayers.length === 0 || confirmedCount === reviewPlayers.length) {
+            // Show apply section if user has made some progress (not requiring all players)
+            if (confirmedCount > 0 || totalReviewNeeded === 0) {
                 applySection.style.display = 'block';
+                
+                // Update the text to show progress
+                const progressText = document.querySelector('#applySection h3');
+                const detailText = document.querySelector('#applySection p');
+                
+                if (confirmedCount === totalReviewNeeded) {
+                    progressText.textContent = 'Ready to Apply Import - All Players Reviewed';
+                    detailText.textContent = `All ${totalReviewNeeded} players have been reviewed. Click below to apply the import.`;
+                } else {
+                    progressText.textContent = `Ready to Apply Import - ${confirmedCount}/${totalReviewNeeded} Players Confirmed`;
+                    detailText.textContent = `You've confirmed ${confirmedCount} out of ${totalReviewNeeded} players. You can apply now or continue reviewing.`;
+                }
             } else {
                 applySection.style.display = 'none';
             }
         }
         
+        async function populateTeamDropdown(playerIndex, teamName) {
+            try {
+                const response = await fetch(`/api/players-by-team?team=${encodeURIComponent(teamName)}`);
+                if (response.ok) {
+                    const players = await response.json();
+                    const dropdown = document.getElementById(`manual-select-${playerIndex}`);
+                    
+                    // Clear existing options except the first one
+                    dropdown.innerHTML = `<option value="">Select a player from ${teamName}...</option>`;
+                    
+                    // Add team players to dropdown
+                    players.forEach(player => {
+                        const option = document.createElement('option');
+                        option.value = JSON.stringify({
+                            fantrax_id: player.fantrax_id,
+                            name: player.name,
+                            team: player.team,
+                            position: player.position
+                        });
+                        option.textContent = `${player.name} - ${player.position}`;
+                        dropdown.appendChild(option);
+                    });
+                }
+            } catch (error) {
+                console.error('Error loading team players:', error);
+            }
+        }
+        
+        function confirmManualSelection(playerIndex) {
+            const dropdown = document.getElementById(`manual-select-${playerIndex}`);
+            const selectedValue = dropdown.value;
+            
+            if (!selectedValue) {
+                alert('Please select a player from the dropdown first.');
+                return;
+            }
+            
+            try {
+                const selectedPlayer = JSON.parse(selectedValue);
+                
+                // Clear any existing suggestion selections
+                const allSuggestions = document.querySelectorAll(`#suggestions-${playerIndex} .suggestion-item`);
+                allSuggestions.forEach(item => item.classList.remove('selected'));
+                
+                // Store the confirmed mapping
+                const reviewPlayers = validationData.players.filter(p => p.needs_review);
+                const player = reviewPlayers[playerIndex];
+                
+                confirmedMappings[player.original_name] = {
+                    fantrax_id: selectedPlayer.fantrax_id,
+                    fantrax_name: selectedPlayer.name,
+                    confidence: 100.0 // Manual selection gets 100% confidence
+                };
+                
+                // Show confirmation status
+                const statusElement = document.getElementById(`status-${playerIndex}`);
+                statusElement.textContent = `✓ Manually Selected: ${selectedPlayer.name}`;
+                statusElement.style.color = '#28a745';
+                
+                // Reset dropdown to default
+                dropdown.selectedIndex = 0;
+                
+                updateApplySection();
+                
+            } catch (error) {
+                console.error('Error processing manual selection:', error);
+                alert('Error processing selection. Please try again.');
+            }
+        }
+
         async function applyImport(dryRun = false) {
+            console.log('applyImport called with dryRun:', dryRun);
+            console.log('validationData:', validationData);
+            console.log('confirmedMappings:', confirmedMappings);
+            
             if (!validationData) {
                 showMessage('No validation data available.');
                 return;
@@ -618,17 +812,27 @@
             clearMessages();
             
             try {
+                const requestData = {
+                    source_system: document.getElementById('sourceSystem').value,
+                    players: validationData.players.map(p => p.original_data || {
+                        name: p.original_name,
+                        team: p.original_team,
+                        position: p.original_position
+                    }),
+                    confirmed_mappings: confirmedMappings,
+                    dry_run: dryRun
+                };
+                
+                console.log('Sending request data:', requestData);
+                console.log('Number of players:', requestData.players.length);
+                console.log('Number of confirmed mappings:', Object.keys(requestData.confirmed_mappings).length);
+                
                 const response = await fetch('/api/apply-import', {
                     method: 'POST',
                     headers: {
                         'Content-Type': 'application/json',
                     },
-                    body: JSON.stringify({
-                        source_system: document.getElementById('sourceSystem').value,
-                        players: validationData.players.map(p => p.original_data),
-                        confirmed_mappings: confirmedMappings,
-                        dry_run: dryRun
-                    })
+                    body: JSON.stringify(requestData)
                 });
                 
                 if (!response.ok) {

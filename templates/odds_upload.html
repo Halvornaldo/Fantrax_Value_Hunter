@@ -1,0 +1,371 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Fixture Odds Upload - Fantrax Value Hunter</title>
+    <style>
+        body {
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+            margin: 0;
+            padding: 20px;
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            min-height: 100vh;
+        }
+        
+        .container {
+            max-width: 800px;
+            margin: 0 auto;
+            background: white;
+            border-radius: 10px;
+            padding: 30px;
+            box-shadow: 0 10px 30px rgba(0,0,0,0.2);
+        }
+        
+        h1 {
+            color: #333;
+            text-align: center;
+            margin-bottom: 30px;
+            font-size: 2.2em;
+        }
+        
+        .upload-section {
+            background: #f8f9fa;
+            border-radius: 8px;
+            padding: 25px;
+            margin-bottom: 25px;
+            border: 2px dashed #dee2e6;
+        }
+        
+        .form-group {
+            margin-bottom: 20px;
+        }
+        
+        label {
+            display: block;
+            margin-bottom: 8px;
+            font-weight: 600;
+            color: #495057;
+        }
+        
+        input[type="file"] {
+            width: 100%;
+            padding: 12px;
+            border: 2px solid #dee2e6;
+            border-radius: 6px;
+            font-size: 16px;
+            background: white;
+        }
+        
+        input[type="number"] {
+            width: 200px;
+            padding: 12px;
+            border: 2px solid #dee2e6;
+            border-radius: 6px;
+            font-size: 16px;
+        }
+        
+        .upload-btn {
+            background: linear-gradient(135deg, #28a745, #20c997);
+            color: white;
+            border: none;
+            padding: 15px 30px;
+            font-size: 16px;
+            border-radius: 6px;
+            cursor: pointer;
+            transition: all 0.3s ease;
+            margin-top: 10px;
+        }
+        
+        .upload-btn:hover {
+            transform: translateY(-2px);
+            box-shadow: 0 5px 15px rgba(40, 167, 69, 0.4);
+        }
+        
+        .upload-btn:disabled {
+            background: #6c757d;
+            cursor: not-allowed;
+            transform: none;
+            box-shadow: none;
+        }
+        
+        .result {
+            padding: 20px;
+            border-radius: 6px;
+            margin-top: 20px;
+            display: none;
+        }
+        
+        .result.success {
+            background: #d4edda;
+            border: 1px solid #c3e6cb;
+            color: #155724;
+        }
+        
+        .result.error {
+            background: #f8d7da;
+            border: 1px solid #f5c6cb;
+            color: #721c24;
+        }
+        
+        .info-box {
+            background: #e3f2fd;
+            border-left: 4px solid #2196F3;
+            padding: 15px;
+            margin-bottom: 20px;
+            border-radius: 4px;
+        }
+        
+        .odds-link {
+            background: #fff3cd;
+            border-left: 4px solid #ffc107;
+            padding: 15px;
+            margin-bottom: 20px;
+            border-radius: 4px;
+        }
+        
+        .odds-btn {
+            background: #17a2b8;
+            color: white;
+            border: none;
+            padding: 10px 20px;
+            border-radius: 6px;
+            text-decoration: none;
+            display: inline-block;
+            margin-top: 8px;
+            transition: background 0.3s ease;
+        }
+        
+        .odds-btn:hover {
+            background: #138496;
+            color: white;
+            text-decoration: none;
+        }
+        
+        .stats-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+            gap: 15px;
+            margin-top: 15px;
+        }
+        
+        .stat-item {
+            background: #f8f9fa;
+            padding: 15px;
+            border-radius: 6px;
+            text-align: center;
+            border: 1px solid #dee2e6;
+        }
+        
+        .stat-number {
+            font-size: 1.8em;
+            font-weight: bold;
+            color: #28a745;
+        }
+        
+        .stat-label {
+            color: #6c757d;
+            font-size: 0.9em;
+            margin-top: 5px;
+        }
+        
+        .back-link {
+            display: inline-block;
+            margin-bottom: 20px;
+            color: #667eea;
+            text-decoration: none;
+            font-weight: 500;
+        }
+        
+        .back-link:hover {
+            text-decoration: underline;
+        }
+        
+        .loading {
+            display: none;
+            text-align: center;
+            padding: 20px;
+        }
+        
+        .loading-spinner {
+            border: 3px solid #f3f3f3;
+            border-top: 3px solid #667eea;
+            border-radius: 50%;
+            width: 30px;
+            height: 30px;
+            animation: spin 1s linear infinite;
+            margin: 0 auto 10px;
+        }
+        
+        @keyframes spin {
+            0% { transform: rotate(0deg); }
+            100% { transform: rotate(360deg); }
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <a href="/" class="back-link">← Back to Dashboard</a>
+        
+        <h1>⚽ Fixture Odds Upload</h1>
+        
+        <div class="odds-link">
+            <strong>📥 Step 1: Get CSV from OddsPortal</strong>
+            <p>Go to OddsPortal.com and export upcoming gameweek fixture odds to CSV:</p>
+            <a href="https://www.oddsportal.com/football/england/premier-league/" 
+               target="_blank" 
+               class="odds-btn">
+                🔗 Open OddsPortal Premier League
+            </a>
+            <small style="display: block; margin-top: 5px; color: #6c757d;">
+                Tip: Look for upcoming fixtures and export the odds data in CSV format
+            </small>
+        </div>
+        
+        <div class="info-box">
+            <strong>📤 Step 2: Upload Instructions</strong>
+            <ul>
+                <li>Upload the CSV file from OddsPortal with the correct gameweek number</li>
+                <li>Safe to re-upload - system will update existing odds if gameweek already exists</li>
+                <li>Expected format: Date, Team A, Team B, Odds A, Draw, Odds B, etc.</li>
+                <li>System calculates difficulty scores automatically from betting odds</li>
+                <li>Will recalculate all 633 player fixture multipliers after import</li>
+            </ul>
+        </div>
+        
+        <div class="upload-section">
+            <form id="uploadForm" enctype="multipart/form-data">
+                <div class="form-group">
+                    <label for="csvFile">OddsPortal CSV Export File:</label>
+                    <input type="file" id="csvFile" name="file" accept=".csv" required>
+                    <small style="color: #6c757d;">Select the CSV file downloaded from OddsPortal</small>
+                </div>
+                
+                <div class="form-group">
+                    <label for="gameweek">Gameweek Number:</label>
+                    <input type="number" id="gameweek" name="gameweek" min="1" max="38" required placeholder="e.g. 2">
+                    <small style="color: #6c757d;">Premier League gameweek (1-38)</small>
+                </div>
+                
+                <button type="submit" class="upload-btn">
+                    ⚽ Upload Fixture Odds
+                </button>
+            </form>
+        </div>
+        
+        <div class="loading" id="loading">
+            <div class="loading-spinner"></div>
+            <div>Processing odds data...</div>
+        </div>
+        
+        <div class="result" id="result"></div>
+    </div>
+
+    <script>
+        document.getElementById('uploadForm').addEventListener('submit', async function(e) {
+            e.preventDefault();
+            
+            const formData = new FormData(this);
+            const uploadBtn = document.querySelector('.upload-btn');
+            const loading = document.getElementById('loading');
+            const result = document.getElementById('result');
+            
+            // Show loading state
+            uploadBtn.disabled = true;
+            uploadBtn.textContent = 'Uploading...';
+            loading.style.display = 'block';
+            result.style.display = 'none';
+            
+            try {
+                const response = await fetch('/api/import-odds-data', {
+                    method: 'POST',
+                    body: formData
+                });
+                
+                const data = await response.json();
+                
+                // Hide loading
+                loading.style.display = 'none';
+                
+                if (data.success) {
+                    result.className = 'result success';
+                    result.innerHTML = `
+                        <h3>✅ Upload Successful!</h3>
+                        <p>${data.message}</p>
+                        
+                        <div class="stats-grid">
+                            <div class="stat-item">
+                                <div class="stat-number">${data.fixtures_imported}</div>
+                                <div class="stat-label">Fixtures Imported</div>
+                            </div>
+                            <div class="stat-item">
+                                <div class="stat-number">${data.teams_updated}</div>
+                                <div class="stat-label">Teams Updated</div>
+                            </div>
+                            <div class="stat-item">
+                                <div class="stat-number">${data.error_count || 0}</div>
+                                <div class="stat-label">Errors</div>
+                            </div>
+                            <div class="stat-item">
+                                <div class="stat-number">GW${data.gameweek}</div>
+                                <div class="stat-label">Gameweek</div>
+                            </div>
+                        </div>
+                        
+                        ${data.difficulty_scores ? `
+                            <div style="margin-top: 15px; padding: 15px; background: #e3f2fd; border-radius: 6px;">
+                                <strong>📊 Difficulty Scores Calculated:</strong><br>
+                                <small style="color: #6c757d;">
+                                    Scale: -10 (easiest) to +10 (hardest)<br>
+                                    Based on opponent betting odds probabilities
+                                </small>
+                            </div>
+                        ` : ''}
+                        
+                        ${data.skipped_fixtures && data.skipped_fixtures.length > 0 ? `
+                            <div style="margin-top: 15px; padding: 15px; background: #f8d7da; border-radius: 6px;">
+                                <strong>⚠️ Issues:</strong><br>
+                                ${data.skipped_fixtures.slice(0, 5).join('<br>')}
+                            </div>
+                        ` : ''}
+                        
+                        <div style="margin-top: 15px; padding: 15px; background: #d4edda; border-radius: 6px;">
+                            <strong>🔄 Next Step:</strong> Return to dashboard to see updated fixture multipliers for all 633 players!
+                        </div>
+                    `;
+                } else {
+                    result.className = 'result error';
+                    result.innerHTML = `
+                        <h3>❌ Upload Failed</h3>
+                        <p><strong>Error:</strong> ${data.error}</p>
+                    `;
+                }
+                
+                result.style.display = 'block';
+                
+            } catch (error) {
+                loading.style.display = 'none';
+                result.className = 'result error';
+                result.innerHTML = `
+                    <h3>❌ Upload Failed</h3>
+                    <p><strong>Network Error:</strong> ${error.message}</p>
+                `;
+                result.style.display = 'block';
+            } finally {
+                // Reset button
+                uploadBtn.disabled = false;
+                uploadBtn.textContent = '⚽ Upload Fixture Odds';
+            }
+        });
+        
+        // File input validation
+        document.getElementById('csvFile').addEventListener('change', function(e) {
+            const file = e.target.files[0];
+            if (file && !file.name.toLowerCase().endsWith('.csv')) {
+                alert('Please select a CSV file');
+                this.value = '';
+            }
+        });
+    </script>
+</body>
+</html>

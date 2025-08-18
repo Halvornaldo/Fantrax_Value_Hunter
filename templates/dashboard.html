@@ -64,64 +64,57 @@
                 <div class="parameter-section">
                     <h3>
                         <input type="checkbox" id="fixture-enabled" checked>
-                        <label for="fixture-enabled">Fixture Difficulty</label>
+                        <label for="fixture-enabled">Odds-Based Fixture Difficulty</label>
                     </h3>
                     <div class="fixture-controls" id="fixture-controls">
+                        <!-- Preset Selection -->
                         <div class="control-group">
-                            <label>Mode:</label>
-                            <div class="radio-group">
-                                <input type="radio" id="mode-3tier" name="fixture-mode" value="3_tier">
-                                <label for="mode-3tier">3-tier</label>
-                                <input type="radio" id="mode-5tier" name="fixture-mode" value="5_tier" checked>
-                                <label for="mode-5tier">5-tier</label>
+                            <label for="fixture-preset">Preset:</label>
+                            <select id="fixture-preset">
+                                <option value="conservative">Conservative (±10%)</option>
+                                <option value="balanced" selected>Balanced (±20%)</option>
+                                <option value="aggressive">Aggressive (±30%)</option>
+                                <option value="custom">Custom</option>
+                            </select>
+                        </div>
+                        
+                        <!-- Fine-tuning Controls -->
+                        <div class="slider-group">
+                            <label for="multiplier-strength-slider">Multiplier Strength:</label>
+                            <input type="range" id="multiplier-strength-slider" min="0.1" max="0.5" step="0.05" value="0.2">
+                            <span id="multiplier-strength-display">±20%</span>
+                        </div>
+                        
+                        <!-- Position Weights -->
+                        <div class="position-weights-section">
+                            <h4>Position Weights</h4>
+                            <div class="slider-group">
+                                <label for="goalkeeper-weight-slider">Goalkeepers:</label>
+                                <input type="range" id="goalkeeper-weight-slider" min="0.8" max="1.5" step="0.05" value="1.10">
+                                <span id="goalkeeper-weight-display">110%</span>
+                            </div>
+                            <div class="slider-group">
+                                <label for="defender-weight-slider">Defenders:</label>
+                                <input type="range" id="defender-weight-slider" min="0.8" max="1.5" step="0.05" value="1.20">
+                                <span id="defender-weight-display">120%</span>
+                            </div>
+                            <div class="slider-group">
+                                <label for="midfielder-weight-slider">Midfielders:</label>
+                                <input type="range" id="midfielder-weight-slider" min="0.8" max="1.5" step="0.05" value="1.00">
+                                <span id="midfielder-weight-display">100%</span>
+                            </div>
+                            <div class="slider-group">
+                                <label for="forward-weight-slider">Forwards:</label>
+                                <input type="range" id="forward-weight-slider" min="0.8" max="1.5" step="0.05" value="1.05">
+                                <span id="forward-weight-display">105%</span>
                             </div>
                         </div>
                         
-                        <!-- 5-tier multiplier controls -->
-                        <div id="tier-5-controls" class="tier-controls">
-                            <div class="slider-group">
-                                <label for="very-easy-slider">Very Easy:</label>
-                                <input type="range" id="very-easy-slider" min="1.2" max="1.5" step="0.05" value="1.3">
-                                <span id="very-easy-display">1.30x</span>
-                            </div>
-                            <div class="slider-group">
-                                <label for="easy-slider">Easy:</label>
-                                <input type="range" id="easy-slider" min="1.05" max="1.25" step="0.05" value="1.15">
-                                <span id="easy-display">1.15x</span>
-                            </div>
-                            <div class="slider-group neutral">
-                                <label>Neutral:</label>
-                                <span class="locked-value">1.00x (locked)</span>
-                            </div>
-                            <div class="slider-group">
-                                <label for="hard-slider">Hard:</label>
-                                <input type="range" id="hard-slider" min="0.75" max="0.95" step="0.05" value="0.85">
-                                <span id="hard-display">0.85x</span>
-                            </div>
-                            <div class="slider-group">
-                                <label for="very-hard-slider">Very Hard:</label>
-                                <input type="range" id="very-hard-slider" min="0.6" max="0.8" step="0.05" value="0.7">
-                                <span id="very-hard-display">0.70x</span>
-                            </div>
-                        </div>
-                        
-                        <!-- 3-tier multiplier controls -->
-                        <div id="tier-3-controls" class="tier-controls" style="display: none;">
-                            <div class="slider-group">
-                                <label for="easy-3tier-slider">Easy:</label>
-                                <input type="range" id="easy-3tier-slider" min="1.1" max="1.4" step="0.05" value="1.2">
-                                <span id="easy-3tier-display">1.20x</span>
-                            </div>
-                            <div class="slider-group neutral">
-                                <label>Neutral:</label>
-                                <span class="locked-value">1.00x (locked)</span>
-                            </div>
-                            <div class="slider-group">
-                                <label for="hard-3tier-slider">Hard:</label>
-                                <input type="range" id="hard-3tier-slider" min="0.7" max="0.9" step="0.05" value="0.8">
-                                <span id="hard-3tier-display">0.80x</span>
-                            </div>
-                        </div>
+                        <p class="help-text">
+                            Uses real betting odds to calculate 21-point difficulty scale (-10 to +10). 
+                            Position weights adjust impact based on role (defenders benefit more from clean sheets vs weaker teams).
+                            Current data: Gameweek 2 (10 matches imported).
+                        </p>
                     </div>
                 </div>
 
@@ -189,6 +182,9 @@
                     </button>
                     <button id="form-upload" class="btn-secondary" onclick="window.open('/form-upload', '_blank')">
                         📊 Upload Form Data
+                    </button>
+                    <button id="odds-upload" class="btn-secondary" onclick="window.open('/odds-upload', '_blank')">
+                        ⚽ Upload Fixture Odds
                     </button>
                 </div>
 
