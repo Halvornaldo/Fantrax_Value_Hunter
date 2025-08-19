@@ -269,11 +269,18 @@ function updateControlVisibility() {
 // PLAYER TABLE FUNCTIONS
 // =================================================================
 
+function getGamesClass(player) {
+    const gamesCount = parseInt(player.games_played_historical) || 0;
+    if (gamesCount >= 10) return 'games-reliable';
+    if (gamesCount >= 5) return 'games-moderate';
+    return 'games-unreliable';
+}
+
 function updatePlayerTable() {
     const tbody = document.getElementById('player-table-body');
     
     if (!playersData || playersData.length === 0) {
-        tbody.innerHTML = '<tr class="loading-row"><td colspan="13">No players found</td></tr>';
+        tbody.innerHTML = '<tr class="loading-row"><td colspan="17">No players found</td></tr>';
         return;
     }
     
@@ -282,6 +289,9 @@ function updatePlayerTable() {
         const valueClass = trueValue > 1.0 ? 'value-high' : trueValue > 0.5 ? 'value-medium' : 'value-low';
         const playerId = player.id;
         
+        const ppValue = parseFloat(player.value_score || 0);
+        const ppClass = ppValue >= 0.7 ? 'pp-excellent' : ppValue >= 0.5 ? 'pp-good' : ppValue >= 0.3 ? 'pp-average' : 'pp-poor';
+        
         return `
             <tr>
                 <td><strong>${escapeHtml(player.name || 'Unknown')}</strong></td>
@@ -289,14 +299,13 @@ function updatePlayerTable() {
                 <td>${escapeHtml(player.position || 'N/A')}</td>
                 <td>$${parseFloat(player.price || 0).toFixed(1)}</td>
                 <td>${parseFloat(player.ppg || 0).toFixed(1)}</td>
+                <td class="${ppClass}">${ppValue.toFixed(3)}</td>
+                <td class="${getGamesClass(player)}">${player.games_display || '0'}</td>
                 <td class="${valueClass}">${trueValue.toFixed(3)}</td>
-                <td>${player.minutes || 0}</td>
-                <td>${parseFloat(player.xg90 || 0).toFixed(3)}</td>
-                <td>${parseFloat(player.xa90 || 0).toFixed(3)}</td>
-                <td>${parseFloat(player.xgi90 || 0).toFixed(3)}</td>
                 <td>${parseFloat(player.form_multiplier || 1.0).toFixed(2)}x</td>
                 <td>${parseFloat(player.fixture_multiplier || 1.0).toFixed(2)}x</td>
                 <td>${parseFloat(player.starter_multiplier || 1.0).toFixed(2)}x</td>
+                <td>${parseFloat(player.xgi_multiplier || 1.0).toFixed(2)}x</td>
                 <td class="manual-override-cell">
                     <div class="override-checkboxes">
                         <label title="Force Starter (1.0x)">
@@ -317,6 +326,10 @@ function updatePlayerTable() {
                         </label>
                     </div>
                 </td>
+                <td>${parseFloat(player.xg90 || 0).toFixed(3)}</td>
+                <td>${parseFloat(player.xa90 || 0).toFixed(3)}</td>
+                <td>${parseFloat(player.xgi90 || 0).toFixed(3)}</td>
+                <td>${player.minutes || 0}</td>
             </tr>
         `;
     }).join('');
@@ -344,23 +357,123 @@ let manualOverrides = {};
 // MANUAL OVERRIDE HANDLERS
 // =================================================================
 
-function handleManualOverride(playerId, overrideType) {
-    if (overrideType === 'auto') {
-        // Remove override
-        delete manualOverrides[playerId];
-    } else {
-        // Set override
-        manualOverrides[playerId] = {
-            type: overrideType,
-            multiplier: overrideType === 'starter' ? 1.0 : 
-                       overrideType === 'bench' ? parseFloat(document.getElementById('bench-penalty-slider').value) :
-                       0.0 // out
-        };
+async function handleManualOverride(playerId, overrideType) {
+    try {
+        console.log('🔧 Applying manual override:', playerId, overrideType);
+        
+        // Call new immediate API endpoint
+        const response = await fetch('/api/manual-override', {
+            method: 'POST',
+            headers: {
+                'Content-Type': 'application/json'
+            },
+            body: JSON.stringify({
+                player_id: playerId,
+                override_type: overrideType,
+                gameweek: 1
+            })
+        });
+        
+        const result = await response.json();
+        
+        if (result.success) {
+            console.log(`✅ ${result.player_name}: ${overrideType} → ${result.new_multiplier.toFixed(2)}x → True Value: ${result.new_true_value.toFixed(3)}`);
+            
+            // Update the local data
+            const player = playersData.find(p => p.id == playerId);
+            if (player) {
+                player.starter_multiplier = result.new_multiplier;
+                player.true_value = result.new_true_value;
+            }
+            
+            // Update the table display immediately
+            updatePlayerRowInTable(playerId, result.new_multiplier, result.new_true_value);
+            
+            // Update global manual overrides tracking (for other features)
+            if (overrideType === 'auto') {
+                delete manualOverrides[playerId];
+            } else {
+                manualOverrides[playerId] = {
+                    type: overrideType,
+                    multiplier: result.new_multiplier
+                };
+            }
+            
+            // Show success feedback
+            showBriefSuccess(`${result.player_name}: ${overrideType.toUpperCase()} (${result.new_multiplier.toFixed(2)}x)`);
+            
+        } else {
+            console.error('❌ Manual override failed:', result.error);
+            showError('Manual override failed: ' + result.error);
+            
+            // Reset radio button to previous state
+            const radioButtons = document.querySelectorAll(`input[name="override-${playerId}"]`);
+            radioButtons.forEach(radio => {
+                if (radio.value === 'auto') radio.checked = true;
+                else radio.checked = false;
+            });
+        }
+        
+    } catch (error) {
+        console.error('❌ Manual override error:', error);
+        showError('Network error applying manual override');
+        
+        // Reset radio button to previous state
+        const radioButtons = document.querySelectorAll(`input[name="override-${playerId}"]`);
+        radioButtons.forEach(radio => {
+            if (radio.value === 'auto') radio.checked = true;
+            else radio.checked = false;
+        });
     }
+}
+
+function updatePlayerRowInTable(playerId, newMultiplier, newTrueValue) {
+    // Find the correct row in the table
+    const tableBody = document.getElementById('player-table-body');
+    const rows = tableBody.querySelectorAll('tr');
     
-    // Mark as pending change
-    handleParameterChange();
-    console.log('🔧 Manual override set:', playerId, overrideType, manualOverrides[playerId]);
+    rows.forEach(row => {
+        const radioButtons = row.querySelectorAll(`input[name="override-${playerId}"]`);
+        if (radioButtons.length > 0) {
+            const cells = row.cells;
+            
+            // Update True Value (column 7 - after adding Games column)
+            const valueClass = newTrueValue > 1.0 ? 'value-high' : newTrueValue > 0.5 ? 'value-medium' : 'value-low';
+            cells[7].textContent = newTrueValue.toFixed(3);
+            cells[7].className = valueClass;
+            
+            // Update Starter multiplier (column 13 - after adding Games column) with color coding
+            cells[13].textContent = `${newMultiplier.toFixed(2)}x`;
+            cells[13].style.fontWeight = 'bold';
+            cells[13].style.color = newMultiplier === 1.0 ? '#28a745' : 
+                                   newMultiplier === 0.0 ? '#dc3545' : '#ffc107';
+            
+            // Brief highlight animation
+            cells[7].style.backgroundColor = '#fff3cd';
+            cells[13].style.backgroundColor = '#fff3cd';
+            setTimeout(() => {
+                cells[7].style.backgroundColor = '';
+                cells[13].style.backgroundColor = '';
+            }, 1000);
+            
+            return;
+        }
+    });
+}
+
+function showBriefSuccess(message) {
+    const indicator = document.getElementById('status-indicator');
+    const originalText = indicator.textContent;
+    const originalClass = indicator.className;
+    
+    indicator.textContent = '✅ ' + message;
+    indicator.className = 'status-success';
+    
+    // Reset after 3 seconds
+    setTimeout(() => {
+        indicator.textContent = originalText;
+        indicator.className = originalClass;
+    }, 3000);
 }
 
 // =================================================================
@@ -515,9 +628,12 @@ function buildParameterChanges() {
         };
     }
     
-    // Manual overrides - add to changes if any exist
+    // Manual overrides - add to starter_prediction changes if any exist
     if (Object.keys(manualOverrides).length > 0) {
-        changes.manual_overrides = manualOverrides;
+        if (!changes.starter_prediction) {
+            changes.starter_prediction = {};
+        }
+        changes.starter_prediction.manual_overrides = manualOverrides;
     }
     
     return changes;
@@ -850,8 +966,20 @@ async function syncUnderstatData() {
         const data = await response.json();
         
         if (data.success) {
-            statusEl.textContent = `✓ Synced ${data.matched} players (${data.match_rate.toFixed(1)}% match rate)`;
+            statusEl.textContent = `✓ Synced ${data.successfully_matched} players (${data.match_rate.toFixed(1)}% match rate)`;
             statusEl.className = 'success';
+            
+            // If there are unmatched players, show option to review them
+            if (data.unmatched_players > 0) {
+                statusEl.textContent += ` - ${data.unmatched_players} need review`;
+                setTimeout(() => {
+                    if (confirm(`${data.unmatched_players} Understat players couldn't be automatically matched. Would you like to review them manually?`)) {
+                        // Route to import validation for manual matching
+                        window.location.href = '/import-validation?source=understat';
+                    }
+                }, 1000);
+            }
+            
             loadUnderstatStats();
             loadPlayersData(); // Refresh table
         } else {

@@ -164,11 +164,53 @@ result = matcher.match_player("matt o&#039;riley", "understat", "BHA", "M")
 - Leeds players: 0.791x (defenders), 0.809x (goalkeepers) - proper penalty for hard fixtures
 - All 633 players: Dynamic fixture multipliers (no more 1.00x lock)
 
-**📋 REMAINING ISSUES AFTER SPRINT 6**
-- Data validation dashboard for quality checks (Sprint 7)
-- Complete workflow documentation and user guides (Sprint 8)
+**📋 SPRINT 7 IN PROGRESS - Critical Bug Fixes**
+**Status**: ⚠️ Partial completion - Manual override fixed, Understat validation partially fixed  
+**Objective**: Fix two critical functionality issues discovered in production
+
+**✅ Bug 1: Manual Override of Starter Predictions Not Working** 
+- ✅ **FIXED**: Created `/api/manual-override` endpoint for immediate processing
+- ✅ **FIXED**: Manual override radio buttons now update starter multiplier in real-time
+- ✅ **FIXED**: Removed dependency on "Apply Changes" button click
+- ✅ **VERIFIED**: All manual override buttons (S/B/O/A) working correctly
+
+**✅ Bug 2: xGI Integration Name Matching Issues - FIXED**  
+- ✅ **FIXED**: "undefined" display issue - now shows actual player counts (36 unmatched)
+- ✅ **FIXED**: Understat unmatched players route through Global Name Matching System
+- ✅ **FIXED**: Team assignment reversal (Fulham/Wolves data corruption in Understat source)
+- ✅ **FIXED**: Empty BRE/NFO dropdowns (database uses BRF/NOT codes)  
+- ✅ **FIXED**: Apply-mappings endpoint 500 error (field name mismatches resolved)
+- ✅ **FIXED**: Database ID column confusion (id column contains fantrax_id values)
+
+**Technical Fixes Applied**:
+- Enhanced corruption detection logic for Fulham↔Wolves team swap in Understat data
+- Team code mapping verified: BRF (Brentford), NOT (Nottingham Forest) are correct
+- Fixed field name mismatches: `player_name` vs `name`, `xG90` vs `xg90` capitalization
+- Corrected database query structure: `WHERE id = %s` with fantrax_id value
+- Added comprehensive error handling and logging for debugging
+- Enhanced team validation with known corruption pattern detection
+
+**📋 SPRINT 8 PENDING - Data Validation Dashboard**
+- Complete data validation dashboard for quality checks
+- Comprehensive workflow documentation and user guides
 
 **🎯 KEY ACHIEVEMENT**: Complete fixture difficulty system operational with real-time odds-based calculation, 2x performance optimization, and full dashboard integration. All 633 players now have dynamic fixture multipliers replacing the non-functional 1.00x system.
+
+### **⚠️ CRITICAL: Database Team Codes Reference (2025-26 Season)**
+
+**Correct team codes in database:**
+- **Brentford**: `BRF` (NOT `BRE`)
+- **Nottingham Forest**: `NOT` (NOT `NFO`)
+- **All Other Teams**: Standard 3-letter codes
+
+**Complete team list verified in database:**
+`['ARS', 'AVL', 'BHA', 'BOU', 'BRF', 'BUR', 'CHE', 'CRY', 'EVE', 'FUL', 'LEE', 'LIV', 'MCI', 'MUN', 'NEW', 'NOT', 'SUN', 'TOT', 'WHU', 'WOL']`
+
+**Database ID Column Structure:**
+- **Column Name**: `id` (primary key)
+- **Column Content**: Contains Fantrax player IDs (e.g., "04tm0", "06yb9")
+- **SQL Usage**: `WHERE id = %s` (use column name 'id', not 'fantrax_id')
+- **Frontend Variables**: Often named `fantrax_id` for clarity, but maps to `id` column
 
 ---
 
@@ -400,5 +442,5 @@ python quick_lineup.py
 
 ---
 
-**Last Updated**: August 18, 2025 - Sprint 6 Fixture Difficulty System Complete  
-**Status**: Production dashboard operational with complete fixture difficulty system (6 sprints complete). Odds-based calculation with 2x performance optimization and upload page integration deployed. Next: Sprint 7 data validation dashboard. 🎯
+**Last Updated**: August 18, 2025 - Sprint 6 Complete, Sprint 7 Bug Fixes Identified  
+**Status**: Production dashboard operational with complete fixture difficulty system (6 sprints complete). Two critical bugs identified requiring Sprint 7 fixes before proceeding to Sprint 8 data validation dashboard. 🎯

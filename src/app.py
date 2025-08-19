@@ -12,6 +12,7 @@ import os
 from typing import Dict, List, Optional, Any
 import time
 import sys
+from datetime import datetime
 
 # Add name_matching module to path
 sys.path.append(os.path.dirname(__file__))
@@ -289,6 +290,10 @@ def recalculate_true_values(gameweek: int = 1):
                     capped_min = params['xgi_integration']['multiplier_modes']['capped'].get('min', 0.5)
                     capped_max = params['xgi_integration']['multiplier_modes']['capped'].get('max', 1.5)
                     xgi_mult = max(capped_min, min(capped_max, xgi90 * strength)) if xgi90 > 0 else 1.0
+                
+                # Debug: Log first few xGI calculations
+                if updated_count < 5 and xgi90 > 0:
+                    print(f"DEBUG: {player['name']} - xGI90: {xgi90}, mode: {xgi_mode}, strength: {strength} -> xgi_mult: {xgi_mult}")
             
             # Calculate True Value: (PPG ÷ Price) × Form × Fixture × Starter × xGI
             ppg = float(player['ppg']) if player['ppg'] else 0
@@ -303,7 +308,8 @@ def recalculate_true_values(gameweek: int = 1):
                 'true_value': true_value,
                 'form_multiplier': form_mult,
                 'fixture_multiplier': fixture_mult,
-                'starter_multiplier': starter_mult
+                'starter_multiplier': starter_mult,
+                'xgi_multiplier': xgi_mult
             })
             
             updated_count += 1
@@ -322,6 +328,7 @@ def recalculate_true_values(gameweek: int = 1):
                     update['form_multiplier'],
                     update['fixture_multiplier'],
                     update['starter_multiplier'],
+                    update['xgi_multiplier'],
                     update['player_id'],
                     gameweek
                 ) for update in batch_updates
@@ -337,8 +344,9 @@ def recalculate_true_values(gameweek: int = 1):
                     form_multiplier = data.form_mult,
                     fixture_multiplier = data.fixture_mult,
                     starter_multiplier = data.starter_mult,
+                    xgi_multiplier = data.xgi_mult,
                     last_updated = CURRENT_TIMESTAMP
-                FROM (VALUES %s) AS data(value_score, true_value, form_mult, fixture_mult, starter_mult, player_id, gameweek)
+                FROM (VALUES %s) AS data(value_score, true_value, form_mult, fixture_mult, starter_mult, xgi_mult, player_id, gameweek)
                 WHERE player_metrics.player_id = data.player_id AND player_metrics.gameweek = data.gameweek
                 """,
                 update_data,
@@ -352,6 +360,9 @@ def recalculate_true_values(gameweek: int = 1):
         
         elapsed_time = time.time() - start_time
         print(f"Recalculated True Values for {updated_count} players in {elapsed_time:.2f}s")
+        print(f"DEBUG: xGI integration enabled: {params.get('xgi_integration', {}).get('enabled', False)}")
+        if params.get('xgi_integration', {}):
+            print(f"DEBUG: xGI params: {params['xgi_integration']}")
         
         return {
             'success': True,
@@ -409,7 +420,10 @@ def get_players():
         'xgi90': 'p.xgi90',
         'form_multiplier': 'pm.form_multiplier',
         'fixture_multiplier': 'pm.fixture_multiplier',
-        'starter_multiplier': 'pm.starter_multiplier'
+        'starter_multiplier': 'pm.starter_multiplier',
+        'xgi_multiplier': 'pm.xgi_multiplier',
+        'games_played': 'pgd.games_played',
+        'games_played_historical': 'pgd.games_played_historical'
     }
     
     if sort_by not in valid_sort_fields:
@@ -422,16 +436,20 @@ def get_players():
     try:
         cursor = conn.cursor(cursor_factory=psycopg2.extras.RealDictCursor)
         
-        # Build dynamic query
+        # Build dynamic query with games data
         base_query = """
             SELECT 
                 p.id, p.name, p.team, p.position,
                 p.minutes, p.xg90, p.xa90, p.xgi90,
                 pm.price, pm.ppg, pm.value_score, pm.true_value,
-                pm.form_multiplier, pm.fixture_multiplier, pm.starter_multiplier,
-                pm.last_updated
+                pm.form_multiplier, pm.fixture_multiplier, pm.starter_multiplier, pm.xgi_multiplier,
+                pm.last_updated,
+                COALESCE(pgd.games_played, 0) as games_played,
+                COALESCE(pgd.games_played_historical, 0) as games_played_historical,
+                COALESCE(pgd.data_source, 'current') as data_source
             FROM players p
             JOIN player_metrics pm ON p.id = pm.player_id
+            LEFT JOIN player_games_data pgd ON p.id = pgd.player_id AND pm.gameweek = pgd.gameweek
             WHERE pm.gameweek = %s
         """
         
@@ -487,6 +505,32 @@ def get_players():
             # Convert any datetime objects to strings
             if player_dict.get('last_updated'):
                 player_dict['last_updated'] = player_dict['last_updated'].isoformat()
+            
+            # Format games display based on gameweek and data availability
+            games_current = player_dict.get('games_played', 0)
+            games_historical = player_dict.get('games_played_historical', 0)
+            
+            if gameweek <= 10:  # Early season - use historical data
+                if games_historical > 0:
+                    games_display = f"{games_historical} (24-25)"
+                else:
+                    games_display = "0"
+            elif gameweek <= 15:  # Transition period - blend data
+                if games_historical > 0 and games_current > 0:
+                    games_display = f"{games_historical}+{games_current}"
+                elif games_historical > 0:
+                    games_display = f"{games_historical} (24-25)"
+                else:
+                    games_display = str(games_current)
+            else:  # Late season - use current data
+                if games_current > 0:
+                    games_display = str(games_current)
+                elif games_historical > 0:
+                    games_display = f"{games_historical} (24-25)"
+                else:
+                    games_display = "0"
+            
+            player_dict['games_display'] = games_display
             players_list.append(player_dict)
         
         elapsed_time = time.time() - start_time
@@ -594,6 +638,103 @@ def update_parameters():
             'success': False,
             'error': str(e)
         }), 500
+
+@app.route('/api/manual-override', methods=['POST'])
+def manual_override():
+    """Apply manual starter override immediately for a specific player"""
+    try:
+        data = request.get_json()
+        if not data:
+            return jsonify({'error': 'No data provided'}), 400
+        
+        player_id = data.get('player_id')
+        override_type = data.get('override_type')  # 'starter', 'bench', 'out', 'auto'
+        gameweek = data.get('gameweek', 1)
+        
+        if not player_id or not override_type:
+            return jsonify({'error': 'player_id and override_type required'}), 400
+        
+        # Load current system parameters to get bench penalty
+        params = load_system_parameters()
+        bench_penalty = params.get('starter_prediction', {}).get('force_bench_penalty', 0.6)
+        
+        # Calculate multiplier based on override type
+        if override_type == 'starter':
+            multiplier = 1.0
+        elif override_type == 'bench':
+            multiplier = bench_penalty
+        elif override_type == 'out':
+            multiplier = 0.0
+        elif override_type == 'auto':
+            # Remove override - will use default CSV prediction or rotation penalty
+            multiplier = None  # Will be calculated based on CSV data
+        else:
+            return jsonify({'error': 'Invalid override_type'}), 400
+        
+        # Update database immediately
+        conn = get_db_connection()
+        cursor = conn.cursor()
+        
+        if override_type == 'auto':
+            # Remove manual override - use default rotation penalty
+            # (CSV starter logic is handled in bulk operations, not individual overrides)
+            rotation_penalty = params.get('starter_prediction', {}).get('auto_rotation_penalty', 0.65)
+            multiplier = rotation_penalty
+        
+        # Update player's starter multiplier
+        cursor.execute("""
+            UPDATE player_metrics 
+            SET starter_multiplier = %s
+            WHERE player_id = %s AND gameweek = %s
+        """, [multiplier, player_id, gameweek])
+        
+        # Recalculate True Value for this player
+        cursor.execute("""
+            UPDATE player_metrics 
+            SET true_value = (ppg / NULLIF(price, 0)) * form_multiplier * fixture_multiplier * starter_multiplier
+            WHERE player_id = %s AND gameweek = %s
+        """, [player_id, gameweek])
+        
+        # Get updated player data
+        cursor.execute("""
+            SELECT pm.true_value, pm.starter_multiplier, p.name
+            FROM player_metrics pm
+            JOIN players p ON pm.player_id = p.id
+            WHERE pm.player_id = %s AND pm.gameweek = %s
+        """, [player_id, gameweek])
+        
+        updated_player = cursor.fetchone()
+        conn.commit()
+        conn.close()
+        
+        # Update manual overrides in system parameters
+        if 'manual_overrides' not in params['starter_prediction']:
+            params['starter_prediction']['manual_overrides'] = {}
+        
+        if override_type == 'auto':
+            # Remove from manual overrides
+            if player_id in params['starter_prediction']['manual_overrides']:
+                del params['starter_prediction']['manual_overrides'][player_id]
+        else:
+            # Add/update manual override
+            params['starter_prediction']['manual_overrides'][player_id] = {
+                'type': override_type,
+                'multiplier': multiplier
+            }
+        
+        save_system_parameters(params)
+        
+        return jsonify({
+            'success': True,
+            'player_id': player_id,
+            'override_type': override_type,
+            'new_multiplier': multiplier,
+            'new_true_value': float(updated_player[0]) if updated_player else 0,
+            'player_name': updated_player[2] if updated_player else 'Unknown'
+        })
+        
+    except Exception as e:
+        return jsonify({'error': str(e)}), 500
 
 @app.route('/api/teams', methods=['GET'])
 def get_teams():
@@ -1932,25 +2073,53 @@ def get_monitoring_metrics():
 
 @app.route('/api/understat/sync', methods=['POST'])
 def sync_understat_data():
-    """Sync Understat data with database"""
+    """Sync Understat data with database using Global Name Matching System"""
     try:
-        # Initialize pipeline
-        pipeline = IntegrationPipeline(DB_CONFIG, dry_run=False)
+        # Initialize integrator to get raw Understat data
+        integrator = UnderstatIntegrator(DB_CONFIG)
+        understat_df = integrator.extract_understat_per90_stats()
         
-        # Run integration with current season 2025/2026
-        matched_df, unmatched_df, multiplier_table, stats = pipeline.integrator.generate_integration_data(
-            season="2025/2026",  # Current season
-            leagues=["EPL"]
-        )
+        if understat_df.empty:
+            return jsonify({'error': 'No Understat data available'}), 500
         
-        if matched_df is None:
-            return jsonify({'error': 'No data extracted from Understat'}), 500
+        # Use Global Name Matching System for improved matching
+        matcher = UnifiedNameMatcher(DB_CONFIG)
+        matched_players = []
+        unmatched_players = []
         
-        # Update database
+        for idx, player in understat_df.iterrows():
+            player_name = player.get('player_name', '')
+            team = player.get('team', '')
+            
+            # Try to match using Global Name Matching System
+            match_result = matcher.match_player(
+                source_name=player_name,
+                source_system='understat',
+                team=team,
+                position=None  # Understat doesn't always have reliable position data
+            )
+            
+            if match_result['fantrax_id'] is not None and match_result['confidence'] >= 70:
+                # High confidence match - add to matched list
+                player_dict = player.to_dict()
+                player_dict['fantrax_id'] = match_result['fantrax_id']
+                player_dict['fantrax_name'] = match_result['fantrax_name']
+                player_dict['confidence'] = match_result['confidence']
+                matched_players.append(player_dict)
+            else:
+                # Low confidence or no match - add to unmatched list for manual review
+                player_dict = player.to_dict()
+                player_dict['suggestions'] = match_result.get('suggested_matches', [])
+                player_dict['needs_review'] = match_result.get('needs_review', True)
+                player_dict['confidence'] = match_result.get('confidence', 0)
+                unmatched_players.append(player_dict)
+        
+        # Update database with matched players
         conn = get_db_connection()
         cursor = conn.cursor()
         
-        for idx, player in matched_df.iterrows():
+        updated_count = 0
+        for player in matched_players:
             cursor.execute("""
                 UPDATE players 
                 SET minutes = %s, xg90 = %s, xa90 = %s, xgi90 = %s,
@@ -1963,34 +2132,246 @@ def sync_understat_data():
                 round(player['xGI90'], 3),
                 player['fantrax_id']
             ])
+            updated_count += 1
         
         conn.commit()
+        conn.close()
+        
+        # Store unmatched players for validation UI (if any)
+        if unmatched_players:
+            # Save unmatched data to session or temporary storage for validation
+            import json
+            import os
+            validation_data = {
+                'source_system': 'understat',
+                'unmatched_players': unmatched_players,
+                'timestamp': time.time()
+            }
+            
+            # Save to temporary file for validation UI to access
+            temp_dir = os.path.join(os.path.dirname(__file__), '..', 'temp')
+            os.makedirs(temp_dir, exist_ok=True)
+            with open(os.path.join(temp_dir, 'understat_unmatched.json'), 'w') as f:
+                json.dump(validation_data, f)
+        
+        # Calculate match rate
+        total_players = len(matched_players) + len(unmatched_players)
+        match_rate = (len(matched_players) / total_players * 100) if total_players > 0 else 0
         
         # Update config
         system_params = load_system_parameters()
         system_params['xgi_integration']['last_sync'] = time.time()
-        system_params['xgi_integration']['matched_players'] = len(matched_df)
-        system_params['xgi_integration']['unmatched_players'] = len(unmatched_df)
+        system_params['xgi_integration']['matched_players'] = len(matched_players)
+        system_params['xgi_integration']['unmatched_players'] = len(unmatched_players)
         save_system_parameters(system_params)
         
         return jsonify({
             'success': True,
-            'total_understat_players': stats['total_understat_players'],
-            'successfully_matched': len(matched_df),
-            'unmatched_players': len(unmatched_df),
-            'match_rate': stats['match_rate'],
-            'avg_xGI90': stats['avg_xGI90'],
-            'top_xGI90_player': stats['top_xGI90_player'],
-            'max_xGI90': stats['max_xGI90'],
-            'players_updated': len(matched_df)
+            'total_understat_players': total_players,
+            'successfully_matched': len(matched_players),
+            'unmatched_players': len(unmatched_players),
+            'match_rate': match_rate,
+            'players_updated': updated_count
         })
         
     except Exception as e:
         return jsonify({'error': str(e)}), 500
 
+@app.route('/api/understat/get-unmatched-data', methods=['GET'])
+def get_understat_unmatched_data():
+    """Load saved unmatched Understat players for validation UI"""
+    try:
+        import os
+        import json
+        
+        # Check if unmatched data file exists
+        temp_dir = os.path.join(os.path.dirname(__file__), '..', 'temp')
+        unmatched_file = os.path.join(temp_dir, 'understat_unmatched.json')
+        
+        if not os.path.exists(unmatched_file):
+            return jsonify({
+                'status': 'error',
+                'message': 'No unmatched Understat data found. Please sync Understat data first.'
+            }), 404
+        
+        # Load the saved unmatched data
+        with open(unmatched_file, 'r') as f:
+            saved_data = json.load(f)
+        
+        # Check data age (only use if less than 1 hour old)
+        data_age_hours = (time.time() - saved_data['timestamp']) / 3600
+        if data_age_hours > 1:
+            return jsonify({
+                'status': 'error',
+                'message': f'Understat data is {data_age_hours:.1f} hours old. Please sync again.'
+            }), 410
+        
+        # Convert saved data to validation UI format
+        unmatched_players = saved_data['unmatched_players']
+        needs_review_count = len(unmatched_players)
+        
+        # Understat team name mapping to database team codes (2025-26 Premier League season)
+        understat_team_mapping = {
+            'Arsenal': 'ARS',
+            'Aston Villa': 'AVL',
+            'Bournemouth': 'BOU', 
+            'Brentford': 'BRF',  # Database uses BRF, not BRE
+            'Brighton': 'BHA',
+            'Brighton and Hove Albion': 'BHA',  # Alternative name
+            'Burnley': 'BUR',
+            'Chelsea': 'CHE',
+            'Crystal Palace': 'CRY',
+            'Everton': 'EVE',
+            'Fulham': 'FUL',
+            'Leeds United': 'LEE',
+            'Liverpool': 'LIV',
+            'Manchester City': 'MCI',
+            'Manchester United': 'MUN', 
+            'Newcastle United': 'NEW',
+            'Nottingham Forest': 'NOT',  # Database uses NOT, not NFO
+            'Sunderland': 'SUN',
+            'Tottenham': 'TOT',
+            'Tottenham Hotspur': 'TOT',  # Alternative name
+            'West Ham United': 'WHU',
+            'Wolverhampton Wanderers': 'WOL'
+        }
+        
+        # Current Premier League teams only (2025-26 season) - all 20 teams
+        current_pl_teams = {
+            'ARS', 'AVL', 'BOU', 'BRF', 'BHA', 'BUR', 'CHE', 'CRY', 
+            'EVE', 'FUL', 'LEE', 'LIV', 'MCI', 'MUN', 'NEW', 'NOT', 
+            'SUN', 'TOT', 'WHU', 'WOL'
+        }
+        
+        # Known data corruption patterns in Understat source
+        KNOWN_CORRUPTED_ASSIGNMENTS = {
+            # Fulham vs Wolves match has reversed team assignments
+            'Fulham': 'Wolverhampton Wanderers',
+            'Wolverhampton Wanderers': 'Fulham',
+        }
+        
+        # Team validation for known Understat data issues
+        def validate_and_correct_team(player_name, understat_team):
+            """Check if player's team assignment matches our database and correct if needed"""
+            
+            # Step 1: Check for known corruption patterns first
+            if understat_team in KNOWN_CORRUPTED_ASSIGNMENTS:
+                potential_correct_team = KNOWN_CORRUPTED_ASSIGNMENTS[understat_team]
+                print(f"Corruption check: {player_name} claims {understat_team}, checking if actually {potential_correct_team}")
+                
+                # Verify if player actually belongs to the "swapped" team
+                with get_db_connection() as conn:
+                    with conn.cursor() as cursor:
+                        correct_team_code = understat_team_mapping.get(potential_correct_team, potential_correct_team)
+                        cursor.execute("""
+                            SELECT name, team FROM players 
+                            WHERE team = %s AND (
+                                LOWER(name) LIKE LOWER(%s) 
+                                OR LOWER(name) LIKE LOWER(%s)
+                                OR LOWER(%s) LIKE LOWER(CONCAT('%%', name, '%%'))
+                            )
+                            LIMIT 1
+                        """, (correct_team_code, f'%{player_name}%', f'{player_name}%', player_name))
+                        result = cursor.fetchone()
+                        
+                        if result:
+                            print(f"CORRUPTION DETECTED: {player_name} actually plays for {potential_correct_team}, not {understat_team}")
+                            return potential_correct_team, understat_team_mapping.get(potential_correct_team, potential_correct_team)
+            
+            # Step 2: Standard database lookup for other cases
+            with get_db_connection() as conn:
+                with conn.cursor() as cursor:
+                    # Use fuzzy matching for name
+                    cursor.execute("""
+                        SELECT name, team FROM players 
+                        WHERE LOWER(name) LIKE LOWER(%s) 
+                        OR LOWER(name) LIKE LOWER(%s)
+                        OR LOWER(%s) LIKE LOWER(CONCAT('%%', name, '%%'))
+                        LIMIT 1
+                    """, (f'%{player_name}%', f'{player_name}%', player_name))
+                    result = cursor.fetchone()
+                    
+                    if result:
+                        db_name, actual_team = result
+                        mapped_understat_team = understat_team_mapping.get(understat_team, understat_team)
+                        
+                        if actual_team != mapped_understat_team:
+                            print(f"Team mismatch: {player_name} - Understat says {understat_team} ({mapped_understat_team}) but DB has {actual_team}")
+                            # Return the correct team name for the dropdown
+                            reverse_mapping = {v: k for k, v in understat_team_mapping.items()}
+                            correct_understat_name = reverse_mapping.get(actual_team, actual_team)
+                            return correct_understat_name, actual_team
+                    
+            return understat_team, understat_team_mapping.get(understat_team, understat_team)
+
+        # Format players for validation UI
+        formatted_players = []
+        position_breakdown = {}
+        
+        for player in unmatched_players:
+            # Extract player info
+            player_name = player.get('player_name', '')
+            understat_team = player.get('team', '')
+            position = 'Unknown'  # Understat doesn't provide reliable position data
+            
+            # Validate and correct team assignment
+            corrected_understat_team, db_team = validate_and_correct_team(player_name, understat_team)
+            
+            # Skip players from teams not in current Premier League
+            if db_team not in current_pl_teams:
+                print(f"Skipping {player_name} from {understat_team} - not in current Premier League")
+                continue
+            
+            # Update position breakdown
+            if position not in position_breakdown:
+                position_breakdown[position] = {'total': 0, 'matched': 0, 'match_rate': 0}
+            position_breakdown[position]['total'] += 1
+            
+            # Format for validation UI
+            formatted_player = {
+                'original_name': player_name,
+                'original_team': db_team,  # Use corrected team code for consistency
+                'original_position': position,
+                'needs_review': True,
+                'match_result': {
+                    'fantrax_name': None,
+                    'confidence': 0,
+                    'suggested_matches': player.get('suggestions', [])
+                },
+                'original_data': {**player, 'team': corrected_understat_team}  # Update team in original data
+            }
+            
+            formatted_players.append(formatted_player)
+        
+        # Create summary statistics
+        summary = {
+            'total': needs_review_count,
+            'matched': 0,  # All are unmatched at this point
+            'needs_review': needs_review_count,
+            'failed': 0,
+            'match_rate': 0.0
+        }
+        
+        return jsonify({
+            'status': 'success',
+            'data': {
+                'total_players': saved_data.get('total_players', needs_review_count),
+                'matched_players': saved_data.get('matched_players', 0),
+                'unmatched_count': needs_review_count,
+                'unmatched_details': formatted_players,
+                'summary': summary,
+                'position_breakdown': position_breakdown,
+                'source_system': 'understat',
+                'timestamp': saved_data['timestamp']
+            }
+        })
+        
+    except Exception as e:
+        return jsonify({'status': 'error', 'message': str(e)}), 500
+
 @app.route('/api/understat/unmatched', methods=['GET'])
 def get_unmatched_understat():
-    """Get list of unmatched Understat players for review"""
+    """Get list of unmatched Understat players for review (legacy endpoint)"""
     try:
         integrator = UnderstatIntegrator(DB_CONFIG)
         understat_df = integrator.extract_understat_per90_stats()
@@ -2064,6 +2445,217 @@ def get_understat_stats():
         
     except Exception as e:
         return jsonify({'error': str(e)}), 500
+
+@app.route('/api/understat/apply-mappings', methods=['POST'])
+def apply_understat_mappings():
+    """Apply confirmed name mappings for Understat players and update the database"""
+    try:
+        print("=== APPLY-MAPPINGS ENDPOINT HIT ===")
+        print(f"Request headers: {dict(request.headers)}")
+        print(f"Request method: {request.method}")
+        print(f"Content-Type: {request.content_type}")
+        data = request.get_json()
+        confirmed_mappings = data.get('confirmed_mappings', {})
+        dry_run = data.get('dry_run', False)
+        
+        # DEBUG: Log the request payload
+        print(f"=== APPLY-MAPPINGS DEBUG ===")
+        print(f"Request data keys: {list(data.keys())}")
+        print(f"Confirmed mappings count: {len(confirmed_mappings)}")
+        print(f"Dry run: {dry_run}")
+        
+        # Handle case where frontend sends players array instead of confirmed_mappings
+        if not confirmed_mappings and 'players' in data:
+            print("WARNING: Frontend sent 'players' array instead of 'confirmed_mappings'")
+            print("This indicates the frontend needs to be fixed to send user selections properly")
+            return jsonify({
+                'error': 'Invalid request format: Frontend sent raw player data instead of confirmed user mappings. Please ensure manual player selections are captured correctly in the UI.',
+                'debug_info': {
+                    'received_keys': list(data.keys()),
+                    'confirmed_mappings_count': len(confirmed_mappings),
+                    'players_count': len(data.get('players', [])) if 'players' in data else 0
+                }
+            }), 400
+        
+        if not confirmed_mappings:
+            print("WARNING: No confirmed mappings received - returning empty response")
+            return jsonify({
+                'status': 'success',
+                'import_count': 0,
+                'message': 'No mappings to apply - no manual selections were captured from the UI',
+                'updated_players': []
+            })
+        
+        # Load the saved unmatched data
+        temp_file = os.path.join('temp', 'understat_unmatched.json')
+        if not os.path.exists(temp_file):
+            return jsonify({'error': 'No unmatched Understat data found. Please sync again.'}), 404
+        
+        with open(temp_file, 'r') as f:
+            saved_data = json.load(f)
+        
+        # Check data age (must be < 1 hour old)
+        data_age_minutes = (time.time() - saved_data['timestamp']) / 60
+        if data_age_minutes > 60:
+            return jsonify({'error': 'Unmatched data is too old. Please sync again.'}), 400
+        
+        conn = get_db_connection()
+        cursor = conn.cursor(cursor_factory=psycopg2.extras.RealDictCursor)
+        
+        # Create understat_name_mappings table if it doesn't exist
+        create_table_query = """
+            CREATE TABLE IF NOT EXISTS understat_name_mappings (
+                id SERIAL PRIMARY KEY,
+                understat_name VARCHAR(255) UNIQUE NOT NULL,
+                fantrax_id VARCHAR(50) NOT NULL,
+                confidence DECIMAL(5,2) NOT NULL,
+                created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+                updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+            )
+        """
+        cursor.execute(create_table_query)
+        conn.commit()
+        print("Created/verified understat_name_mappings table")
+        
+        updated_players = []
+        
+        for original_name, mapping in confirmed_mappings.items():
+            fantrax_id = mapping.get('fantrax_id')
+            fantrax_name = mapping.get('fantrax_name')
+            
+            if not fantrax_id or not fantrax_name:
+                print(f"Warning: Missing ID or name for {original_name}: fantrax_id={fantrax_id}, fantrax_name={fantrax_name}")
+                continue
+            
+            # Find the original Understat data for this player
+            understat_player = None
+            for player in saved_data['unmatched_players']:  # Correct key: unmatched_players
+                if player['player_name'] == original_name:  # Correct field: player_name
+                    understat_player = player
+                    break
+            
+            if not understat_player:
+                print(f"Warning: Could not find Understat data for {original_name}")
+                continue
+            
+            if not dry_run:
+                try:
+                    # Update the database with Understat stats
+                    update_query = """
+                        UPDATE players 
+                        SET xg90 = %s, xa90 = %s, xgi90 = %s, minutes = %s,
+                            last_understat_update = %s
+                        WHERE id = %s
+                    """
+                    
+                    cursor.execute(update_query, (
+                        understat_player.get('xG90', 0),  # Correct case: xG90
+                        understat_player.get('xA90', 0),   # Correct case: xA90
+                        understat_player.get('xGI90', 0),  # Correct case: xGI90
+                        understat_player.get('minutes', 0),
+                        datetime.now(),
+                        fantrax_id  # Correct: fantrax_id value goes to 'id' column
+                    ))
+                    
+                    if cursor.rowcount == 0:
+                        print(f"Warning: No player found with id={fantrax_id} for {original_name}")
+                        continue
+                    
+                except Exception as e:
+                    print(f"Database error updating {original_name}: {e}")
+                    continue
+                
+                # Add to understat_name_mappings for backwards compatibility
+                understat_mapping_query = """
+                    INSERT INTO understat_name_mappings (understat_name, fantrax_id, confidence, created_at)
+                    VALUES (%s, %s, %s, %s)
+                    ON CONFLICT (understat_name) DO UPDATE SET
+                        fantrax_id = EXCLUDED.fantrax_id,
+                        confidence = EXCLUDED.confidence,
+                        updated_at = %s
+                """
+                
+                cursor.execute(understat_mapping_query, (
+                    original_name,
+                    fantrax_id,
+                    mapping.get('confidence', 100.0),
+                    datetime.now(),
+                    datetime.now()
+                ))
+                
+                # ALSO add to Global Name Matching System for cross-source benefits
+                global_mapping_query = """
+                    INSERT INTO name_mappings (
+                        source_system, source_name, fantrax_id, fantrax_name, 
+                        confidence_score, match_type, verified, verification_date, 
+                        verified_by, last_used, usage_count
+                    )
+                    VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s)
+                    ON CONFLICT (source_system, source_name) DO UPDATE SET
+                        fantrax_id = EXCLUDED.fantrax_id,
+                        fantrax_name = EXCLUDED.fantrax_name,
+                        confidence_score = EXCLUDED.confidence_score,
+                        match_type = EXCLUDED.match_type,
+                        verified = EXCLUDED.verified,
+                        verification_date = EXCLUDED.verification_date,
+                        verified_by = EXCLUDED.verified_by,
+                        last_used = EXCLUDED.last_used,
+                        usage_count = EXCLUDED.usage_count + 1,
+                        updated_at = CURRENT_TIMESTAMP
+                """
+                
+                try:
+                    cursor.execute(global_mapping_query, (
+                        'understat',                         # source_system
+                        original_name,                       # source_name  
+                        fantrax_id,                         # fantrax_id
+                        fantrax_name,                       # fantrax_name
+                        mapping.get('confidence', 100.0),   # confidence_score
+                        'manual',                           # match_type
+                        True,                               # verified
+                        datetime.now(),                     # verification_date
+                        'user_manual_import',               # verified_by
+                        datetime.now(),                     # last_used
+                        1                                   # usage_count
+                    ))
+                    print(f"Added {original_name} → {fantrax_name} to Global Name Matching System")
+                except Exception as e:
+                    print(f"Warning: Could not add to Global Name Matching System: {e}")
+                    # Continue - understat_name_mappings still worked
+            
+            updated_players.append({
+                'understat_name': original_name,
+                'fantrax_name': fantrax_name,
+                'fantrax_id': fantrax_id,
+                'xGI90': understat_player.get('xGI90', 0)  # Correct case: xGI90
+            })
+        
+        if not dry_run:
+            conn.commit()
+            
+            # Clean up the temp file after successful import
+            if os.path.exists(temp_file):
+                os.remove(temp_file)
+        
+        conn.close()
+        
+        return jsonify({
+            'status': 'success',
+            'import_count': len(updated_players),
+            'message': f"{'Would update' if dry_run else 'Updated'} {len(updated_players)} players with Understat data",
+            'updated_players': updated_players
+        })
+        
+    except Exception as e:
+        print(f"CRITICAL ERROR in apply_understat_mappings: {str(e)}")
+        print(f"Error type: {type(e).__name__}")
+        import traceback
+        print(f"Full traceback: {traceback.format_exc()}")
+        return jsonify({
+            'error': f'Database error: {str(e)}',
+            'error_type': type(e).__name__,
+            'debug': True
+        }), 500
 
 def parse_formation_csv(lines, cursor):
     """
@@ -2245,9 +2837,11 @@ if __name__ == '__main__':
         cursor.execute("SELECT COUNT(*) FROM players")
         player_count = cursor.fetchone()[0]
         print(f"Database connected: {player_count} players loaded")
+        
+        cursor.close()
         conn.close()
     except Exception as e:
         print(f"Database connection failed: {e}")
-        exit(1)
+        print("Starting app anyway...")
     
     app.run(debug=True, host='0.0.0.0', port=5000)

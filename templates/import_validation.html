@@ -381,8 +381,19 @@
                 document.getElementById('selectedFileName').textContent = fileName;
             });
             
-            // Check if we have unmatched players from a recent import
-            checkForRecentImport();
+            // Check for source parameter (Understat integration)
+            const urlParams = new URLSearchParams(window.location.search);
+            const source = urlParams.get('source');
+            
+            if (source === 'understat') {
+                // Hide upload section and automatically load Understat data
+                document.querySelector('.upload-section').style.display = 'none';
+                showMessage('Loading unmatched Understat players for review...', 'success');
+                loadUnderstatData();
+            } else {
+                // Check if we have unmatched players from a recent import
+                checkForRecentImport();
+            }
         });
         
         async function checkForRecentImport() {
@@ -439,6 +450,62 @@
                 console.log('Error checking for recent import:', error);
                 // Clean up potentially corrupted session data
                 sessionStorage.removeItem('pendingValidation');
+            }
+        }
+        
+        async function loadUnderstatData() {
+            try {
+                showLoading(true);
+                
+                const response = await fetch('/api/understat/get-unmatched-data');
+                if (!response.ok) {
+                    throw new Error(`Server error: ${response.status}`);
+                }
+                
+                const result = await response.json();
+                
+                if (result.status === 'success') {
+                    // Convert to validation data format
+                    validationData = {
+                        summary: {
+                            total: result.data.total_players,
+                            matched: result.data.matched_players,
+                            needs_review: result.data.unmatched_count,
+                            failed: 0,
+                            match_rate: (result.data.matched_players / result.data.total_players * 100)
+                        },
+                        players: result.data.unmatched_details.map(player => ({
+                            original_name: player.original_name,
+                            original_team: player.original_team,
+                            original_position: player.original_position,
+                            needs_review: true,
+                            original_data: player.original_data,
+                            match_result: {
+                                fantrax_name: player.match_result?.fantrax_name || null,
+                                confidence: player.match_result?.confidence || 0,
+                                suggested_matches: player.match_result?.suggested_matches || []
+                            }
+                        })),
+                        position_breakdown: {},
+                        source_system: 'understat'
+                    };
+                    
+                    // Set source system dropdown to understat
+                    document.getElementById('sourceSystem').value = 'understat';
+                    
+                    displayValidationResults();
+                    showMessage(`Loaded ${result.data.unmatched_count} unmatched Understat players for review.`, 'success');
+                } else {
+                    throw new Error(result.message || 'Failed to load Understat data');
+                }
+                
+            } catch (error) {
+                console.error('Error loading Understat data:', error);
+                showMessage(`Failed to load Understat data: ${error.message}`, 'error');
+                // Show upload section as fallback
+                document.querySelector('.upload-section').style.display = 'block';
+            } finally {
+                showLoading(false);
             }
         }
         
@@ -812,8 +879,9 @@
             clearMessages();
             
             try {
+                const sourceSystem = document.getElementById('sourceSystem').value;
                 const requestData = {
-                    source_system: document.getElementById('sourceSystem').value,
+                    source_system: sourceSystem,
                     players: validationData.players.map(p => p.original_data || {
                         name: p.original_name,
                         team: p.original_team,
@@ -823,11 +891,14 @@
                     dry_run: dryRun
                 };
                 
+                // Use specific Understat endpoint if source is understat
+                const endpoint = sourceSystem === 'understat' ? '/api/understat/apply-mappings' : '/api/apply-import';
+                
                 console.log('Sending request data:', requestData);
                 console.log('Number of players:', requestData.players.length);
                 console.log('Number of confirmed mappings:', Object.keys(requestData.confirmed_mappings).length);
                 
-                const response = await fetch('/api/apply-import', {
+                const response = await fetch(endpoint, {
                     method: 'POST',
                     headers: {
                         'Content-Type': 'application/json',
