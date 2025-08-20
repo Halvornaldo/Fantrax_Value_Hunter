@@ -169,6 +169,30 @@
                     </div>
                 </div>
 
+                <!-- Games Display Configuration -->
+                <div class="parameter-section">
+                    <h3>
+                        <input type="checkbox" id="gamesDisplayEnabled" checked>
+                        <label for="gamesDisplayEnabled">Games Display</label>
+                    </h3>
+                    <div class="games-display-controls" id="gamesDisplayContent">
+                        <div class="control-group">
+                            <label for="baselineSwitchover">Baseline Switchover Gameweek:</label>
+                            <input type="number" id="baselineSwitchover" min="5" max="15" value="10">
+                            <span class="help-text">When to start blending historical + current data</span>
+                        </div>
+                        <div class="control-group">
+                            <label for="transitionEnd">Transition Period End:</label>
+                            <input type="number" id="transitionEnd" min="10" max="20" value="15">
+                            <span class="help-text">When to switch from blended to current-only</span>
+                        </div>
+                        <div class="control-group">
+                            <input type="checkbox" id="showHistorical" checked>
+                            <label for="showHistorical">Show Historical Data (24-25)</label>
+                        </div>
+                    </div>
+                </div>
+
                 <!-- Action Buttons -->
                 <div class="action-buttons">
                     <button id="apply-changes" class="btn-primary" disabled>
@@ -249,23 +273,158 @@
                     <table id="player-table" class="player-table">
                         <thead>
                             <tr>
-                                <th data-sort="name">Name <span class="sort-indicator"></span></th>
-                                <th data-sort="team">Team <span class="sort-indicator"></span></th>
-                                <th data-sort="position">Pos <span class="sort-indicator"></span></th>
-                                <th data-sort="price">Price <span class="sort-indicator"></span></th>
-                                <th data-sort="ppg">PPG <span class="sort-indicator"></span></th>
-                                <th data-sort="value_score">PP$ <span class="sort-indicator"></span></th>
-                                <th data-sort="games_played_historical">Games <span class="sort-indicator"></span></th>
-                                <th data-sort="true_value" class="default-sort">True Value <span class="sort-indicator">▼</span></th>
-                                <th data-sort="form_multiplier">Form <span class="sort-indicator"></span></th>
-                                <th data-sort="fixture_multiplier">Fixture <span class="sort-indicator"></span></th>
-                                <th data-sort="starter_multiplier">Starter <span class="sort-indicator"></span></th>
-                                <th data-sort="xgi_multiplier">xGI <span class="sort-indicator"></span></th>
-                                <th class="manual-override-header">Manual Override</th>
-                                <th data-sort="xg90">xG90 <span class="sort-indicator"></span></th>
-                                <th data-sort="xa90">xA90 <span class="sort-indicator"></span></th>
-                                <th data-sort="xgi90">xGI90 <span class="sort-indicator"></span></th>
-                                <th data-sort="minutes">Minutes <span class="sort-indicator"></span></th>
+                                <th data-sort="name">
+                                    <div class="header-content">
+                                        <span class="header-text">Name</span>
+                                        <span class="header-icons">
+                                            <span class="info-icon" data-column="name">ⓘ</span>
+                                            <span class="sort-indicator"></span>
+                                        </span>
+                                    </div>
+                                </th>
+                                <th data-sort="team">
+                                    <div class="header-content">
+                                        <span class="header-text">Team</span>
+                                        <span class="header-icons">
+                                            <span class="info-icon" data-column="team">ⓘ</span>
+                                            <span class="sort-indicator"></span>
+                                        </span>
+                                    </div>
+                                </th>
+                                <th data-sort="position">
+                                    <div class="header-content">
+                                        <span class="header-text">Pos</span>
+                                        <span class="header-icons">
+                                            <span class="info-icon" data-column="position">ⓘ</span>
+                                            <span class="sort-indicator"></span>
+                                        </span>
+                                    </div>
+                                </th>
+                                <th data-sort="price">
+                                    <div class="header-content">
+                                        <span class="header-text">Price</span>
+                                        <span class="header-icons">
+                                            <span class="info-icon" data-column="price">ⓘ</span>
+                                            <span class="sort-indicator"></span>
+                                        </span>
+                                    </div>
+                                </th>
+                                <th data-sort="ppg">
+                                    <div class="header-content">
+                                        <span class="header-text">PPG</span>
+                                        <span class="header-icons">
+                                            <span class="info-icon" data-column="ppg">ⓘ</span>
+                                            <span class="sort-indicator"></span>
+                                        </span>
+                                    </div>
+                                </th>
+                                <th data-sort="value_score">
+                                    <div class="header-content">
+                                        <span class="header-text">PP$</span>
+                                        <span class="header-icons">
+                                            <span class="info-icon" data-column="value_score">ⓘ</span>
+                                            <span class="sort-indicator"></span>
+                                        </span>
+                                    </div>
+                                </th>
+                                <th data-sort="games_played_historical">
+                                    <div class="header-content">
+                                        <span class="header-text">Games</span>
+                                        <span class="header-icons">
+                                            <span class="info-icon" data-column="games">ⓘ</span>
+                                            <span class="sort-indicator"></span>
+                                        </span>
+                                    </div>
+                                </th>
+                                <th data-sort="true_value" class="default-sort">
+                                    <div class="header-content">
+                                        <span class="header-text">True Value</span>
+                                        <span class="header-icons">
+                                            <span class="info-icon" data-column="true_value">ⓘ</span>
+                                            <span class="sort-indicator">▼</span>
+                                        </span>
+                                    </div>
+                                </th>
+                                <th data-sort="form_multiplier">
+                                    <div class="header-content">
+                                        <span class="header-text">Form</span>
+                                        <span class="header-icons">
+                                            <span class="info-icon" data-column="form_multiplier">ⓘ</span>
+                                            <span class="sort-indicator"></span>
+                                        </span>
+                                    </div>
+                                </th>
+                                <th data-sort="fixture_multiplier">
+                                    <div class="header-content">
+                                        <span class="header-text">Fixture</span>
+                                        <span class="header-icons">
+                                            <span class="info-icon" data-column="fixture_multiplier">ⓘ</span>
+                                            <span class="sort-indicator"></span>
+                                        </span>
+                                    </div>
+                                </th>
+                                <th data-sort="starter_multiplier">
+                                    <div class="header-content">
+                                        <span class="header-text">Starter</span>
+                                        <span class="header-icons">
+                                            <span class="info-icon" data-column="starter_multiplier">ⓘ</span>
+                                            <span class="sort-indicator"></span>
+                                        </span>
+                                    </div>
+                                </th>
+                                <th data-sort="xgi_multiplier">
+                                    <div class="header-content">
+                                        <span class="header-text">xGI</span>
+                                        <span class="header-icons">
+                                            <span class="info-icon" data-column="xgi_multiplier">ⓘ</span>
+                                            <span class="sort-indicator"></span>
+                                        </span>
+                                    </div>
+                                </th>
+                                <th class="manual-override-header">
+                                    <div class="header-content">
+                                        <span class="header-text">Starter Override</span>
+                                        <span class="header-icons">
+                                            <span class="info-icon" data-column="manual_override">ⓘ</span>
+                                        </span>
+                                    </div>
+                                </th>
+                                <th data-sort="xg90">
+                                    <div class="header-content">
+                                        <span class="header-text">xG90</span>
+                                        <span class="header-icons">
+                                            <span class="info-icon" data-column="xg90">ⓘ</span>
+                                            <span class="sort-indicator"></span>
+                                        </span>
+                                    </div>
+                                </th>
+                                <th data-sort="xa90">
+                                    <div class="header-content">
+                                        <span class="header-text">xA90</span>
+                                        <span class="header-icons">
+                                            <span class="info-icon" data-column="xa90">ⓘ</span>
+                                            <span class="sort-indicator"></span>
+                                        </span>
+                                    </div>
+                                </th>
+                                <th data-sort="xgi90">
+                                    <div class="header-content">
+                                        <span class="header-text">xGI90</span>
+                                        <span class="header-icons">
+                                            <span class="info-icon" data-column="xgi90">ⓘ</span>
+                                            <span class="sort-indicator"></span>
+                                        </span>
+                                    </div>
+                                </th>
+                                <th data-sort="minutes">
+                                    <div class="header-content">
+                                        <span class="header-text">Min</span>
+                                        <span class="header-icons">
+                                            <span class="info-icon" data-column="minutes">ⓘ</span>
+                                            <span class="sort-indicator"></span>
+                                        </span>
+                                    </div>
+                                </th>
                             </tr>
                         </thead>
                         <tbody id="player-table-body">

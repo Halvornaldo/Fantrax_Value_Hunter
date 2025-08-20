@@ -393,6 +393,9 @@ def get_players():
     """
     start_time = time.time()
     
+    # Load system parameters for configurable games display
+    parameters = load_system_parameters()
+    
     # Parse query parameters
     position = request.args.get('position')
     min_price = request.args.get('min_price', type=float)
@@ -510,22 +513,30 @@ def get_players():
             games_current = player_dict.get('games_played', 0)
             games_historical = player_dict.get('games_played_historical', 0)
             
-            if gameweek <= 10:  # Early season - use historical data
-                if games_historical > 0:
+            # Get configurable thresholds for games display
+            games_config = parameters.get('games_display', {})
+            baseline_switchover = games_config.get('baseline_switchover_gameweek', 10)
+            transition_end = games_config.get('transition_period_end', 15)
+            show_historical = games_config.get('show_historical_data', True)
+            
+            if gameweek <= baseline_switchover:  # Early season - show blended format if current games exist
+                if games_current > 0:
+                    games_display = f"{games_historical}+{games_current}"
+                elif games_historical > 0 and show_historical:
                     games_display = f"{games_historical} (24-25)"
                 else:
                     games_display = "0"
-            elif gameweek <= 15:  # Transition period - blend data
+            elif gameweek <= transition_end:  # Transition period - blend data
                 if games_historical > 0 and games_current > 0:
                     games_display = f"{games_historical}+{games_current}"
-                elif games_historical > 0:
+                elif games_historical > 0 and show_historical:
                     games_display = f"{games_historical} (24-25)"
                 else:
                     games_display = str(games_current)
             else:  # Late season - use current data
                 if games_current > 0:
                     games_display = str(games_current)
-                elif games_historical > 0:
+                elif games_historical > 0 and show_historical:
                     games_display = f"{games_historical} (24-25)"
                 else:
                     games_display = "0"
@@ -1600,7 +1611,7 @@ def import_form_data():
         csv_input = pd.read_csv(stream)
         
         # Validate required columns
-        required_columns = ['ID', 'Player', 'FPts']
+        required_columns = ['ID', 'Player', 'FPts', 'Salary']
         missing_columns = [col for col in required_columns if col not in csv_input.columns]
         if missing_columns:
             return jsonify({
@@ -1648,8 +1659,10 @@ def import_form_data():
                         skipped_players.append(f"{player_name} (ID: {player_id}) - Failed to add: {add_error}")
                         continue
                 
-                # Get fantasy points
+                # Get fantasy points and price
                 fpts = float(row['FPts'])
+                salary = float(row['Salary'])
+                print(f"DEBUG - Price for {player_name}: {salary} (from CSV column 'Salary')")
                 
                 # Insert/update player form data
                 cursor.execute("""
@@ -1658,6 +1671,23 @@ def import_form_data():
                     ON CONFLICT (player_id, gameweek) 
                     DO UPDATE SET points = EXCLUDED.points, timestamp = NOW()
                 """, [player_id, gameweek, fpts])
+                
+                # Insert/update player_metrics with price
+                cursor.execute("""
+                    INSERT INTO player_metrics (player_id, gameweek, price, last_updated)
+                    VALUES (%s, %s, %s, NOW())
+                    ON CONFLICT (player_id, gameweek) 
+                    DO UPDATE SET price = EXCLUDED.price, last_updated = NOW()
+                """, [player_id, gameweek, salary])
+                
+                # Update games_played count in player_games_data (only if player actually played)
+                games_played = 1 if fpts != 0 else 0
+                cursor.execute("""
+                    INSERT INTO player_games_data (player_id, gameweek, games_played, last_updated)
+                    VALUES (%s, %s, %s, NOW())
+                    ON CONFLICT (player_id, gameweek)
+                    DO UPDATE SET games_played = EXCLUDED.games_played, last_updated = NOW()
+                """, [player_id, gameweek, games_played])
                 
                 imported_count += 1
                 
@@ -1668,6 +1698,20 @@ def import_form_data():
                 
                 # Don't fail completely for individual row errors
                 continue
+        
+        # Recalculate PPG from current season data after import
+        print(f"Recalculating PPG for gameweek {gameweek}...")
+        cursor.execute("""
+            UPDATE player_metrics pm
+            SET ppg = (
+                SELECT AVG(pf.points)
+                FROM player_form pf
+                WHERE pf.player_id = pm.player_id
+                AND pf.gameweek <= %s
+            )
+            WHERE pm.gameweek = %s
+        """, [gameweek, gameweek])
+        print(f"PPG recalculation completed.")
         
         # Commit all changes
         conn.commit()
@@ -1691,7 +1735,8 @@ def import_form_data():
             'skipped_players': skipped_players[:20],  # Show first 20 skipped players
             'new_players_added': new_players_added[:20],  # Show first 20 auto-added players
             'total_new_players': len(new_players_added),
-            'gameweek': gameweek
+            'gameweek': gameweek,
+            'trigger_recalc': True  # Signal to frontend to trigger recalculation
         })
         
     except Exception as e:

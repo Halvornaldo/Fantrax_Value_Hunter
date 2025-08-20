@@ -445,7 +445,7 @@ body {
 
 .player-table th {
     background: var(--section-bg);
-    padding: 12px 8px;
+    padding: 10px 6px;
     text-align: left;
     font-weight: 600;
     color: var(--text-secondary);
@@ -453,6 +453,88 @@ body {
     cursor: pointer;
     user-select: none;
     position: relative;
+    white-space: nowrap;
+    min-width: 60px;
+}
+
+/* New header structure styling */
+.header-content {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    gap: 4px;
+    width: 100%;
+}
+
+.header-text {
+    flex: 1;
+    min-width: 0; /* Allows text to shrink if needed */
+}
+
+.header-icons {
+    display: flex;
+    align-items: center;
+    gap: 2px;
+    flex-shrink: 0; /* Icons stay the same size */
+}
+
+/* Column-specific width optimizations */
+.player-table th[data-sort="position"] {
+    width: 50px;
+    min-width: 50px;
+}
+
+.player-table th[data-sort="team"] {
+    width: 60px;
+    min-width: 60px;
+}
+
+.player-table th[data-sort="price"] {
+    width: 70px;
+    min-width: 70px;
+}
+
+.player-table th[data-sort="ppg"] {
+    width: 60px;
+    min-width: 60px;
+}
+
+.player-table th[data-sort="value_score"] {
+    width: 60px;
+    min-width: 60px;
+}
+
+.player-table th[data-sort="games_played_historical"] {
+    width: 80px;
+    min-width: 80px;
+}
+
+.player-table th[data-sort="form_multiplier"],
+.player-table th[data-sort="fixture_multiplier"],
+.player-table th[data-sort="starter_multiplier"],
+.player-table th[data-sort="xgi_multiplier"] {
+    width: 70px;
+    min-width: 70px;
+}
+
+.player-table th[data-sort="xg90"],
+.player-table th[data-sort="xa90"],
+.player-table th[data-sort="xgi90"] {
+    width: 75px;
+    min-width: 75px;
+}
+
+.player-table th[data-sort="minutes"] {
+    width: 60px;
+    min-width: 60px;
+}
+
+.player-table th[data-sort="name"] {
+    min-width: 140px;
+}
+
+.player-table th[data-sort="true_value"] {
+    min-width: 100px;
 }
 
 .player-table th:hover {
@@ -464,8 +546,11 @@ body {
 }
 
 .sort-indicator {
-    margin-left: 4px;
     color: #6c757d;
+    font-size: 12px;
+    width: 12px;
+    text-align: center;
+    flex-shrink: 0;
 }
 
 .player-table td {
@@ -711,3 +796,200 @@ body {
 .games-reliable { color: #28a745; font-weight: 600; }    /* >= 10 games - Green */
 .games-moderate { color: #ffc107; font-weight: 600; }    /* 5-9 games - Yellow */
 .games-unreliable { color: #dc3545; font-weight: 600; }  /* < 5 games - Red */
+
+/* =================================================================
+   PROFESSIONAL TOOLTIP SYSTEM - SPRINT 3
+   ================================================================= */
+
+/* Info icon styling */
+.info-icon {
+    display: inline-block;
+    width: 14px;
+    height: 14px;
+    cursor: help;
+    color: #666;
+    font-size: 11px;
+    opacity: 0.6;
+    transition: all 0.2s ease;
+    user-select: none;
+    flex-shrink: 0;
+    text-align: center;
+    line-height: 1;
+}
+
+.info-icon:hover {
+    color: #007bff;
+    opacity: 1;
+    transform: scale(1.1);
+}
+
+/* Tooltip container */
+.tooltip {
+    position: absolute;
+    background: #333;
+    color: white;
+    padding: 12px 16px;
+    border-radius: 6px;
+    font-size: 13px;
+    line-height: 1.4;
+    z-index: 1000;
+    max-width: 280px;
+    box-shadow: 0 4px 12px rgba(0,0,0,0.25);
+    pointer-events: none;
+    animation: tooltipFadeIn 0.2s ease-in;
+}
+
+/* Tooltip arrow */
+.tooltip::after {
+    content: '';
+    position: absolute;
+    top: -6px;
+    left: 50%;
+    transform: translateX(-50%);
+    border-left: 6px solid transparent;
+    border-right: 6px solid transparent;
+    border-bottom: 6px solid #333;
+}
+
+/* Tooltip arrow for top placement */
+.tooltip-top::after {
+    top: auto;
+    bottom: -6px;
+    border-bottom: none;
+    border-top: 6px solid #333;
+}
+
+/* Tooltip title */
+.tooltip-title {
+    font-weight: 600;
+    font-size: 14px;
+    margin-bottom: 6px;
+    color: #fff;
+}
+
+/* Tooltip description */
+.tooltip-description {
+    margin-bottom: 8px;
+    color: #e9ecef;
+}
+
+/* Formula display */
+.tooltip-formula {
+    background: #444;
+    padding: 6px 8px;
+    border-radius: 4px;
+    font-family: 'Courier New', monospace;
+    margin: 6px 0;
+    font-size: 12px;
+    border-left: 3px solid #007bff;
+}
+
+/* Interpretation sections */
+.tooltip-interpretation {
+    margin-top: 8px;
+    padding-top: 8px;
+    border-top: 1px solid #555;
+}
+
+.tooltip-interpretation-item {
+    margin: 3px 0;
+    padding-left: 8px;
+    color: #ced4da;
+}
+
+/* Usage notes */
+.tooltip-usage {
+    margin-top: 8px;
+    padding: 6px 8px;
+    background: rgba(0, 123, 255, 0.1);
+    border-radius: 4px;
+    border-left: 3px solid #007bff;
+    font-style: italic;
+    color: #b3d7ff;
+}
+
+/* Note sections */
+.tooltip-note {
+    margin-top: 6px;
+    font-size: 12px;
+    color: #adb5bd;
+    font-style: italic;
+}
+
+/* Source attribution */
+.tooltip-source {
+    margin-top: 6px;
+    font-size: 11px;
+    color: #6c757d;
+    text-align: right;
+}
+
+/* Animations */
+@keyframes tooltipFadeIn {
+    from { 
+        opacity: 0; 
+        transform: translateY(-8px);
+    }
+    to { 
+        opacity: 1; 
+        transform: translateY(0);
+    }
+}
+
+/* Dark theme tooltip adjustments */
+[data-theme="dark"] .tooltip {
+    background: #1a1a1a;
+    border: 1px solid #404040;
+    box-shadow: 0 4px 12px rgba(0,0,0,0.4);
+}
+
+[data-theme="dark"] .tooltip::after {
+    border-bottom-color: #1a1a1a;
+}
+
+[data-theme="dark"] .tooltip-top::after {
+    border-top-color: #1a1a1a;
+}
+
+[data-theme="dark"] .tooltip-formula {
+    background: #2d2d2d;
+    border-left-color: #4dabf7;
+}
+
+[data-theme="dark"] .tooltip-usage {
+    background: rgba(77, 171, 247, 0.15);
+    border-left-color: #4dabf7;
+    color: #74c0fc;
+}
+
+[data-theme="dark"] .info-icon {
+    color: #adb5bd;
+}
+
+[data-theme="dark"] .info-icon:hover {
+    color: #4dabf7;
+}
+
+/* Mobile responsiveness for tooltips */
+@media (max-width: 768px) {
+    .tooltip {
+        max-width: 240px;
+        font-size: 12px;
+        padding: 10px 12px;
+    }
+    
+    .tooltip-title {
+        font-size: 13px;
+    }
+    
+    .tooltip-formula {
+        font-size: 11px;
+        padding: 4px 6px;
+    }
+    
+    .info-icon {
+        font-size: 14px;
+        width: 18px;
+        height: 18px;
+    }
+}

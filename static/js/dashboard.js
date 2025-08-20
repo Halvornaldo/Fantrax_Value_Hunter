@@ -16,6 +16,147 @@ let currentFilters = {
     search: ''
 };
 
+// Column information database for tooltips
+const columnInfo = {
+    'name': {
+        title: 'Player Name',
+        description: 'Full name of the Premier League player',
+        interpretation: 'Click on any column header to sort by that field'
+    },
+    'team': {
+        title: 'Team Code',
+        description: 'Three-letter abbreviation for player\'s current club',
+        interpretation: 'Use team filter to focus on specific clubs'
+    },
+    'position': {
+        title: 'Position',
+        description: 'Primary playing position',
+        interpretation: {
+            'G': '🥅 Goalkeeper',
+            'D': '🛡️ Defender', 
+            'M': '⚡ Midfielder',
+            'F': '⚽ Forward'
+        }
+    },
+    'price': {
+        title: 'Player Price',
+        description: 'Current salary cost in your $100 budget',
+        interpretation: 'Lower prices leave more budget for other positions',
+        usage: 'Price range filter helps find value options'
+    },
+    'ppg': {
+        title: 'Points Per Game',
+        description: 'Average fantasy points per match',
+        interpretation: 'Based on historical or current season data',
+        formula: 'Total Points ÷ Games Played',
+        note: 'Raw scoring rate before multiplier adjustments'
+    },
+    'value_score': {
+        title: 'Points Per Dollar (PP$)',
+        description: 'Raw value efficiency metric',
+        interpretation: {
+            'excellent': '🟢 ≥0.7 - Elite value',
+            'good': '🔵 0.5-0.7 - Good value', 
+            'average': '🟡 0.3-0.5 - Fair value',
+            'poor': '🔴 <0.3 - Poor value'
+        },
+        formula: 'PPG ÷ Price',
+        usage: 'Starting point before True Value adjustments'
+    },
+    'games': {
+        title: 'Games Played',
+        description: 'Number of matches used in calculations',
+        interpretation: {
+            'reliable': '🟢 ≥10 games - Highly reliable data',
+            'moderate': '🟡 5-9 games - Use with caution',
+            'unreliable': '🔴 <5 games - Limited sample size'
+        },
+        note: 'Early season shows "38 (24-25)" for historical data, later shows current season games or blended format "38+5"'
+    },
+    'true_value': {
+        title: 'True Value Score',
+        description: 'Complete value assessment incorporating all factors',
+        interpretation: 'PP$ adjusted for form, fixtures, starting likelihood, and attacking threat',
+        formula: 'PP$ × Form × Fixture × Starter × xGI',
+        usage: '⭐ Primary metric for lineup decisions - sorts by this by default'
+    },
+    'form_multiplier': {
+        title: 'Form Multiplier',
+        description: 'Recent performance vs season average',
+        interpretation: {
+            'hot': '🔥 >1.1x - On fire',
+            'normal': '➖ 0.9-1.1x - Steady performance',
+            'cold': '🥶 <0.9x - Poor recent form'
+        },
+        calculation: 'Weighted average of recent games vs baseline'
+    },
+    'fixture_multiplier': {
+        title: 'Fixture Difficulty',
+        description: 'Opponent strength adjustment based on betting odds',
+        interpretation: {
+            'easy': '🟢 >1.1x - Favorable matchup',
+            'neutral': '➖ 0.9-1.1x - Average difficulty', 
+            'hard': '🔴 <0.9x - Tough opponent'
+        },
+        source: 'Real betting odds converted to 21-point difficulty scale'
+    },
+    'starter_multiplier': {
+        title: 'Starter Prediction',
+        description: 'Likelihood to start or play significant minutes',
+        values: {
+            'starter': '✅ 1.0x - Predicted starter',
+            'rotation': '⚠️ ~0.65x - Rotation risk',
+            'bench': '🪑 ~0.6x - Likely benched',
+            'out': '❌ 0.0x - Injured/suspended'
+        },
+        source: 'Based on lineup predictions and manual overrides'
+    },
+    'xgi_multiplier': {
+        title: 'xGI Multiplier',
+        description: 'Expected Goals + Assists impact on scoring potential',
+        interpretation: 'Attacking threat adjustment based on xG90 + xA90 data',
+        formula: 'Various modes: Direct (xGI90 × strength), Adjusted (1 + xGI90 × strength), or Capped',
+        note: 'Higher for players with greater goal/assist potential'
+    },
+    'manual_override': {
+        title: 'Starter Override',
+        description: 'Manual starter prediction override for specific players',
+        interpretation: 'User-defined starter status to override automated predictions',
+        usage: 'Use when you have insider knowledge about lineups or disagree with predictions',
+        input: 'Select: Starter (1.0x), Bench (~0.6x), Out (0.0x), or Auto (use prediction)'
+    },
+    'xg90': {
+        title: 'Expected Goals per 90',
+        description: 'Goal probability per full match played',
+        interpretation: {
+            'elite': '🔥 >0.5 - Elite finisher',
+            'good': '⚽ 0.3-0.5 - Regular scorer',
+            'low': '🎯 <0.3 - Limited goal threat'
+        },
+        source: 'Understat.com advanced statistics'
+    },
+    'xa90': {
+        title: 'Expected Assists per 90', 
+        description: 'Assist probability per full match played',
+        interpretation: 'Measures creative output and chance creation ability',
+        note: 'Important for midfielders and attacking players',
+        source: 'Understat.com advanced statistics'
+    },
+    'xgi90': {
+        title: 'Expected Goal Involvement per 90',
+        description: 'Combined attacking contribution per match',
+        formula: 'xG90 + xA90',
+        usage: 'Overall attacking threat metric - higher values boost xGI multiplier',
+        interpretation: 'Total expected goals and assists per 90 minutes'
+    },
+    'minutes': {
+        title: 'Total Minutes Played',
+        description: 'Season minutes across all competitions',
+        interpretation: 'Indicates playing time and fitness levels',
+        usage: 'Higher minutes suggest regular starts and manager trust'
+    }
+};
+
 // Initialize dashboard when page loads
 document.addEventListener('DOMContentLoaded', function() {
     console.log('🚀 Fantrax Value Hunter Dashboard initializing...');
@@ -207,6 +348,13 @@ function updateUIFromConfig() {
     document.getElementById('xgiStrength').value = xgiIntegration.multiplier_strength || 1.0;
     document.getElementById('xgiStrengthValue').textContent = xgiIntegration.multiplier_strength || 1.0;
     
+    // Games Display controls
+    const gamesDisplay = currentConfig.games_display || {};
+    document.getElementById('gamesDisplayEnabled').checked = true; // Always enabled for now
+    document.getElementById('baselineSwitchover').value = gamesDisplay.baseline_switchover_gameweek || 10;
+    document.getElementById('transitionEnd').value = gamesDisplay.transition_period_end || 15;
+    document.getElementById('showHistorical').checked = gamesDisplay.show_historical_data !== false;
+    
     // Update control section visibility
     updateControlVisibility();
     
@@ -262,6 +410,10 @@ function updateControlVisibility() {
     // xGI controls
     const xgiEnabled = document.getElementById('xgiEnabled').checked;
     document.getElementById('xgiContent').style.opacity = xgiEnabled ? '1' : '0.5';
+    
+    // Games Display controls (always enabled for now)
+    const gamesDisplayEnabled = document.getElementById('gamesDisplayEnabled').checked;
+    document.getElementById('gamesDisplayContent').style.opacity = gamesDisplayEnabled ? '1' : '0.5';
 }
 
 
@@ -513,6 +665,12 @@ function setupParameterControls() {
     });
     document.getElementById('syncUnderstat').addEventListener('click', syncUnderstatData);
     
+    // Games Display controls
+    document.getElementById('gamesDisplayEnabled').addEventListener('change', handleParameterChange);
+    document.getElementById('baselineSwitchover').addEventListener('change', handleParameterChange);
+    document.getElementById('transitionEnd').addEventListener('change', handleParameterChange);
+    document.getElementById('showHistorical').addEventListener('change', handleParameterChange);
+    
     // Action buttons
     document.getElementById('apply-changes').addEventListener('click', applyChanges);
     document.getElementById('reset-defaults').addEventListener('click', resetToDefaults);
@@ -625,6 +783,23 @@ function buildParameterChanges() {
             enabled: xgiEnabled,
             multiplier_mode: xgiMode,
             multiplier_strength: xgiStrength
+        };
+    }
+    
+    // Games Display changes
+    const gamesDisplayEnabled = document.getElementById('gamesDisplayEnabled').checked;
+    const gamesSwitchover = parseInt(document.getElementById('baselineSwitchover').value);
+    const transitionEnd = parseInt(document.getElementById('transitionEnd').value);
+    const showHistorical = document.getElementById('showHistorical').checked;
+    
+    if (gamesDisplayEnabled !== true || // Always enabled for now
+        gamesSwitchover !== (currentConfig.games_display?.baseline_switchover_gameweek || 10) ||
+        transitionEnd !== (currentConfig.games_display?.transition_period_end || 15) ||
+        showHistorical !== (currentConfig.games_display?.show_historical_data !== false)) {
+        changes.games_display = {
+            baseline_switchover_gameweek: gamesSwitchover,
+            transition_period_end: transitionEnd,
+            show_historical_data: showHistorical
         };
     }
     
@@ -777,8 +952,13 @@ function sortPlayersData() {
         let aVal = a[currentSort.field];
         let bVal = b[currentSort.field];
         
+        // Special handling for Games column - always treat as numeric
+        if (currentSort.field === 'games_played_historical') {
+            aVal = parseInt(aVal) || 0;
+            bVal = parseInt(bVal) || 0;
+        }
         // Handle different data types
-        if (typeof aVal === 'string') {
+        else if (typeof aVal === 'string') {
             aVal = aVal.toLowerCase();
             bVal = bVal.toLowerCase();
         } else {
@@ -1130,4 +1310,205 @@ function setTheme(theme) {
     localStorage.setItem('theme', theme);
     
     console.log(`🎨 Theme switched to: ${theme}`);
+}
+
+// =================================================================
+// PROFESSIONAL TOOLTIP SYSTEM - SPRINT 3
+// =================================================================
+
+// Initialize tooltips after DOM is loaded
+document.addEventListener('DOMContentLoaded', function() {
+    setupTooltips();
+});
+
+function setupTooltips() {
+    // Initialize tooltips for all info icons
+    document.querySelectorAll('.info-icon').forEach(icon => {
+        icon.addEventListener('mouseenter', showTooltip);
+        icon.addEventListener('mouseleave', hideTooltip);
+        
+        // Mobile touch support
+        icon.addEventListener('touchstart', handleTooltipTouch);
+        icon.addEventListener('touchend', handleTooltipTouchEnd);
+    });
+    
+    // Hide tooltip when scrolling or clicking elsewhere
+    document.addEventListener('scroll', hideTooltip);
+    document.addEventListener('click', function(e) {
+        if (!e.target.closest('.info-icon')) {
+            hideTooltip();
+        }
+    });
+}
+
+function showTooltip(e) {
+    const column = e.target.dataset.column;
+    const info = columnInfo[column];
+    
+    if (!info) {
+        console.warn('No tooltip info found for column:', column);
+        return;
+    }
+    
+    // Remove any existing tooltips
+    hideTooltip();
+    
+    // Create tooltip element
+    const tooltip = document.createElement('div');
+    tooltip.className = 'tooltip';
+    tooltip.id = 'active-tooltip';
+    
+    // Build tooltip content
+    let html = `<div class="tooltip-title">${info.title}</div>`;
+    html += `<div class="tooltip-description">${info.description}</div>`;
+    
+    // Add formula if available
+    if (info.formula) {
+        html += `<div class="tooltip-formula">Formula: ${info.formula}</div>`;
+    }
+    
+    // Add interpretation section
+    if (info.interpretation) {
+        html += '<div class="tooltip-interpretation">';
+        if (typeof info.interpretation === 'string') {
+            html += `<div>${info.interpretation}</div>`;
+        } else {
+            for (const [key, value] of Object.entries(info.interpretation)) {
+                html += `<div class="tooltip-interpretation-item">${value}</div>`;
+            }
+        }
+        html += '</div>';
+    }
+    
+    // Add values section (for starter_multiplier)
+    if (info.values) {
+        html += '<div class="tooltip-interpretation">';
+        for (const [key, value] of Object.entries(info.values)) {
+            html += `<div class="tooltip-interpretation-item">${value}</div>`;
+        }
+        html += '</div>';
+    }
+    
+    // Add usage notes
+    if (info.usage) {
+        html += `<div class="tooltip-usage">${info.usage}</div>`;
+    }
+    
+    // Add additional info
+    if (info.note) {
+        html += `<div class="tooltip-note">Note: ${info.note}</div>`;
+    }
+    
+    if (info.calculation) {
+        html += `<div class="tooltip-note">Calculation: ${info.calculation}</div>`;
+    }
+    
+    if (info.input) {
+        html += `<div class="tooltip-note">Input: ${info.input}</div>`;
+    }
+    
+    // Add source attribution
+    if (info.source) {
+        html += `<div class="tooltip-source">Source: ${info.source}</div>`;
+    }
+    
+    tooltip.innerHTML = html;
+    document.body.appendChild(tooltip);
+    
+    // Position tooltip
+    positionTooltip(tooltip, e.target);
+}
+
+function positionTooltip(tooltip, targetElement) {
+    const rect = targetElement.getBoundingClientRect();
+    const tooltipRect = tooltip.getBoundingClientRect();
+    const viewportWidth = window.innerWidth;
+    const viewportHeight = window.innerHeight;
+    
+    // Default position: below the icon, centered
+    let left = rect.left + (rect.width / 2) - (tooltipRect.width / 2);
+    let top = rect.bottom + 8;
+    
+    // Adjust horizontal position if tooltip would go off screen
+    if (left < 10) {
+        left = 10;
+    } else if (left + tooltipRect.width > viewportWidth - 10) {
+        left = viewportWidth - tooltipRect.width - 10;
+    }
+    
+    // Adjust vertical position if tooltip would go off screen
+    if (top + tooltipRect.height > viewportHeight - 10) {
+        // Position above the icon instead
+        top = rect.top - tooltipRect.height - 8;
+        
+        // Update arrow position for top placement
+        tooltip.style.setProperty('--arrow-position', 'bottom');
+        const arrow = tooltip.querySelector('::after');
+        if (arrow) {
+            tooltip.classList.add('tooltip-top');
+        }
+    }
+    
+    // Apply position
+    tooltip.style.left = left + 'px';
+    tooltip.style.top = top + 'px';
+}
+
+function hideTooltip() {
+    const existingTooltip = document.getElementById('active-tooltip');
+    if (existingTooltip) {
+        existingTooltip.remove();
+    }
+}
+
+// Mobile touch support
+let touchTimeout;
+
+function handleTooltipTouch(e) {
+    e.preventDefault(); // Prevent default touch behavior
+    
+    // Clear any existing touch timeout
+    if (touchTimeout) {
+        clearTimeout(touchTimeout);
+    }
+    
+    // Show tooltip immediately
+    showTooltip(e);
+    
+    // Set timeout to hide tooltip after 3 seconds
+    touchTimeout = setTimeout(() => {
+        hideTooltip();
+    }, 3000);
+}
+
+function handleTooltipTouchEnd(e) {
+    // Don't hide immediately on touch end - let timeout handle it
+    // This allows users to read the tooltip
+}
+
+// Update tooltip positioning on window resize
+window.addEventListener('resize', function() {
+    const activeTooltip = document.getElementById('active-tooltip');
+    if (activeTooltip) {
+        hideTooltip();
+    }
+});
+
+// Enhanced setup function to be called when new content is loaded
+function refreshTooltips() {
+    // Remove old event listeners and add new ones
+    // This is useful when table content is dynamically updated
+    document.querySelectorAll('.info-icon').forEach(icon => {
+        // Remove existing listeners (if any)
+        icon.removeEventListener('mouseenter', showTooltip);
+        icon.removeEventListener('mouseleave', hideTooltip);
+        icon.removeEventListener('touchstart', handleTooltipTouch);
+        icon.removeEventListener('touchend', handleTooltipTouchEnd);
+        
+        // Add fresh listeners
+        icon.addEventListener('mouseenter', showTooltip);
+        icon.addEventListener('mouseleave', hideTooltip);
+        icon.addEventListener('touchstart', handleTooltipTouch);
+        icon.addEventListener('touchend', handleTooltipTouchEnd);
+    });
 }
