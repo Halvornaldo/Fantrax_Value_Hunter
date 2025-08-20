@@ -68,9 +68,16 @@ All features can be configured through the Parameter Controls panel on the left 
 - **Force Bench Penalty**: Penalty for likely benched players (default: 0.60x)
 
 **How It Works**:
-- CSV import identifies predicted starters
-- Non-starters receive rotation penalty multiplier
+- CSV import identifies predicted starters (receive 1.0x multiplier)
+- Non-starters receive penalty multiplier based on slider values
+- Manual overrides can force specific multiplier values
 - Helps avoid players likely to be rested or benched
+
+**Multiplier Values**:
+- **Starter**: 1.0x (predicted to start)
+- **Rotation Risk**: Uses "Auto Rotation Penalty" slider value (default: 0.65x)
+- **Bench**: Uses "Force Bench Penalty" slider value (default: 0.60x)  
+- **Out**: 0.0x (injured/suspended)
 
 ### xGI Integration (Understat)
 
@@ -90,7 +97,7 @@ All features can be configured through the Parameter Controls panel on the left 
 - Accounts for underlying performance metrics
 - Helps identify undervalued attacking players
 
-### Games Display
+### Blender Display
 
 **Purpose**: Configures how games played data is displayed and when to switch between historical/current data
 
@@ -122,7 +129,7 @@ All features can be configured through the Parameter Controls panel on the left 
 - **Fixture**: Fixture difficulty multiplier (>1.00x = easy fixture)
 - **Starter**: Starter prediction multiplier (1.00x = predicted starter)
 - **xGI**: xGI multiplier based on Understat data
-- **Starter Override**: Manual override controls
+- **Starter Override**: Manual override controls (S/B/O/A radio buttons)
 - **xG90/xA90/xGI90**: Understat expected stats per 90 minutes
 - **Min**: Minutes played
 
@@ -139,11 +146,41 @@ All features can be configured through the Parameter Controls panel on the left 
 - Yellow (5-9 games): Moderate sample size
 - Red (<5 games): Small sample size
 
+### Manual Override System
+
+**Purpose**: Override automatic starter predictions for specific players
+
+**Controls**:
+- **S (Starter)**: Force player as starter (1.0x multiplier)
+- **B (Bench)**: Force player as bench player (~0.6x multiplier)
+- **O (Out)**: Force player as out (0.0x multiplier)
+- **A (Auto)**: Use automatic prediction (default)
+
+**How It Works**:
+- Overrides apply immediately without needing to "Apply Changes"
+- Updates True Value calculation in real-time
+- Visual feedback shows updated multipliers with color coding
+- Useful for insider knowledge about lineups or disagreeing with predictions
+
+### Table Features
+
+**Sorting**: Click any column header to sort (Games column now sorts numerically)
+**Pagination**: 
+- Page size options: 50, 100, 200, All
+- Previous/Next navigation
+- "All" option loads all ~647 players (may impact performance)
+**Filtering**:
+- Position checkboxes (G/D/M/F)
+- Price range sliders
+- Team dropdown (multi-select)
+- Player name search
+**Export**: CSV export with current filters and sorting applied
+
 ## Data Import Workflows
 
 ### Weekly Form Data Import
 
-1. Click "📊 Upload Form Data" button
+1. Click "📊 Upload Weekly Game Data" button
 2. Enter gameweek number (e.g., "2" for Week 2)
 3. Upload Fantrax CSV export
 4. System processes points and updates metrics

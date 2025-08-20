@@ -5,6 +5,7 @@
 let currentConfig = {};
 let pendingChanges = {};
 let playersData = [];
+let totalFilteredCount = 0;
 let currentPage = 0;
 let pageSize = 100;
 let currentSort = { field: 'true_value', direction: 'desc' };
@@ -273,6 +274,7 @@ async function loadPlayersData() {
         
         if (response.ok) {
             playersData = result.players;
+            totalFilteredCount = result.filtered_count;
             updatePlayerTable();
             updatePaginationInfo(result.total_count, result.filtered_count);
             updateFilterCount(result.filtered_count);
@@ -348,7 +350,7 @@ function updateUIFromConfig() {
     document.getElementById('xgiStrength').value = xgiIntegration.multiplier_strength || 1.0;
     document.getElementById('xgiStrengthValue').textContent = xgiIntegration.multiplier_strength || 1.0;
     
-    // Games Display controls
+    // Blender Display controls
     const gamesDisplay = currentConfig.games_display || {};
     document.getElementById('gamesDisplayEnabled').checked = true; // Always enabled for now
     document.getElementById('baselineSwitchover').value = gamesDisplay.baseline_switchover_gameweek || 10;
@@ -411,7 +413,7 @@ function updateControlVisibility() {
     const xgiEnabled = document.getElementById('xgiEnabled').checked;
     document.getElementById('xgiContent').style.opacity = xgiEnabled ? '1' : '0.5';
     
-    // Games Display controls (always enabled for now)
+    // Blender Display controls (always enabled for now)
     const gamesDisplayEnabled = document.getElementById('gamesDisplayEnabled').checked;
     document.getElementById('gamesDisplayContent').style.opacity = gamesDisplayEnabled ? '1' : '0.5';
 }
@@ -452,7 +454,7 @@ function updatePlayerTable() {
                 <td>$${parseFloat(player.price || 0).toFixed(1)}</td>
                 <td>${parseFloat(player.ppg || 0).toFixed(1)}</td>
                 <td class="${ppClass}">${ppValue.toFixed(3)}</td>
-                <td class="${getGamesClass(player)}">${player.games_display || '0'}</td>
+                <td class="${getGamesClass(player)}" data-sort="${player.games_total || 0}">${player.games_display || '0'}</td>
                 <td class="${valueClass}">${trueValue.toFixed(3)}</td>
                 <td>${parseFloat(player.form_multiplier || 1.0).toFixed(2)}x</td>
                 <td>${parseFloat(player.fixture_multiplier || 1.0).toFixed(2)}x</td>
@@ -665,7 +667,7 @@ function setupParameterControls() {
     });
     document.getElementById('syncUnderstat').addEventListener('click', syncUnderstatData);
     
-    // Games Display controls
+    // Blender Display controls
     document.getElementById('gamesDisplayEnabled').addEventListener('change', handleParameterChange);
     document.getElementById('baselineSwitchover').addEventListener('change', handleParameterChange);
     document.getElementById('transitionEnd').addEventListener('change', handleParameterChange);
@@ -786,7 +788,7 @@ function buildParameterChanges() {
         };
     }
     
-    // Games Display changes
+    // Blender Display changes
     const gamesDisplayEnabled = document.getElementById('gamesDisplayEnabled').checked;
     const gamesSwitchover = parseInt(document.getElementById('baselineSwitchover').value);
     const transitionEnd = parseInt(document.getElementById('transitionEnd').value);
@@ -912,8 +914,11 @@ function setupTableControls() {
     });
     
     document.getElementById('next-page').addEventListener('click', () => {
-        currentPage++;
-        loadPlayersData();
+        const totalPages = Math.ceil(totalFilteredCount / pageSize);
+        if (currentPage < totalPages - 1) {
+            currentPage++;
+            loadPlayersData();
+        }
     });
     
     document.getElementById('page-size-select').addEventListener('change', function() {

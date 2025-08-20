@@ -30,6 +30,9 @@ Player performance metrics by gameweek
 - `true_value` (DECIMAL) - Calculated true value
 - `last_updated` (TIMESTAMP)
 
+**Computed Fields** (calculated in queries):
+- `games_total` - Sum of games_played + games_played_historical for sorting
+
 **Multiplier Columns**:
 - `form_multiplier` (DECIMAL 5,3, DEFAULT 1.0)
 - `fixture_multiplier` (DECIMAL 5,3, DEFAULT 1.0)
@@ -203,6 +206,13 @@ Automatically logs all changes to name_mappings in the audit history table
 4. **External Data**: Name mappings handle external data source integration
 5. **Form Calculation**: Historical points stored in `player_form` for form multipliers
 6. **Fixture Data**: Odds-based difficulty stored in `fixture_difficulty`
+
+## Recent Data Fixes
+
+**Player Data Corrections** (applied to database):
+- Fixed Leandro Trossard incorrect xGI/minutes data (set to 0)
+- Updated 50 players with 0 games but >0 minutes to set games_played=1
+- Added name mappings for Rodrigo Muniz and Rodrigo Gomes (correct team associations)
 
 ## Key Relationships
 

@@ -426,7 +426,8 @@ def get_players():
         'starter_multiplier': 'pm.starter_multiplier',
         'xgi_multiplier': 'pm.xgi_multiplier',
         'games_played': 'pgd.games_played',
-        'games_played_historical': 'pgd.games_played_historical'
+        'games_played_historical': 'pgd.games_played_historical',
+        'games_total': '(COALESCE(pgd.games_played_historical, 0) + COALESCE(pgd.games_played, 0))'
     }
     
     if sort_by not in valid_sort_fields:
@@ -542,6 +543,8 @@ def get_players():
                     games_display = "0"
             
             player_dict['games_display'] = games_display
+            # Add numeric value for sorting (total games for reliable sorting)
+            player_dict['games_total'] = games_historical + games_current
             players_list.append(player_dict)
         
         elapsed_time = time.time() - start_time

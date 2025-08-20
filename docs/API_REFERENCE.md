@@ -38,12 +38,27 @@
 - `team` (string, optional): Filter by team code
 - `search` (string, optional): Search player names
 - `gameweek` (int, optional, default=1): Gameweek data to retrieve
-- `limit` (int, optional, default=100): Results per page
+- `limit` (int, optional, default=100): Results per page (50, 100, 200, 1000)
 - `offset` (int, optional, default=0): Pagination offset
-- `sort_by` (string, optional, default='true_value'): Sort field
+- `sort_by` (string, optional, default='true_value'): Sort field (games_total supported for numeric Games sorting)
 - `sort_direction` (string, optional, default='desc'): Sort direction (asc/desc)
 
-**Returns**: JSON array of player objects
+**Returns**: JSON object with pagination info and player array
+
+**Response Format**:
+```json
+{
+  "players": [...],
+  "total_count": 647,
+  "filtered_count": 50,
+  "filters_applied": {...},
+  "pagination": {
+    "limit": 50,
+    "offset": 0,
+    "has_more": true
+  }
+}
+```
 
 #### `GET /api/players-by-team`
 **Description**: Get players for a specific team  
@@ -104,9 +119,24 @@
 ### Player Management API
 
 #### `POST /api/manual-override`
-**Description**: Set manual starter override for players  
-**Body**: JSON with player overrides  
-**Returns**: Success/error response
+**Description**: Set manual starter override for individual players (applies immediately)
+**Body**: 
+```json
+{
+  "player_id": "string", 
+  "override_type": "starter|bench|out|auto",
+  "gameweek": "number"
+}
+```
+**Returns**: 
+```json
+{
+  "success": true,
+  "player_name": "string",
+  "new_multiplier": "number", 
+  "new_true_value": "number"
+}
+```
 
 #### `POST /api/get-player-suggestions`
 **Description**: Get player name suggestions for mapping  
@@ -170,11 +200,15 @@
   "starter_multiplier": "number",
   "xgi_multiplier": "number",
   "games_played": "number",
+  "games_played_historical": "number",
+  "games_total": "number",
   "games_display": "string",
+  "data_source": "string",
   "xg90": "number",
   "xa90": "number", 
   "xgi90": "number",
-  "minutes": "number"
+  "minutes": "number",
+  "last_updated": "timestamp"
 }
 ```
 

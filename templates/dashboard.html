@@ -169,11 +169,11 @@
                     </div>
                 </div>
 
-                <!-- Games Display Configuration -->
+                <!-- Blender Display Configuration -->
                 <div class="parameter-section">
                     <h3>
                         <input type="checkbox" id="gamesDisplayEnabled" checked>
-                        <label for="gamesDisplayEnabled">Games Display</label>
+                        <label for="gamesDisplayEnabled">Blender Display</label>
                     </h3>
                     <div class="games-display-controls" id="gamesDisplayContent">
                         <div class="control-group">
@@ -205,7 +205,7 @@
                         Import Lineups CSV
                     </button>
                     <button id="form-upload" class="btn-secondary" onclick="window.open('/form-upload', '_blank')">
-                        📊 Upload Form Data
+                        📊 Upload Weekly Game Data
                     </button>
                     <button id="odds-upload" class="btn-secondary" onclick="window.open('/odds-upload', '_blank')">
                         ⚽ Upload Fixture Odds
@@ -327,7 +327,7 @@
                                         </span>
                                     </div>
                                 </th>
-                                <th data-sort="games_played_historical">
+                                <th data-sort="games_total">
                                     <div class="header-content">
                                         <span class="header-text">Games</span>
                                         <span class="header-icons">
@@ -447,6 +447,7 @@
                             <option value="50">50</option>
                             <option value="100" selected>100</option>
                             <option value="200">200</option>
+                            <option value="1000">All</option>
                         </select>
                     </div>
                 </div>

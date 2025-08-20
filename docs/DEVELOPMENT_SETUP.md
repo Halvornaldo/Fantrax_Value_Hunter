@@ -39,7 +39,7 @@ pip install psycopg2-binary  # PostgreSQL adapter
 ```bash
 python check_db_structure.py
 ```
-Expected output: "✅ Database connection successful"
+Expected output: "✅ Database connection successful" and "Database connected: 647 players loaded"
 
 ### 4. Configuration Files
 
@@ -86,7 +86,9 @@ python run_migration.py               # Run database migrations
 **Basic functionality**:
 - Dashboard loads at http://localhost:5000
 - Parameter controls respond to changes
-- Player table displays 633 players
+- Player table displays 633+ players with pagination (50/100/200/All page sizes)
+- Games column sorts numerically
+- Manual override controls work in real-time
 - Import pages accessible at `/form-upload` and `/odds-upload`
 
 ### Code Quality

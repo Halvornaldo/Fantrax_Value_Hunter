@@ -5,10 +5,12 @@
 ✅ **Production Ready Dashboard** with comprehensive parameter controls and player analytics
 
 ### Recent Major Features (2025-08-20)
-- **Games Display Configuration**: Adjustable thresholds for blending historical/current season data
+- **Blender Display Configuration**: Adjustable thresholds for blending historical/current season data
 - **Professional Tooltip System**: All 17 columns have detailed explanations
 - **Complete xGI Integration**: Understat data with name matching system
 - **Optimized Performance**: Fixture difficulty calculations improved 2x (90s → 46s)
+- **Manual Override System**: Real-time starter prediction overrides with S/B/O/A controls
+- **Enhanced Table Features**: Numeric Games sorting, pagination (50/100/200/All), improved filtering
 
 ## Core Architecture
 
@@ -40,7 +42,7 @@ True Value = PPG × Form × Fixture × Starter × xGI Multipliers
 3. **Starter**: Rotation penalties based on predicted lineups
 4. **xGI**: Expected Goals Involvement from Understat data
 
-### Games Display Logic
+### Blender Display Logic
 **Configurable Thresholds** (new dashboard feature):
 - **Baseline Switchover**: When to start blending historical+current (default: GW10)
 - **Transition End**: When to switch to current-only (default: GW15)
@@ -58,7 +60,7 @@ True Value = PPG × Form × Fixture × Starter × xGI Multipliers
 - Manual review interface at `/import-validation`
 
 **CSV Upload Workflows**:
-- Weekly form data via `/form-upload` 
+- Weekly game data via `/form-upload` ("Upload Weekly Game Data" button)
 - Fixture odds via `/odds-upload`
 - Lineup predictions with auto-matching
 
@@ -97,11 +99,12 @@ config/system_parameters.json # All configurable parameters
 - JavaScript variable conflicts: Fixed `baselineSwitchover` naming collision
 - Performance optimization: Fixture calculations improved 2x speed
 
-### Current Known Issues ⚠️
-- **Games Column Sorting**: Sorts alphabetically due to complex display format ("38+2", "38 (24-25)")
-  - Status: Paused by user request
-  - Impact: Minor UX issue, functionality intact
-  - Solution: Consider backend sort field or simplified display
+### Recent Bug Fixes ✅ (2025-08-20)
+- **Games Column Sorting**: Fixed to sort numerically using `games_total` backend field
+- **Player Data Corrections**: Fixed Leandro Trossard xGI/minutes data, updated 50 players with incorrect games count
+- **Name Mappings**: Added Rodrigo Muniz/Gomes mappings for correct team associations (Wolves/Fulham swap)
+- **Pagination**: Fixed Previous/Next buttons to use proper filtered count instead of page data length
+- **UI Terminology**: Updated "Games Display" → "Blender Display" and "Upload Form Data" → "Upload Weekly Game Data"
 
 ### Active Development Areas
 - Configuration refinement based on weekly usage
@@ -137,10 +140,11 @@ conn = psycopg2.connect(
 ## Development Context
 
 ### Recent Session Focus (2025-08-20)
-- Implemented Games Display configuration feature
-- Fixed JavaScript errors preventing table loading
-- Enhanced documentation structure with proper reference materials
-- Integrated valuable technical information from system-specific docs
+- Implemented comprehensive bug fixes for 5 reported issues and 2 enhancements
+- Enhanced table functionality: numeric Games sorting, pagination improvements, "All" page size option
+- Updated UI terminology for better clarity ("Blender Display", "Upload Weekly Game Data")
+- Comprehensive documentation review and enhancement across 4 key documentation files
+- Fixed critical player data issues (Trossard, games counting, name mappings)
 
 ### System Maturity
 The system is production-ready with:
@@ -153,4 +157,4 @@ The system is production-ready with:
 The dashboard successfully handles all 633 Premier League players with real-time parameter adjustments, making it effective for weekly fantasy lineup optimization.
 
 ---
-*Last Updated: 2025-08-20 - Focus: Documentation cleanup & Games Display configuration*
+*Last Updated: 2025-08-20 - Focus: Bug fixes, table enhancements, and comprehensive documentation review*
