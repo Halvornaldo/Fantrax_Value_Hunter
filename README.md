@@ -1,43 +1,51 @@
 # Fantrax Value Hunter
 **Fantasy Football Analytics Platform - Production Ready**
 
-Two-panel dashboard for finding undervalued players through real-time parameter adjustment. Shows all 633 Premier League players with True Value calculations, advanced filtering, and xGI analytics.
+Advanced dashboard for finding undervalued Premier League players through configurable True Value calculations. Analyzes all 647+ players with real-time parameter adjustment, manual overrides, and comprehensive data integration.
 
 ---
 
 ## 🎯 **Current Status: Production Ready**
 
 ✅ **Fully Operational Dashboard** with:
-- **Left Panel**: Parameter controls for adjusting True Value calculations
-- **Right Panel**: Filterable table showing all players ranked by True Value
-- **xGI Integration**: Expected Goals Involvement data from Understat (155 players matched)
-- **Real-time Updates**: Parameter changes trigger immediate recalculation
-- **Advanced Name Matching**: 85%+ accuracy across multiple data sources
+- **Two-Panel Design**: Parameter controls + filterable player table
+- **True Value Calculator**: PPG × Form × Fixture × Starter × xGI multipliers
+- **Manual Override System**: Real-time starter prediction controls (S/B/O/A)
+- **Advanced Filtering**: Position, price range, team, player search
+- **Comprehensive Pagination**: 50/100/200/All page sizes with numeric sorting
+- **xGI Integration**: Expected Goals Involvement data from Understat
+- **Professional UI**: Tooltips, color coding, responsive design
 
-**Features**: Odds-based fixture difficulty, form calculation, starter predictions, xGI multipliers, CSV imports, upload page integration
+**Recent Updates (2025-08-20)**:
+- Fixed Games column numeric sorting
+- Enhanced pagination with "All" option  
+- Updated UI terminology ("Blender Display", "Upload Weekly Game Data")
+- Comprehensive documentation overhaul
+- Critical data fixes (player corrections, name mappings)
 
 ---
 
 ## 🚀 **Quick Start**
 
-### **1. Launch Dashboard**
+### **1. Launch Application**
 ```bash
 cd C:/Users/halvo/.claude/Fantrax_Value_Hunter
 python src/app.py
 ```
-Visit: http://localhost:5000
+**Access**: http://localhost:5000  
+**Database**: PostgreSQL on localhost:5433 (fantrax_user/fantrax_password)
 
-### **2. Use Parameter Controls**
-- Adjust form, fixture, starter, and xGI multipliers in left panel
-- See immediate impact on True Value rankings in right panel
-- Filter players by position, price, team, or search by name
-- Sort by any column (True Value, xGI90, etc.)
+### **2. Use Dashboard**
+- **Left Panel**: Adjust form, fixture, starter, xGI, and blender display parameters
+- **Right Panel**: View all players ranked by True Value with advanced filtering
+- **Real-time Updates**: Parameter changes trigger immediate recalculation
+- **Manual Overrides**: Use S/B/O/A radio buttons for starter predictions
 
-### **3. Import Data**
-- **📊 Upload Form Data**: Weekly Fantrax performance CSV via `/form-upload`
-- **⚽ Upload Fixture Odds**: OddsPortal betting data via `/odds-upload`
-- **CSV Import**: Upload starter predictions with intelligent name matching
-- **Sync xGI**: Understat data integration for expected goals involvement
+### **3. Data Import Workflows**
+- **📊 Upload Weekly Game Data**: Fantrax CSV via `/form-upload`
+- **⚽ Upload Fixture Odds**: Betting odds CSV via `/odds-upload`  
+- **Import Lineups CSV**: Starter predictions with intelligent name matching
+- **Sync Understat**: xGI data integration with name resolution
 
 ---
 
@@ -46,241 +54,174 @@ Visit: http://localhost:5000
 ```
 Fantrax_Value_Hunter/
 ├── README.md                           # This file - Production overview
-├── requirements.txt                    # Python dependencies
-├── docs/
-│   ├── BUG_FIX_SPRINT_PLAN.md         # Sprint planning documentation
-│   ├── CURRENT_STATUS.md              # System status
-│   ├── GLOBAL_NAME_MATCHING_SYSTEM.md # Name matching system docs
-│   ├── FORM_DATA_INFRASTRUCTURE.md    # Form data system guide
-│   ├── FIXTURE_DIFFICULTY_SYSTEM.md   # Odds-based fixture difficulty docs  
-│   ├── STARTER_IMPORT_GUIDE.md        # User guides
-│   └── CLAUDE.md                      # AI context file
+├── CLAUDE.md                          # Development context
+├── requirements.txt                   # Python dependencies
+├── docs/                              # Complete documentation
+│   ├── FEATURE_GUIDE.md              # Dashboard functionality guide
+│   ├── API_REFERENCE.md              # Complete endpoint documentation  
+│   ├── DATABASE_SCHEMA.md            # Database structure with credentials
+│   └── DEVELOPMENT_SETUP.md          # Setup and testing instructions
 ├── src/
-│   ├── app.py                         # ✅ Flask backend (production)
-│   └── name_matching/                 # ✅ Name matching system
-│       ├── unified_matcher.py         # Core matching service
-│       ├── matching_strategies.py     # 6 matching algorithms
-│       └── suggestion_engine.py       # Smart suggestions
+│   ├── app.py                        # ✅ Flask backend (2500+ lines)
+│   ├── db_manager.py                 # Database management
+│   ├── fixture_difficulty.py         # Odds-based difficulty calculation
+│   ├── form_tracker.py               # Form calculation utilities
+│   └── name_matching/                # Global name matching system
+│       ├── unified_matcher.py        # Core matching service
+│       ├── matching_strategies.py    # 6 matching algorithms
+│       └── suggestion_engine.py      # Smart suggestions with confidence
 ├── templates/
-│   ├── dashboard.html                 # ✅ Two-panel UI with upload page links
-│   ├── form_upload.html               # ✅ Form data CSV upload interface
-│   └── odds_upload.html               # ✅ Fixture odds CSV upload interface
+│   ├── dashboard.html                # ✅ Two-panel UI with tooltips
+│   ├── form_upload.html              # ✅ Weekly game data upload
+│   ├── odds_upload.html              # ✅ Fixture odds upload
+│   └── import_validation.html        # ✅ Name matching validation
 ├── static/
-│   ├── css/dashboard.css             # ✅ Dashboard styling
-│   └── js/dashboard.js               # ✅ Parameter controls
-├── config/
-│   └── system_parameters.json        # ✅ All adjustable parameters
-└── C:/Users/halvo/.claude/Fantrax_Expected_Stats/
-    └── integration_package/           # ✅ xGI integration
-        ├── understat_integrator.py    # Understat data extraction
-        ├── integration_pipeline.py    # Full integration pipeline
-        └── value_hunter_extension.py  # True Value enhancements
+│   ├── css/dashboard.css             # ✅ Professional styling
+│   └── js/dashboard.js               # ✅ Parameter controls & table logic
+└── config/
+    ├── system_parameters.json        # ✅ All adjustable parameters
+    └── fantrax_cookies.json          # Browser cookies (optional)
 ```
 
 ### **🔧 Development Setup**
-```bash
-# 1. Clone repository (after Git initialization)
-git clone <repository-url>
-cd Fantrax_Value_Hunter
+See `docs/DEVELOPMENT_SETUP.md` for complete setup instructions including:
+- Python dependencies and database setup
+- Configuration files and verification scripts
+- Testing guidelines and development workflow
 
-# 2. Install dependencies
-pip install -r requirements.txt
+---
 
-# 3. Set up configuration
-cp config/fantrax_cookies.json.example config/fantrax_cookies.json
-# Edit with your browser cookies
+## 🎯 **Core Features**
 
-# 4. Run current analysis
-python src/candidate_analyzer.py
-
-# 5. Future: Launch dashboard
-python src/dashboard.py
+### **True Value Calculation**
+```
+True Value = PPG × Form × Fixture × Starter × xGI Multipliers
 ```
 
----
-
-## 🎯 **Development Philosophy**
-
-### **⚖️ Scope & Quality First**
-- **Stick to defined scope**: No feature creep or over-engineering
-- **Test each component**: Validate every feature before moving forward
-- **Incremental progress**: Small, tested steps toward the end goal
-- **Slow and steady**: Build it right rather than build it fast
-
-### **🧪 Testing Approach**
-- **Unit validation**: Test each function with known data
-- **API testing**: Verify data accuracy against Fantrax
-- **Integration testing**: Ensure components work together
-- **Real-world validation**: Compare recommendations to actual results
-
----
-
-## 📊 **Current Status (Day 1 Complete + Documentation)**
-
-### **✅ Database Foundation (August 15, 2025)**
-- ✅ **PostgreSQL Setup**: Database operational on port 5433
-- ✅ **Schema Created**: players, player_form, player_metrics tables
-- ✅ **Data Imported**: All 633 players with complete metrics
-- ✅ **True Value Formula**: PPG ÷ Price validated and working
-- ✅ **Multiplier System**: Form, fixture, starter calculations ready
-- ✅ **Form Calculation**: player_form table ready for 5 gameweek lookback
-
-### **✅ Documentation Updated (August 15, 2025)**
-- ✅ **Version 1.0 Scope**: Clearly defined in VERSION_1.0_SPECIFICATION.md
-- ✅ **Future Features**: Moved to FUTURE_IDEAS.md (out of v1.0 scope)
-- ✅ **Implementation Plan**: Updated for simplified two-panel dashboard
-- ✅ **AI Context**: CLAUDE.md consolidated in docs/ folder
-
-### **📊 Database Contents**
-- **633 total players** with complete metrics for gameweek 1
-- **Position breakdown**: 74 GK, 213 DEF, 232 MID, 114 FWD  
-- **Value calculations**: PPG ÷ Price formula working correctly
-- **Multipliers**: All default to 1.0, ready for dashboard adjustment
-
-### **🎯 Next Steps (Days 2-8)**
-1. **Day 2-3**: Flask backend with parameter adjustment endpoints
-2. **Day 4-5**: Two-panel dashboard UI with all controls
-3. **Day 6**: CSV import for starter predictions
-4. **Day 7-8**: Testing and validation
-
----
-
-## 🎯 **Version 1.0 Features**
-
-### **Left Panel - Parameter Controls**
-All boost factors adjustable via dashboard UI:
+### **Parameter Control Systems**
 
 **Form Calculation**
-- ✅ Enable/disable toggle
-- Lookback period (3 or 5 games)
-- Minimum games threshold
+- Weighted recent performance vs season/historical baseline
+- Configurable lookback period (3-5 games) and strength multiplier
+- Automatic baseline switchover at configurable gameweek
 
-**Fixture Difficulty** 
-- ✅ Enable/disable toggle
-- 5-tier multiplier system with sliders
-- Very Easy (1.2x-1.5x) through Very Hard (0.6x-0.8x)
+**Odds-Based Fixture Difficulty**  
+- 21-point scale (-10 to +10) from real betting odds
+- Position-specific weights (Defenders 120%, Goalkeepers 110%)
+- Preset levels: Conservative/Balanced/Aggressive or custom
 
 **Starter Predictions**
-- ✅ Enable/disable toggle  
-- Confidence multipliers for consensus levels
-- CSV import for weekly lineup updates
+- CSV import with intelligent name matching
+- Configurable rotation and bench penalties
+- Real-time manual overrides (S/B/O/A controls)
 
-**Display Filters**
+**xGI Integration (Understat)**
+- Expected Goals Involvement data (xG90 + xA90)
+- Multiple multiplier modes: Direct, Adjusted, Capped
+- Automatic sync with confidence-based name matching
+
+**Blender Display Configuration**
+- Configurable thresholds for historical vs current season data
+- Smart display formats: "38 (24-25)", "38+2", "5"
+- Transition periods for data source blending
+
+### **Advanced Table Features**
+
+**Sorting & Pagination**
+- Click any column header to sort (Games column sorts numerically)
+- Page size options: 50, 100, 200, All (~647 players)
+- Efficient pagination with Previous/Next navigation
+
+**Filtering System**
 - Position checkboxes (G/D/M/F)
-- Price range slider
-- Ownership % threshold
-- Team selector
-- Name search
+- Price range sliders ($5.0-$25.0)
+- Team dropdown (multi-select)
+- Player name search with real-time filtering
 
-### **Right Panel - Player Table**
-- **All 633 players** (not limited to 68)
-- Sortable by True Value, Price, PPG, Ownership
-- Real-time updates when parameters change
-- Export filtered results to CSV
-
-### **Core Workflow**
-1. Adjust multipliers → True Value recalculates for all 633 players
-2. Apply filters → See subset matching criteria  
-3. Sort by True Value → Find best value opportunities
-4. Export selection → Use for lineup construction
+**Data Integration**
+- Global Name Matching System with 100% visibility
+- 6 matching algorithms with confidence scoring
+- Manual review interface for unmatched players
+- Learning system builds persistent mapping database
 
 ---
 
-## 🔧 **Technical Stack**
+## 📊 **Database System**
 
-- **Backend**: Flask + PostgreSQL with Database MCP integration
-- **Frontend**: HTML/CSS/JavaScript with real-time parameter controls
-- **Database**: 633 players with historical FP/G data
-- **Formula**: `TrueValue = (PPG ÷ Price) × Form × Fixture × Starter`
+**Core Tables**:
+- `players` (647+ players) - Core player data with xG statistics
+- `player_metrics` - Weekly performance data with all multipliers
+- `player_games_data` - Games tracking (historical vs current)
+- `name_mappings` - Cross-source player name resolution
+- `team_fixtures` - Odds-based fixture difficulty scores
+- `player_form` - Historical form data for calculations
 
----
-
-## 📝 **Development Philosophy**
-
-### **Version 1.0 Scope Discipline**
-- ✅ **Core Feature**: Parameter adjustment affecting True Value rankings
-- ✅ **Data Display**: All 633 players with filtering capabilities  
-- ❌ **Out of Scope**: Auto-selection, drag-and-drop, web scraping
-
-### **Quality First**
-- Every parameter change must trigger accurate recalculation
-- Database performance must handle 633 players smoothly
-- UI must be responsive and intuitive for parameter tuning
+**Performance**:
+- Handles all Premier League players efficiently
+- Optimized queries with appropriate indexes
+- Real-time parameter updates in ~2-3 seconds
+- Memory caching for fixture difficulty calculations
 
 ---
 
-## 📊 **League Context**
+## 🔗 **API Endpoints**
+
+**Player Data**: `/api/players` (filtering, sorting, pagination)  
+**Configuration**: `/api/config`, `/api/update-parameters`  
+**Data Import**: `/api/import-form-data`, `/api/import-lineups`, `/api/import-odds`  
+**Manual Overrides**: `/api/manual-override` (real-time starter adjustments)  
+**Understat Integration**: `/api/understat/sync`, `/api/understat/stats`  
+**Name Matching**: `/api/validate-import`, `/api/confirm-mapping`
+
+See `docs/API_REFERENCE.md` for complete endpoint documentation.
+
+---
+
+## 🎲 **League Context**
 
 - **League**: Its Coming Home (EPL 2025-26)
 - **Budget**: $100 per game week
 - **Format**: Weekly reset (complete team changes allowed)
-- **Players**: 11 (1 GK, 3-5 DEF, 3-5 MID, 1-3 FWD)
+- **Players**: 11 starters (1 GK, 3-5 DEF, 3-5 MID, 1-3 FWD)
+- **Data Source**: All 647+ Premier League players with comprehensive metrics
 
 ---
 
-## 🔗 **Related Projects**
+## 📖 **Documentation**
 
-- **API Wrapper**: `../Fantrax_Wrapper/` - Complete Fantrax API documentation
-- **Technical Guide**: `../Fantrax_Wrapper/WRAPPER_SUMMARY.md` - How to access all player data
+Complete documentation available in `docs/` folder:
 
----
-
----
-
-## 🔗 **Global Name Matching System** *(Production Ready)*
-
-### **Overview**
-Enterprise-grade name matching system that resolves player name discrepancies across data sources (FFS CSV, Understat xG/xA, future integrations). Eliminates silent failures and provides smart suggestions for manual review.
-
-### **Key Features**
-- ✅ **100% Visibility**: No more silent failures - every player gets matched or flagged for review
-- ✅ **Smart Suggestions**: AI-powered recommendations with confidence scoring
-- ✅ **Learning System**: Builds mapping database through user confirmations (50+ mappings)
-- ✅ **Validation UI**: Web interface at `/import-validation` for easy manual review
-- ✅ **Multi-Strategy Matching**: 6 different algorithms (exact, fuzzy, component, etc.)
-- ✅ **HTML Entity Support**: Handles encoded characters from web sources (`&#039;` → `'`)
-
-### **Production Performance**
-- **FFS CSV Import**: 71.4% automatic match rate, 95%+ confidence on matches
-- **Understat Integration**: 16.7% automatic, 91.7% reviewable (realistic for first-time)
-- **Database**: 50+ verified mappings across 3 source systems
-- **API**: 5 endpoints for programmatic access and UI integration
-
-### **Usage**
-```bash
-# Import with validation
-curl -X POST http://localhost:5000/api/validate-import \
-  -H "Content-Type: application/json" \
-  -d '{"source_system": "ffs", "players": [...]}'
-
-# Manual review UI
-http://localhost:5000/import-validation
-
-# Updated FFS import (now uses UnifiedNameMatcher)
-curl -X POST http://localhost:5000/api/import-lineups \
-  -F "lineups_csv=@your_file.csv"
-```
-
-### **Architecture**
-```
-name_matching/
-├── unified_matcher.py      # Main matching service
-├── matching_strategies.py  # 6 matching algorithms  
-├── suggestion_engine.py    # Smart suggestions with confidence
-└── __init__.py
-
-Database Tables:
-├── name_mappings           # Persistent player mappings
-├── name_mapping_history    # Audit trail
-└── players (existing)      # Canonical player database
-```
-
-### **Integration Status**
-- ✅ **FFS CSV Import**: Fully integrated, production ready
-- 🔄 **Understat xG/xA**: Ready for integration (tested, working)
-- ⏳ **Future Sources**: Framework ready for any new data source
+- **FEATURE_GUIDE.md**: Comprehensive dashboard functionality guide
+- **API_REFERENCE.md**: All 25+ endpoints with request/response formats
+- **DATABASE_SCHEMA.md**: Complete database structure with credentials
+- **DEVELOPMENT_SETUP.md**: Setup instructions and development workflow
 
 ---
 
-**Version 1.0: Focus on parameter tuning for value discovery 🎯⚽**
-**Global Name Matching: Production-ready data integration system 🔗✨**
+## 🔧 **System Status**
+
+### **✅ Production Ready Features**
+- Two-panel dashboard with real-time parameter adjustment
+- All 647+ Premier League players with comprehensive filtering
+- Manual override system for starter predictions
+- Professional UI with tooltips and color coding
+- Comprehensive data import workflows with name matching
+- Optimized performance and caching systems
+
+### **📊 Current Performance**
+- **Database**: 647+ players with complete metrics
+- **Response Time**: Parameter changes recalculate all players in ~2-3 seconds
+- **Match Accuracy**: 71.4% automatic for FFS imports, 85%+ confidence scoring
+- **UI Features**: Professional tooltips, numeric sorting, advanced pagination
+
+### **🔄 Recent Fixes (2025-08-20)**
+- Games column now sorts numerically using backend `games_total` field
+- Fixed pagination buttons to use correct filtered count
+- Updated 50+ players with incorrect games/minutes data
+- Enhanced name mapping for Rodrigo players (Wolves/Fulham team swap)
+- Comprehensive UI terminology updates for clarity
+
+---
+
+**🎯 Focus: Advanced parameter tuning for fantasy value discovery**  
+**🔗 Production-ready data integration with intelligent name matching**
