@@ -261,6 +261,85 @@
 **Body**: JSON with mapping data  
 **Returns**: Success/error response
 
+### Validation Framework API (Sprint 3)
+
+#### `POST /api/run-validation`
+**Description**: Execute validation backtesting against actual fantasy performance  
+**Body**: 
+```json
+{
+  "gameweeks": [1, 2, 3],
+  "min_minutes": 90,
+  "formula_version": "v2.0",
+  "validation_type": "temporal|cross_validation"
+}
+```
+**Returns**: 
+```json
+{
+  "success": true,
+  "validation_id": "string",
+  "metrics": {
+    "rmse": 0.305,
+    "mae": 0.234,
+    "correlation": 0.87,
+    "r_squared": 0.76,
+    "players_tested": 33
+  },
+  "limitations": [
+    "Single gameweek testing",
+    "Potential data leakage risk",
+    "Small sample size (33 players)"
+  ]
+}
+```
+
+#### `POST /api/optimize-parameters`
+**Description**: Run parameter optimization for multipliers  
+**Body**: 
+```json
+{
+  "parameters_to_optimize": ["form_strength", "fixture_strength"],
+  "gameweeks": [1, 2, 3],
+  "objective": "minimize_rmse"
+}
+```
+**Returns**: Parameter optimization results
+
+#### `POST /api/benchmark-versions`
+**Description**: Compare v1.0 vs v2.0 formula performance  
+**Body**: 
+```json
+{
+  "gameweeks": [1],
+  "min_minutes": 90
+}
+```
+**Returns**: 
+```json
+{
+  "v1_metrics": {
+    "rmse": 2.277,
+    "players_tested": 74,
+    "bias": 1.7
+  },
+  "v2_metrics": {
+    "rmse": 0.305,
+    "players_tested": 33,
+    "bias": 0.1
+  },
+  "improvement": "87% RMSE reduction"
+}
+```
+
+#### `GET /api/validation-history`
+**Description**: Get historical validation results  
+**Returns**: Array of previous validation runs
+
+#### `GET /api/validation-dashboard`
+**Description**: Validation dashboard page  
+**Returns**: HTML validation dashboard interface
+
 ### Utility API
 
 #### `GET /api/export`
@@ -348,4 +427,4 @@
 
 **Maintenance Note**: This document must be updated after each Formula Optimization sprint with new endpoints, response formats, and API changes. See `docs/DOCUMENTATION_MAINTENANCE.md` for complete update requirements.
 
-*Last updated: 2025-08-21 - Post Formula Optimization v2.0 Sprint 2 completion*
+*Last updated: 2025-08-21 - Post Formula Optimization v2.0 Sprint 3 completion (Validation Framework)*

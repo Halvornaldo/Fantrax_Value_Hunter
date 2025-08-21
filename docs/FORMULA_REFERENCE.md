@@ -326,6 +326,85 @@ if difficulty_score is None:
 - **Division Protection**: All ratios checked for zero denominators
 - **Global Cap**: 3.0 maximum total multiplier (configurable)
 
+## Sprint 3 Validation Framework Findings
+
+### Critical Data Quality Discovery (Sprint 3)
+
+**Championship Contamination Issue:**
+- **Problem**: 63 players had `baseline_xgi` values from Championship/lower leagues
+- **Impact**: Created false validation results and biased predictions
+- **Teams Affected**: Leeds (promoted), Burnley, Southampton, plus new signings
+- **Resolution**: Cleaned to 303 Premier League-only players for accurate validation
+
+**Validation Results with Clean Data:**
+```python
+# Before cleanup: 366 players with baseline data
+# After cleanup: 303 players with valid Premier League baseline
+# Players removed: 63 with Championship/lower league contamination
+```
+
+### Formula Version Validation Issues
+
+**v1.0 vs v2.0 Testing Problem:**
+- **v1.0 Formula Issue**: `true_value = (ppg / price) * multipliers` → 0.0 when ppg=0 (early season)  
+- **v2.0 Formula Correct**: `true_value = blended_ppg * multipliers` → Uses historical baseline properly
+
+**Validation Comparison:**
+```python
+# v1.0 Results (Deprecated):
+# - 74 players tested
+# - RMSE: 2.277 (poor accuracy)
+# - Bias: +1.7 points (massive under-prediction)
+
+# v2.0 Results (Limited Data):
+# - 33 players tested (90+ minutes filter)
+# - RMSE: 0.305 (excellent accuracy)
+# - Bias: +0.1 points (minimal error)
+# - WARNING: Single gameweek, potential data leakage
+```
+
+### Validation Framework Limitations
+
+**Critical Limitations Identified:**
+1. **Data Leakage Risk**: Current validation tests against potentially seen data
+2. **Small Sample Size**: Only 33 players with complete v2.0 data and 90+ minutes
+3. **Single Gameweek**: No consistency testing across multiple gameweeks
+4. **Temporal Separation**: Need future gameweek data for proper validation
+
+**Validation Quality Assessment:**
+- **Formula Architecture**: ✅ EXCELLENT - Proper prediction/value separation
+- **Data Integration**: ✅ EXCELLENT - 99% name matching, clean historical data
+- **Validation Results**: ⚠️ LIMITED but PROMISING - Need temporal separation for conclusive testing
+
+### Production-Ready Validation Pipeline
+
+**Created for Sprint 3:**
+- `validation_pipeline.py` - Production-ready framework for future validation
+- `fantasy_validation_simple.py` - Clean validation execution with limited data
+- `verify_baseline_cleanup.py` - Data integrity verification system
+- Comprehensive error analysis and prediction failure tracking
+
+**Framework Capabilities:**
+- Cross-validation across multiple gameweeks
+- Temporal separation for proper backtesting
+- Position-specific performance analysis
+- Robustness testing for fixture difficulty and form variations
+- Statistical framework with RMSE, MAE, correlation, R², precision@K metrics
+
+### Sprint 3 Validation Requirements for Future Use
+
+**For Proper Validation (Awaiting Data):**
+1. **Temporal Separation**: Test on GW2+ data when available
+2. **Historical Backtesting**: Use 2023-24 season data with ScraperFC
+3. **Cross-Validation**: Test consistency across multiple gameweeks
+4. **Larger Sample Size**: Expand beyond 33 players when more v2.0 data available
+
+**Framework Status:**
+- ✅ **Data Quality**: Championship contamination detection and cleanup system operational
+- ✅ **Validation Infrastructure**: Production-ready pipeline created and tested
+- ✅ **Error Analysis**: Comprehensive prediction failure tracking implemented
+- ⏳ **Temporal Validation**: Framework ready, awaiting proper temporal data separation
+
 ## Integration with Dashboard
 
 ### Real-time Updates:
@@ -339,4 +418,10 @@ if difficulty_score is None:
 - Manual override JSON editor for starter predictions
 - Display toggles for showing/hiding statistical components
 
-This reference provides the complete mathematical foundation for the Fantrax Value Hunter system, enabling precise understanding and modification of the value calculation methodology.
+### Sprint 3 Validation Dashboard (Ready for Deployment):
+- Backend API: 5 new validation endpoints in `src/app.py`
+- Frontend: Complete HTML dashboard (`templates/validation_dashboard.html`)
+- Real-time metrics display with historical trend charts
+- Interactive parameter controls and target achievement indicators
+
+This reference provides the complete mathematical foundation for the Fantrax Value Hunter system, including critical Sprint 3 validation framework findings and data quality discoveries.

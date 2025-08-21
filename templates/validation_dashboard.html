@@ -1,0 +1,647 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Formula Validation Dashboard - Fantrax Value Hunter</title>
+    
+    <!-- Bootstrap CSS -->
+    <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.1.3/dist/css/bootstrap.min.css" rel="stylesheet">
+    <!-- Chart.js -->
+    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+    
+    <style>
+        .metric-card {
+            border-radius: 10px;
+            border-left: 4px solid;
+            transition: transform 0.2s;
+        }
+        
+        .metric-card:hover {
+            transform: translateY(-2px);
+        }
+        
+        .metric-good {
+            border-left-color: #28a745;
+            background: linear-gradient(135deg, #28a74505, #28a74510);
+        }
+        
+        .metric-warning {
+            border-left-color: #ffc107;
+            background: linear-gradient(135deg, #ffc10705, #ffc10710);
+        }
+        
+        .metric-danger {
+            border-left-color: #dc3545;
+            background: linear-gradient(135deg, #dc354505, #dc354510);
+        }
+        
+        .sprint-badge {
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            color: white;
+            border: none;
+            border-radius: 20px;
+            padding: 5px 15px;
+            font-size: 0.85em;
+            font-weight: bold;
+        }
+        
+        .validation-controls {
+            background: linear-gradient(135deg, #f8f9fa 0%, #e9ecef 100%);
+            border-radius: 15px;
+            padding: 25px;
+            margin-bottom: 30px;
+        }
+        
+        .btn-validation {
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            border: none;
+            border-radius: 25px;
+            padding: 10px 20px;
+            color: white;
+            font-weight: 500;
+            transition: all 0.3s;
+        }
+        
+        .btn-validation:hover {
+            transform: translateY(-2px);
+            box-shadow: 0 5px 15px rgba(102, 126, 234, 0.3);
+            color: white;
+        }
+        
+        .loading-spinner {
+            display: none;
+        }
+        
+        .target-indicator {
+            font-size: 1.2em;
+            font-weight: bold;
+        }
+        
+        .target-met {
+            color: #28a745;
+        }
+        
+        .target-missed {
+            color: #dc3545;
+        }
+    </style>
+</head>
+<body>
+    <div class="container-fluid mt-4">
+        <!-- Header -->
+        <div class="row mb-4">
+            <div class="col-12">
+                <div class="d-flex justify-content-between align-items-center">
+                    <div>
+                        <h1 class="h2 mb-0">Formula Validation Dashboard</h1>
+                        <p class="text-muted mb-0">
+                            <span class="sprint-badge">Sprint 3</span>
+                            Validation Framework & Backtesting
+                        </p>
+                    </div>
+                    <div>
+                        <button class="btn btn-outline-primary btn-sm" onclick="loadValidationHistory()">
+                            📊 Refresh History
+                        </button>
+                    </div>
+                </div>
+            </div>
+        </div>
+        
+        <!-- Validation Controls -->
+        <div class="validation-controls">
+            <div class="row">
+                <div class="col-md-4">
+                    <h5 class="mb-3">🧪 Run Validation</h5>
+                    <div class="mb-3">
+                        <label class="form-label">Gameweek Range</label>
+                        <div class="row">
+                            <div class="col-6">
+                                <input type="number" class="form-control" id="startGameweek" value="1" min="1" max="38">
+                                <small class="text-muted">Start</small>
+                            </div>
+                            <div class="col-6">
+                                <input type="number" class="form-control" id="endGameweek" value="10" min="1" max="38">
+                                <small class="text-muted">End</small>
+                            </div>
+                        </div>
+                    </div>
+                    <div class="mb-3">
+                        <label class="form-label">Season</label>
+                        <select class="form-control" id="season">
+                            <option value="2024/25">2024/25</option>
+                            <option value="2025/26">2025/26 (Current)</option>
+                        </select>
+                    </div>
+                    <button class="btn btn-validation w-100" onclick="runValidation()">
+                        <span class="loading-spinner spinner-border spinner-border-sm me-2" role="status"></span>
+                        Run Backtesting
+                    </button>
+                </div>
+                
+                <div class="col-md-4">
+                    <h5 class="mb-3">⚙️ Parameter Optimization</h5>
+                    <div class="mb-3">
+                        <label class="form-label">Optimization Range (GW)</label>
+                        <div class="row">
+                            <div class="col-6">
+                                <input type="number" class="form-control" id="optStartGw" value="1" min="1" max="38">
+                            </div>
+                            <div class="col-6">
+                                <input type="number" class="form-control" id="optEndGw" value="15" min="1" max="38">
+                            </div>
+                        </div>
+                    </div>
+                    <p class="small text-muted mb-3">
+                        Tests α (0.75-0.95), K (12-20), multiplier caps
+                    </p>
+                    <button class="btn btn-validation w-100" onclick="optimizeParameters()">
+                        <span class="loading-spinner spinner-border spinner-border-sm me-2" role="status"></span>
+                        Optimize Parameters
+                    </button>
+                </div>
+                
+                <div class="col-md-4">
+                    <h5 class="mb-3">📈 Version Benchmark</h5>
+                    <div class="mb-3">
+                        <label class="form-label">Comparison Range (GW)</label>
+                        <div class="row">
+                            <div class="col-6">
+                                <input type="number" class="form-control" id="benchStartGw" value="1" min="1" max="38">
+                            </div>
+                            <div class="col-6">
+                                <input type="number" class="form-control" id="benchEndGw" value="15" min="1" max="38">
+                            </div>
+                        </div>
+                    </div>
+                    <p class="small text-muted mb-3">
+                        Compare v1.0 baseline vs v2.0 enhanced
+                    </p>
+                    <button class="btn btn-validation w-100" onclick="benchmarkVersions()">
+                        <span class="loading-spinner spinner-border spinner-border-sm me-2" role="status"></span>
+                        Run Benchmark
+                    </button>
+                </div>
+            </div>
+        </div>
+        
+        <!-- Results Display -->
+        <div id="results-section" style="display: none;">
+            <!-- Current Metrics -->
+            <div class="row mb-4" id="current-metrics">
+                <div class="col-12 mb-3">
+                    <h4>Current Validation Metrics</h4>
+                </div>
+                
+                <div class="col-md-2">
+                    <div class="card metric-card h-100">
+                        <div class="card-body text-center">
+                            <h5 class="card-title">RMSE</h5>
+                            <h3 id="metric-rmse" class="mb-0">-</h3>
+                            <div class="target-indicator" id="rmse-target">
+                                Target: < 2.85
+                            </div>
+                        </div>
+                    </div>
+                </div>
+                
+                <div class="col-md-2">
+                    <div class="card metric-card h-100">
+                        <div class="card-body text-center">
+                            <h5 class="card-title">MAE</h5>
+                            <h3 id="metric-mae" class="mb-0">-</h3>
+                            <small class="text-muted">Mean Absolute Error</small>
+                        </div>
+                    </div>
+                </div>
+                
+                <div class="col-md-2">
+                    <div class="card metric-card h-100">
+                        <div class="card-body text-center">
+                            <h5 class="card-title">Spearman ρ</h5>
+                            <h3 id="metric-spearman" class="mb-0">-</h3>
+                            <div class="target-indicator" id="spearman-target">
+                                Target: > 0.30
+                            </div>
+                        </div>
+                    </div>
+                </div>
+                
+                <div class="col-md-2">
+                    <div class="card metric-card h-100">
+                        <div class="card-body text-center">
+                            <h5 class="card-title">Precision@20</h5>
+                            <h3 id="metric-precision" class="mb-0">-</h3>
+                            <div class="target-indicator" id="precision-target">
+                                Target: > 0.30
+                            </div>
+                        </div>
+                    </div>
+                </div>
+                
+                <div class="col-md-2">
+                    <div class="card metric-card h-100">
+                        <div class="card-body text-center">
+                            <h5 class="card-title">R²</h5>
+                            <h3 id="metric-r2" class="mb-0">-</h3>
+                            <small class="text-muted">R-Squared</small>
+                        </div>
+                    </div>
+                </div>
+                
+                <div class="col-md-2">
+                    <div class="card metric-card h-100">
+                        <div class="card-body text-center">
+                            <h5 class="card-title">N</h5>
+                            <h3 id="metric-n" class="mb-0">-</h3>
+                            <small class="text-muted">Predictions</small>
+                        </div>
+                    </div>
+                </div>
+            </div>
+            
+            <!-- Charts Row -->
+            <div class="row mb-4">
+                <div class="col-md-6">
+                    <div class="card">
+                        <div class="card-header">
+                            <h5 class="card-title mb-0">Validation History Trend</h5>
+                        </div>
+                        <div class="card-body">
+                            <canvas id="metricsChart" height="200"></canvas>
+                        </div>
+                    </div>
+                </div>
+                
+                <div class="col-md-6">
+                    <div class="card">
+                        <div class="card-header">
+                            <h5 class="card-title mb-0">Parameter Impact</h5>
+                        </div>
+                        <div class="card-body">
+                            <canvas id="parametersChart" height="200"></canvas>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+        
+        <!-- Validation History Table -->
+        <div class="row">
+            <div class="col-12">
+                <div class="card">
+                    <div class="card-header d-flex justify-content-between align-items-center">
+                        <h5 class="card-title mb-0">Validation History</h5>
+                        <span class="badge bg-secondary" id="history-count">Loading...</span>
+                    </div>
+                    <div class="card-body">
+                        <div class="table-responsive">
+                            <table class="table table-hover" id="validation-history-table">
+                                <thead class="table-light">
+                                    <tr>
+                                        <th>Date</th>
+                                        <th>Version</th>
+                                        <th>Season</th>
+                                        <th>RMSE</th>
+                                        <th>Spearman ρ</th>
+                                        <th>Precision@20</th>
+                                        <th>N</th>
+                                        <th>Notes</th>
+                                    </tr>
+                                </thead>
+                                <tbody id="history-tbody">
+                                    <tr>
+                                        <td colspan="8" class="text-center">Loading validation history...</td>
+                                    </tr>
+                                </tbody>
+                            </table>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+    
+    <!-- Bootstrap JS -->
+    <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.1.3/dist/js/bootstrap.bundle.min.js"></script>
+    
+    <script>
+        // Global variables for charts
+        let metricsChart;
+        let parametersChart;
+        
+        // Load validation history on page load
+        document.addEventListener('DOMContentLoaded', function() {
+            loadValidationHistory();
+        });
+        
+        async function runValidation() {
+            const btn = event.target;
+            const spinner = btn.querySelector('.loading-spinner');
+            
+            // Show loading state
+            btn.disabled = true;
+            spinner.style.display = 'inline-block';
+            
+            try {
+                const response = await fetch('/api/run-validation', {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json'
+                    },
+                    body: JSON.stringify({
+                        start_gameweek: parseInt(document.getElementById('startGameweek').value),
+                        end_gameweek: parseInt(document.getElementById('endGameweek').value),
+                        model_version: 'v2.0',
+                        season: document.getElementById('season').value
+                    })
+                });
+                
+                const result = await response.json();
+                
+                if (result.success) {
+                    // Update current metrics display
+                    updateMetricsDisplay(result.metrics, result.target_achievement);
+                    showAlert('success', `Validation completed! ${result.predictions_count} predictions analyzed.`);
+                    
+                    // Refresh history
+                    setTimeout(loadValidationHistory, 1000);
+                } else {
+                    showAlert('danger', `Validation failed: ${result.error}`);
+                }
+                
+            } catch (error) {
+                showAlert('danger', `Error running validation: ${error.message}`);
+            } finally {
+                // Hide loading state
+                btn.disabled = false;
+                spinner.style.display = 'none';
+            }
+        }
+        
+        async function optimizeParameters() {
+            const btn = event.target;
+            const spinner = btn.querySelector('.loading-spinner');
+            
+            btn.disabled = true;
+            spinner.style.display = 'inline-block';
+            
+            try {
+                const response = await fetch('/api/optimize-parameters', {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json'
+                    },
+                    body: JSON.stringify({
+                        gameweek_range: [
+                            parseInt(document.getElementById('optStartGw').value),
+                            parseInt(document.getElementById('optEndGw').value)
+                        ],
+                        season: document.getElementById('season').value
+                    })
+                });
+                
+                const result = await response.json();
+                
+                if (result.success) {
+                    const bestParams = result.optimization_results.best_parameters;
+                    const bestMetrics = result.optimization_results.best_metrics;
+                    
+                    showAlert('info', 
+                        `Parameter optimization completed! Best RMSE: ${bestMetrics.rmse.toFixed(3)}, ` + 
+                        `α=${bestParams.alpha}, K=${bestParams.adaptation_gameweek}`
+                    );
+                    
+                    setTimeout(loadValidationHistory, 1000);
+                } else {
+                    showAlert('danger', `Optimization failed: ${result.error}`);
+                }
+                
+            } catch (error) {
+                showAlert('danger', `Error running optimization: ${error.message}`);
+            } finally {
+                btn.disabled = false;
+                spinner.style.display = 'none';
+            }
+        }
+        
+        async function benchmarkVersions() {
+            const btn = event.target;
+            const spinner = btn.querySelector('.loading-spinner');
+            
+            btn.disabled = true;
+            spinner.style.display = 'inline-block';
+            
+            try {
+                const response = await fetch('/api/benchmark-versions', {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json'
+                    },
+                    body: JSON.stringify({
+                        gameweek_range: [
+                            parseInt(document.getElementById('benchStartGw').value),
+                            parseInt(document.getElementById('benchEndGw').value)
+                        ]
+                    })
+                });
+                
+                const result = await response.json();
+                
+                if (result.success) {
+                    const improvements = result.benchmark_results.improvements;
+                    
+                    showAlert('success', 
+                        `Benchmark completed! v2.0 improvements: ` +
+                        `RMSE ${improvements.rmse_improvement_pct.toFixed(1)}%, ` +
+                        `Correlation ${improvements.correlation_improvement_pct.toFixed(1)}%`
+                    );
+                    
+                    setTimeout(loadValidationHistory, 1000);
+                } else {
+                    showAlert('danger', `Benchmark failed: ${result.error}`);
+                }
+                
+            } catch (error) {
+                showAlert('danger', `Error running benchmark: ${error.message}`);
+            } finally {
+                btn.disabled = false;
+                spinner.style.display = 'none';
+            }
+        }
+        
+        function updateMetricsDisplay(metrics, targets) {
+            document.getElementById('results-section').style.display = 'block';
+            
+            // Update metric values
+            document.getElementById('metric-rmse').textContent = metrics.rmse.toFixed(3);
+            document.getElementById('metric-mae').textContent = metrics.mae.toFixed(3);
+            document.getElementById('metric-spearman').textContent = metrics.spearman_correlation.toFixed(3);
+            document.getElementById('metric-precision').textContent = metrics.precision_at_20.toFixed(3);
+            document.getElementById('metric-r2').textContent = metrics.r_squared.toFixed(3);
+            document.getElementById('metric-n').textContent = metrics.n_predictions;
+            
+            // Update target indicators
+            updateTargetIndicator('rmse-target', targets.rmse_target, 'Target: < 2.85');
+            updateTargetIndicator('spearman-target', targets.correlation_target, 'Target: > 0.30');
+            updateTargetIndicator('precision-target', targets.precision_target, 'Target: > 0.30');
+            
+            // Update card styling based on performance
+            updateCardStyling('metric-rmse', targets.rmse_target);
+            updateCardStyling('metric-spearman', targets.correlation_target);
+            updateCardStyling('metric-precision', targets.precision_target);
+        }
+        
+        function updateTargetIndicator(elementId, targetMet, text) {
+            const indicator = document.getElementById(elementId);
+            indicator.textContent = text;
+            indicator.className = 'target-indicator ' + (targetMet ? 'target-met' : 'target-missed');
+        }
+        
+        function updateCardStyling(elementId, targetMet) {
+            const card = document.getElementById(elementId).closest('.card');
+            card.className = card.className.replace(/metric-\w+/, '');
+            card.classList.add('metric-card', targetMet ? 'metric-good' : 'metric-warning');
+        }
+        
+        async function loadValidationHistory() {
+            try {
+                const response = await fetch('/api/validation-history');
+                const result = await response.json();
+                
+                if (result.success) {
+                    updateHistoryTable(result.validation_history);
+                    updateHistoryCharts(result.validation_history);
+                } else {
+                    showAlert('warning', 'Failed to load validation history');
+                }
+                
+            } catch (error) {
+                console.error('Error loading validation history:', error);
+                showAlert('warning', 'Error loading validation history');
+            }
+        }
+        
+        function updateHistoryTable(history) {
+            const tbody = document.getElementById('history-tbody');
+            const countBadge = document.getElementById('history-count');
+            
+            countBadge.textContent = `${history.length} records`;
+            
+            if (history.length === 0) {
+                tbody.innerHTML = '<tr><td colspan="8" class="text-center text-muted">No validation history found</td></tr>';
+                return;
+            }
+            
+            tbody.innerHTML = history.map(record => `
+                <tr>
+                    <td>${new Date(record.test_date).toLocaleDateString()}</td>
+                    <td><span class="badge bg-primary">${record.model_version || 'N/A'}</span></td>
+                    <td>${record.season || 'N/A'}</td>
+                    <td>${record.rmse ? record.rmse.toFixed(3) : 'N/A'}</td>
+                    <td>${record.spearman_correlation ? record.spearman_correlation.toFixed(3) : 'N/A'}</td>
+                    <td>${record.precision_at_20 ? record.precision_at_20.toFixed(3) : 'N/A'}</td>
+                    <td>${record.n_predictions || 0}</td>
+                    <td><small class="text-muted">${record.notes || ''}</small></td>
+                </tr>
+            `).join('');
+        }
+        
+        function updateHistoryCharts(history) {
+            // Prepare data for charts
+            const recentHistory = history.slice(0, 10).reverse(); // Last 10 results, oldest first
+            
+            const labels = recentHistory.map(r => new Date(r.test_date).toLocaleDateString());
+            const rmseData = recentHistory.map(r => r.rmse || 0);
+            const correlationData = recentHistory.map(r => r.spearman_correlation || 0);
+            const precisionData = recentHistory.map(r => r.precision_at_20 || 0);
+            
+            // Update metrics trend chart
+            if (metricsChart) metricsChart.destroy();
+            
+            const ctx1 = document.getElementById('metricsChart').getContext('2d');
+            metricsChart = new Chart(ctx1, {
+                type: 'line',
+                data: {
+                    labels: labels,
+                    datasets: [
+                        {
+                            label: 'RMSE',
+                            data: rmseData,
+                            borderColor: '#dc3545',
+                            backgroundColor: 'rgba(220, 53, 69, 0.1)',
+                            yAxisID: 'y'
+                        },
+                        {
+                            label: 'Spearman ρ',
+                            data: correlationData,
+                            borderColor: '#28a745',
+                            backgroundColor: 'rgba(40, 167, 69, 0.1)',
+                            yAxisID: 'y1'
+                        },
+                        {
+                            label: 'Precision@20',
+                            data: precisionData,
+                            borderColor: '#007bff',
+                            backgroundColor: 'rgba(0, 123, 255, 0.1)',
+                            yAxisID: 'y1'
+                        }
+                    ]
+                },
+                options: {
+                    responsive: true,
+                    maintainAspectRatio: false,
+                    scales: {
+                        y: {
+                            type: 'linear',
+                            display: true,
+                            position: 'left',
+                            title: {
+                                display: true,
+                                text: 'RMSE'
+                            }
+                        },
+                        y1: {
+                            type: 'linear',
+                            display: true,
+                            position: 'right',
+                            title: {
+                                display: true,
+                                text: 'Correlation / Precision'
+                            },
+                            grid: {
+                                drawOnChartArea: false,
+                            },
+                        }
+                    },
+                    plugins: {
+                        legend: {
+                            position: 'top'
+                        }
+                    }
+                }
+            });
+        }
+        
+        function showAlert(type, message) {
+            // Create and show Bootstrap alert
+            const alertDiv = document.createElement('div');
+            alertDiv.className = `alert alert-${type} alert-dismissible fade show`;
+            alertDiv.innerHTML = `
+                ${message}
+                <button type="button" class="btn-close" data-bs-dismiss="alert"></button>
+            `;
+            
+            // Insert at top of container
+            const container = document.querySelector('.container-fluid');
+            container.insertBefore(alertDiv, container.firstChild);
+            
+            // Auto dismiss after 5 seconds
+            setTimeout(() => {
+                alertDiv.remove();
+            }, 5000);
+        }
+    </script>
+</body>
+</html>

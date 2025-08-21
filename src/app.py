@@ -3095,6 +3095,215 @@ def store_v2_calculations(calculations: List[Dict], version: str):
             conn.close()
 
 
+# ================================
+# SPRINT 3: VALIDATION API ENDPOINTS
+# ================================
+
+@app.route('/api/run-validation', methods=['POST'])
+def run_validation_endpoint():
+    """
+    API endpoint to run backtesting validation
+    
+    Request body:
+    {
+        "start_gameweek": 1,
+        "end_gameweek": 10, 
+        "model_version": "v2.0",
+        "season": "2024/25"
+    }
+    """
+    try:
+        data = request.get_json() or {}
+        
+        start_gw = data.get('start_gameweek', 1)
+        end_gw = data.get('end_gameweek', 5)
+        model_version = data.get('model_version', 'v2.0')
+        season = data.get('season', '2024/25')
+        
+        # Import validation engine
+        sys.path.append(os.path.dirname(os.path.dirname(__file__)))
+        from validation_engine import ValidationEngine
+        
+        # Run validation
+        validator = ValidationEngine(DB_CONFIG)
+        predictions = validator.run_historical_backtest(
+            start_gameweek=start_gw,
+            end_gameweek=end_gw,
+            season=season,
+            model_version=model_version
+        )
+        
+        if predictions:
+            # Calculate metrics
+            metrics = validator.calculate_validation_metrics(predictions, model_version)
+            
+            # Store results
+            validator.store_validation_results(
+                metrics=metrics,
+                model_version=model_version,
+                season=season,
+                parameters=data.get('parameters', {}),
+                notes=f"API validation run: GW{start_gw}-{end_gw}"
+            )
+            
+            validator.close_connection()
+            
+            return jsonify({
+                'success': True,
+                'predictions_count': len(predictions),
+                'metrics': {
+                    'rmse': round(metrics.rmse, 3),
+                    'mae': round(metrics.mae, 3),
+                    'spearman_correlation': round(metrics.spearman_correlation, 3),
+                    'spearman_p_value': round(metrics.spearman_p_value, 4),
+                    'precision_at_20': round(metrics.precision_at_20, 3),
+                    'r_squared': round(metrics.r_squared, 3),
+                    'n_predictions': metrics.n_predictions
+                },
+                'target_achievement': {
+                    'rmse_target': metrics.rmse < 2.85,
+                    'correlation_target': metrics.spearman_correlation > 0.30,
+                    'precision_target': metrics.precision_at_20 > 0.30
+                },
+                'message': f'Validation completed: {len(predictions)} predictions analyzed'
+            })
+        else:
+            return jsonify({
+                'success': False,
+                'error': 'No predictions generated - check data availability'
+            }), 400
+            
+    except Exception as e:
+        print(f"Validation API error: {e}")
+        return jsonify({
+            'success': False,
+            'error': f'Validation failed: {str(e)}'
+        }), 500
+
+@app.route('/api/optimize-parameters', methods=['POST']) 
+def optimize_parameters_endpoint():
+    """
+    API endpoint for parameter optimization
+    
+    Request body:
+    {
+        "gameweek_range": [1, 15],
+        "season": "2024/25"
+    }
+    """
+    try:
+        data = request.get_json() or {}
+        
+        gameweek_range = tuple(data.get('gameweek_range', [1, 10]))
+        season = data.get('season', '2024/25')
+        
+        # Import validation engine  
+        sys.path.append(os.path.dirname(os.path.dirname(__file__)))
+        from validation_engine import ValidationEngine
+        
+        # Run optimization
+        validator = ValidationEngine(DB_CONFIG)
+        results = validator.optimize_parameters(
+            gameweek_range=gameweek_range,
+            season=season
+        )
+        
+        validator.close_connection()
+        
+        return jsonify({
+            'success': True,
+            'optimization_results': results,
+            'message': 'Parameter optimization completed'
+        })
+        
+    except Exception as e:
+        print(f"Parameter optimization API error: {e}")
+        return jsonify({
+            'success': False,
+            'error': f'Parameter optimization failed: {str(e)}'
+        }), 500
+
+@app.route('/api/benchmark-versions', methods=['POST'])
+def benchmark_versions_endpoint():
+    """
+    API endpoint for v1.0 vs v2.0 benchmarking
+    
+    Request body:
+    {
+        "gameweek_range": [1, 15]
+    }
+    """
+    try:
+        data = request.get_json() or {}
+        gameweek_range = tuple(data.get('gameweek_range', [1, 10]))
+        
+        # Import validation engine
+        sys.path.append(os.path.dirname(os.path.dirname(__file__)))
+        from validation_engine import ValidationEngine
+        
+        # Run benchmark
+        validator = ValidationEngine(DB_CONFIG)
+        results = validator.benchmark_v1_vs_v2(gameweek_range=gameweek_range)
+        
+        validator.close_connection()
+        
+        return jsonify({
+            'success': True,
+            'benchmark_results': results,
+            'message': 'Version benchmark completed'
+        })
+        
+    except Exception as e:
+        print(f"Benchmark API error: {e}")
+        return jsonify({
+            'success': False,
+            'error': f'Benchmark failed: {str(e)}'
+        }), 500
+
+@app.route('/api/validation-history', methods=['GET'])
+def validation_history_endpoint():
+    """Get historical validation results"""
+    try:
+        conn = get_db_connection()
+        cursor = conn.cursor(cursor_factory=psycopg2.extras.RealDictCursor)
+        
+        cursor.execute("""
+            SELECT id, model_version, season, rmse, mae, 
+                   spearman_correlation, precision_at_20, r_squared,
+                   n_predictions, test_date, parameters, notes
+            FROM validation_results
+            ORDER BY test_date DESC
+            LIMIT 50
+        """)
+        
+        results = cursor.fetchall()
+        conn.close()
+        
+        # Convert to JSON-serializable format
+        history = []
+        for row in results:
+            result_dict = dict(row)
+            result_dict['test_date'] = row['test_date'].isoformat() if row['test_date'] else None
+            history.append(result_dict)
+        
+        return jsonify({
+            'success': True,
+            'validation_history': history
+        })
+        
+    except Exception as e:
+        print(f"Validation history API error: {e}")
+        return jsonify({
+            'success': False,
+            'error': f'Failed to load validation history: {str(e)}'
+        }), 500
+
+@app.route('/api/validation-dashboard')
+def validation_dashboard():
+    """Render validation dashboard page"""
+    return render_template('validation_dashboard.html')
+
+
 if __name__ == '__main__':
     print("Starting Fantrax Value Hunter Flask Backend...")
     print(f"Database: {DB_CONFIG['database']} on port {DB_CONFIG['port']}")
