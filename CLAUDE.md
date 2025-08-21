@@ -13,11 +13,11 @@
 - **Enhanced Table Features**: Numeric Games sorting, pagination (50/100/200/All), improved filtering
 - **Calculation Research Framework**: 6 specialized LLM research prompts for formula optimization
 
-### Formula Optimization v2.0 Implementation (2025-08-21)
+### Formula Optimization v2.0 Implementation (2025-08-21/22)
 - **Sprint 1 COMPLETED**: Foundation & Critical Fixes implemented and tested
 - **Sprint 2 COMPLETED**: Advanced calculations implemented and tested
 - **Sprint 3 COMPLETED**: Validation Framework & Critical Data Fixes
-- **Sprint 4 Phase 1 COMPLETED**: Dashboard Integration - v2.0 toggle, ROI column, validation status
+- **Sprint 4 COMPLETED**: Dashboard Integration - v2.0 toggle, ROI column, validation status, tooltip system fixes
 - **Core Formula Fixed**: Separated True Value (point prediction) from ROI (value/price ratio)
 - **Exponential Fixture Calculation**: Implemented base^(-difficulty) instead of linear multipliers
 - **EWMA Form Calculation**: Exponential weighted moving average with configurable α=0.87
@@ -231,4 +231,74 @@ The system is production-ready with:
 The dashboard successfully handles all 633 Premier League players with real-time parameter adjustments, making it effective for weekly fantasy lineup optimization.
 
 ---
-*Last Updated: 2025-08-21 - Focus: Sprint 4 Phase 1 completion - Dashboard Integration with v2.0 ROI column and validation system*
+*Last Updated: 2025-08-21 - Focus: Sprint 4 Phase 2 - V1.0 Legacy Removal and Clean V2.0 Interface*
+
+## Sprint 4 Phase 2: V1.0 Legacy Removal Progress (2025-08-21)
+
+### Issues Discovered
+During Sprint 4 Phase 2, we identified critical architectural problems with the v1.0/v2.0 dual system:
+
+**Core Problem**: V2.0 implemented as cosmetic wrapper over V1.0 base system
+- V1.0 controls still visible and functional when v2.0 is selected
+- Both systems active simultaneously causing parameter conflicts
+- JavaScript treats v1.0/v2.0 as shared parameter system
+- Apply Changes button responds to v1.0 sliders even in v2.0 mode
+
+### Technical Issues Identified
+1. **Duplicate HTML IDs**: Two `syncUnderstat` buttons causing JavaScript conflicts
+2. **CSS Visibility Failure**: `body.v2-enabled` class not properly hiding v1.0 controls  
+3. **Parameter Detection Conflict**: `buildParameterChanges()` reads from v1.0 controls in v2.0 mode
+4. **Backend Engine Uncertainty**: Unclear if v2.0 can run independently of v1.0 system
+5. **Broken Functionality**: Dark mode toggle, Import Lineup button not working
+
+### Actions Taken
+**✅ Fixed Immediate Issues**:
+- Resolved duplicate sync button IDs (`syncUnderstat` vs `syncUnderstat-v2`)
+- Updated JavaScript to handle both sync buttons safely
+- Fixed ROI column to show actual values (was showing 0.000)
+- Maintained git safety checkpoint at `2d0031c` for safe rollback
+
+**⚠️ Partial Solutions Attempted**:
+- Tried complete v1.0 removal → JavaScript broke (requires v1.0 element IDs)
+- Added CSS classes for v1.0 hiding → Not working properly in practice
+- Moved Sync button to v2.0 → Created conflicts, had to create separate button
+
+### Current Status
+- **ROI calculations working** ✅
+- **V1.0 controls still visible** ❌ (should be hidden)
+- **Parameter conflicts persist** ❌ (v1.0 sliders trigger Apply Changes in v2.0 mode)
+- **Core functionality intact** ✅ (can revert to working state anytime)
+
+### Architecture Discovery
+Research revealed v2.0 is NOT a true replacement but a layer over v1.0:
+- V1.0 provides base parameter detection and JavaScript event handling
+- V2.0 adds enhanced controls but relies on v1.0 infrastructure  
+- True v2.0 migration requires complete JavaScript architecture redesign
+
+### Next Phase Requirements
+**Complete V2.0 Migration Plan Needed**:
+1. Backend engine independence verification
+2. JavaScript parameter system separation  
+3. HTML structure cleanup (remove v1.0 entirely)
+4. CSS simplification for single-system interface
+5. Comprehensive testing of v2.0-only functionality
+
+### Recent Fixes (2025-08-22)
+**✅ Sprint 4 Tooltip System Issues Resolved**:
+- **Auto-triggering Fixed**: Tooltips no longer appear automatically on page load
+- **Multiple Tooltip Cleanup**: Fixed tooltip stacking in top-left corner 
+- **Positioning Robustness**: Added validation to prevent tooltips for invisible elements
+- **V2.0 Tooltip Integration**: Properly integrated v2.0 parameter tooltips with cleanup system
+- **Initialization Timing**: Added 500ms delay flag to prevent layout-triggered tooltips
+
+**Technical Implementation**:
+- Enhanced `hideTooltip()` function to clean up all tooltip types
+- Added `tooltipsReady` flag with delayed activation
+- Added element visibility validation in positioning functions
+- Ensured v2.0 tooltips get proper IDs for cleanup
+
+### Safety Measures
+- Git checkpoint `2d0031c` available for instant rollback
+- All v2.0 enhanced features confirmed working
+- Database proven compatible with v2.0-only operation
+- User can safely experiment knowing rollback option exists

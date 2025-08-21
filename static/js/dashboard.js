@@ -674,6 +674,12 @@ function setupParameterControls() {
     });
     document.getElementById('syncUnderstat').addEventListener('click', syncUnderstatData);
     
+    // v2.0 Sync button (if it exists and is visible)
+    const syncV2Button = document.getElementById('syncUnderstat-v2');
+    if (syncV2Button) {
+        syncV2Button.addEventListener('click', syncUnderstatData);
+    }
+    
     // Blender Display controls
     document.getElementById('gamesDisplayEnabled').addEventListener('change', handleParameterChange);
     document.getElementById('baselineSwitchover').addEventListener('change', handleParameterChange);
@@ -1231,20 +1237,40 @@ function exportToCSV() {
 
 async function syncUnderstatData() {
     const statusEl = document.getElementById('syncStatus');
-    statusEl.textContent = 'Syncing...';
-    statusEl.className = 'syncing';
+    const statusV2El = document.getElementById('syncStatus-v2');
+    
+    // Update both status displays
+    if (statusEl) {
+        statusEl.textContent = 'Syncing...';
+        statusEl.className = 'syncing';
+    }
+    if (statusV2El) {
+        statusV2El.textContent = 'Syncing...';
+        statusV2El.className = 'syncing';
+    }
     
     try {
         const response = await fetch('/api/understat/sync', { method: 'POST' });
         const data = await response.json();
         
         if (data.success) {
-            statusEl.textContent = `✓ Synced ${data.successfully_matched} players (${data.match_rate.toFixed(1)}% match rate)`;
-            statusEl.className = 'success';
+            const successMessage = `✓ Synced ${data.successfully_matched} players (${data.match_rate.toFixed(1)}% match rate)`;
+            
+            if (statusEl) {
+                statusEl.textContent = successMessage;
+                statusEl.className = 'success';
+            }
+            if (statusV2El) {
+                statusV2El.textContent = successMessage;
+                statusV2El.className = 'success';
+            }
             
             // If there are unmatched players, show option to review them
             if (data.unmatched_players > 0) {
-                statusEl.textContent += ` - ${data.unmatched_players} need review`;
+                const reviewMessage = ` - ${data.unmatched_players} need review`;
+                if (statusEl) statusEl.textContent += reviewMessage;
+                if (statusV2El) statusV2El.textContent += reviewMessage;
+                
                 setTimeout(() => {
                     if (confirm(`${data.unmatched_players} Understat players couldn't be automatically matched. Would you like to review them manually?`)) {
                         // Route to import validation for manual matching
@@ -1256,12 +1282,26 @@ async function syncUnderstatData() {
             loadUnderstatStats();
             loadPlayersData(); // Refresh table
         } else {
-            statusEl.textContent = `✗ Sync failed: ${data.error}`;
-            statusEl.className = 'error';
+            const errorMessage = `✗ Sync failed: ${data.error}`;
+            if (statusEl) {
+                statusEl.textContent = errorMessage;
+                statusEl.className = 'error';
+            }
+            if (statusV2El) {
+                statusV2El.textContent = errorMessage;
+                statusV2El.className = 'error';
+            }
         }
     } catch (error) {
-        statusEl.textContent = `✗ Error: ${error.message}`;
-        statusEl.className = 'error';
+        const errorMessage = `✗ Error: ${error.message}`;
+        if (statusEl) {
+            statusEl.textContent = errorMessage;
+            statusEl.className = 'error';
+        }
+        if (statusV2El) {
+            statusV2El.textContent = errorMessage;
+            statusV2El.className = 'error';
+        }
     }
 }
 
@@ -1271,11 +1311,16 @@ async function loadUnderstatStats() {
         const data = await response.json();
         
         const statsEl = document.getElementById('xgiStats');
-        statsEl.innerHTML = `
+        const statsV2El = document.getElementById('xgiStats-v2');
+        
+        const statsHtml = `
             <strong>Coverage:</strong> ${data.stats.players_with_xgi}/${data.stats.total_players} players |
             <strong>Avg xGI90:</strong> ${(data.stats.avg_xgi90 || 0).toFixed(3)} |
             <strong>Last sync:</strong> ${data.config.last_sync ? new Date(data.config.last_sync * 1000).toLocaleDateString() : 'Never'}
         `;
+        
+        if (statsEl) statsEl.innerHTML = statsHtml;
+        if (statsV2El) statsV2El.innerHTML = statsHtml;
     } catch (error) {
         console.error('Failed to load Understat stats:', error);
     }
@@ -1514,6 +1559,13 @@ function showTooltip(e) {
 
 function positionTooltip(tooltip, targetElement) {
     const rect = targetElement.getBoundingClientRect();
+    
+    // Don't show tooltip if element isn't visible or positioned
+    if (rect.width === 0 || rect.height === 0) {
+        tooltip.remove();
+        return;
+    }
+    
     const tooltipRect = tooltip.getBoundingClientRect();
     const viewportWidth = window.innerWidth;
     const viewportHeight = window.innerHeight;
@@ -1548,10 +1600,9 @@ function positionTooltip(tooltip, targetElement) {
 }
 
 function hideTooltip() {
-    const existingTooltip = document.getElementById('active-tooltip');
-    if (existingTooltip) {
-        existingTooltip.remove();
-    }
+    // Remove all existing tooltips (both regular and v2)
+    const existingTooltips = document.querySelectorAll('.tooltip, #active-tooltip');
+    existingTooltips.forEach(tooltip => tooltip.remove());
 }
 
 // Mobile touch support
@@ -1823,6 +1874,9 @@ const v2ParameterInfo = {
     }
 };
 
+// Flag to prevent tooltips during initialization
+let tooltipsReady = false;
+
 // Initialize v2.0 parameter tooltips
 function initializeV2Tooltips() {
     // Add hover handlers for v2.0 parameter labels and controls
@@ -1832,7 +1886,9 @@ function initializeV2Tooltips() {
             if (element && !element.hasAttribute('data-tooltip-initialized')) {
                 element.setAttribute('data-tooltip-initialized', 'true');
                 element.addEventListener('mouseenter', function(e) {
-                    showV2ParameterTooltip(e, paramKey);
+                    if (tooltipsReady) {
+                        showV2ParameterTooltip(e, paramKey);
+                    }
                 });
                 element.addEventListener('mouseleave', function() {
                     hideTooltip();
@@ -1840,14 +1896,23 @@ function initializeV2Tooltips() {
             }
         });
     });
+    
+    // Enable tooltips after a short delay
+    setTimeout(() => {
+        tooltipsReady = true;
+    }, 500);
 }
 
 function showV2ParameterTooltip(event, paramKey) {
     const info = v2ParameterInfo[paramKey];
     if (!info) return;
     
+    // Remove any existing tooltips first
+    hideTooltip();
+    
     const tooltip = document.createElement('div');
     tooltip.className = 'tooltip v2-tooltip';
+    tooltip.id = 'active-tooltip';
     tooltip.innerHTML = `
         <div class="tooltip-title">${info.title}</div>
         <div class="tooltip-description">${info.description}</div>
@@ -1870,6 +1935,13 @@ function showV2ParameterTooltip(event, paramKey) {
     
     // Position tooltip
     const rect = event.target.getBoundingClientRect();
+    
+    // Don't show tooltip if element isn't visible or positioned
+    if (rect.width === 0 || rect.height === 0) {
+        tooltip.remove();
+        return;
+    }
+    
     const tooltipRect = tooltip.getBoundingClientRect();
     
     let left = rect.left + (rect.width / 2) - (tooltipRect.width / 2);
