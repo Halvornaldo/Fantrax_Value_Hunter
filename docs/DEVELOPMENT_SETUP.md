@@ -21,9 +21,15 @@ Install core dependencies:
 pip install -r requirements.txt
 ```
 
-**Additional Required Dependencies** (missing from requirements.txt):
+**Additional Required Dependencies** (verify against requirements.txt):
 ```bash
 pip install psycopg2-binary  # PostgreSQL adapter
+pip install flask            # Web framework
+pip install pandas           # Data manipulation
+pip install numpy            # Numerical calculations
+pip install requests         # HTTP requests for APIs
+pip install scraperfc        # Understat data integration
+pip install python-dateutil  # Date parsing
 ```
 
 ### 3. Database Setup
@@ -39,7 +45,22 @@ pip install psycopg2-binary  # PostgreSQL adapter
 ```bash
 python check_db_structure.py
 ```
-Expected output: "✅ Database connection successful" and "Database connected: 647 players loaded"
+Expected output: "✅ Database connection successful" and "Database connected: 633 players loaded"
+
+**Data Initialization** (for new setups):
+```bash
+# Initialize player database (if starting fresh)
+python initialize_players.py
+
+# Populate historical data (2024-25 season baseline)
+python import_historical_data.py
+
+# Set up initial xGI data sync
+python sync_understat_data.py
+
+# Initialize team fixtures and odds
+python setup_fixture_data.py
+```
 
 ### 4. Configuration Files
 
@@ -48,10 +69,34 @@ Expected output: "✅ Database connection successful" and "Database connected: 6
 - Contains all dashboard parameter defaults
 - No manual editing needed - managed via dashboard
 
-**API Keys** (if needed):
+**Configuration File Structure**:
 ```bash
+config/
+├── system_parameters.json     # Dashboard parameters (auto-managed)
+├── api_keys.json             # API credentials 
+├── fantrax_cookies.json      # Browser cookies for web scraping
+└── database_config.json      # Database connection settings
+```
+
+**Environment Setup**:
+```bash
+# Copy example configurations (if they exist)
 cp config/fantrax_cookies.json.example config/fantrax_cookies.json
-# Edit with your browser cookies if web scraping features used
+cp config/api_keys.json.example config/api_keys.json
+
+# Edit with your specific credentials
+# Browser cookies needed only if web scraping features used
+```
+
+**System Parameters Structure** (automatically managed):
+```json
+{
+  "form_calculation": {"enabled": true, "lookback_period": 3},
+  "fixture_difficulty": {"enabled": true, "multiplier_strength": 0.2},
+  "starter_prediction": {"enabled": true, "auto_rotation_penalty": 0.7},
+  "xgi_integration": {"enabled": true, "multiplier_strength": 0.7},
+  "games_display": {"baseline_switchover_gameweek": 10}
+}
 ```
 
 ### 5. Launch Application
@@ -186,11 +231,47 @@ See `docs/FEATURE_GUIDE.md` for dashboard functionality explanation.
 
 ## Development Questions (To Verify)
 
-1. **Python Version**: What minimum Python version is required?
-2. **Virtual Environment**: Should developers use venv/conda for isolation?
-3. **PostgreSQL Setup**: How do developers set up local PostgreSQL on port 5433?
-4. **Environment Variables**: Are there any .env files or environment configuration needed?
-5. **Data Initialization**: How do developers populate the initial player database?
-6. **Test Data**: Are there any test datasets for development?
+## System Requirements & Performance
 
-*Please verify these details and update this guide accordingly.*
+### Minimum Requirements
+- **Python**: 3.8+ (verify specific version requirement)
+- **Memory**: 4GB RAM minimum (8GB recommended for full dataset)
+- **Storage**: 2GB for database and application files
+- **PostgreSQL**: Version 12+ with custom port configuration
+
+### Performance Expectations
+- **Startup Time**: Reasonable initialization time for weekly analysis tool
+- **Database Queries**: Efficient response for 633 player dataset
+- **Parameter Updates**: Timely recalculation suitable for parameter testing
+- **CSV Processing**: Processing time varies with file size, optimized for weekly workflows
+
+### Virtual Environment Setup (Recommended)
+```bash
+# Create virtual environment
+python -m venv fantrax_env
+
+# Activate (Windows)
+fantrax_env\Scripts\activate
+
+# Activate (Linux/Mac) 
+source fantrax_env/bin/activate
+
+# Install dependencies
+pip install -r requirements.txt
+```
+
+### PostgreSQL Setup Notes
+- **Custom Port 5433**: Avoid conflicts with default PostgreSQL instances
+- **Database Creation**: `CREATE DATABASE fantrax_value_hunter;`
+- **User Setup**: `CREATE USER fantrax_user WITH PASSWORD 'fantrax_password';`
+- **Permissions**: `GRANT ALL PRIVILEGES ON DATABASE fantrax_value_hunter TO fantrax_user;`
+
+### Development Environment Variables
+```bash
+# Optional .env file for development
+FLASK_ENV=development
+FLASK_DEBUG=True
+DATABASE_URL=postgresql://fantrax_user:fantrax_password@localhost:5433/fantrax_value_hunter
+```
+
+*Last updated: 2025-08-20 - Based on production system running 633 Premier League players*

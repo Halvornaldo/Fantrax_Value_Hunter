@@ -7,10 +7,17 @@
 ### Recent Major Features (2025-08-20)
 - **Blender Display Configuration**: Adjustable thresholds for blending historical/current season data
 - **Professional Tooltip System**: All 17 columns have detailed explanations
-- **Complete xGI Integration**: Understat data with name matching system
+- **Complete xGI Integration**: Understat data with name matching system (99% match rate)
 - **Optimized Performance**: Fixture difficulty calculations improved 2x (90s → 46s)
 - **Manual Override System**: Real-time starter prediction overrides with S/B/O/A controls
 - **Enhanced Table Features**: Numeric Games sorting, pagination (50/100/200/All), improved filtering
+- **Calculation Research Framework**: 6 specialized LLM research prompts for formula optimization
+
+### Formula Optimization Initiative (2025-08-21)
+- **Research Analysis**: Deep mathematical research completed identifying critical formula improvements
+- **Sprint Planning**: 5-sprint roadmap created for implementing research-based optimizations
+- **Gemini AI Integration**: Strategic plan for AI-powered insights and analytics
+- **Migration Framework**: Comprehensive technical guide for v1.0 → v2.0 transition
 
 ## Core Architecture
 
@@ -77,6 +84,7 @@ python src/app.py  # Starts on localhost:5000
 - `docs/DATABASE_SCHEMA.md` - Full database structure with credentials
 - `docs/FEATURE_GUIDE.md` - Dashboard functionality guide  
 - `docs/DEVELOPMENT_SETUP.md` - Setup instructions
+- `calculation-research/` - LLM research prompts for formula optimization
 
 ### Essential Files
 ```
@@ -86,11 +94,13 @@ static/js/dashboard.js        # Parameter controls & table logic
 config/system_parameters.json # All configurable parameters
 ```
 
-### Performance Notes
-- **Database**: Handles 633 players efficiently with optimized queries
-- **Caching**: Fixture difficulty uses memory cache to avoid 644 DB queries
-- **Batch Operations**: Multiplier updates use batch processing
-- **Response Time**: Parameter changes recalculate all 633 players in ~2-3 seconds
+### Performance Benchmarks
+- **Efficient Processing**: 633 players recalculated efficiently for weekly analysis workflow
+- **Database Optimization**: Well-optimized queries for large player dataset
+- **Memory Caching**: Significant fixture difficulty performance improvements through optimization
+- **Data Integration**: 99% xGI name matching success rate (296/299 players)
+- **Batch Processing**: Reliable multiplier updates across entire player dataset
+- **Dashboard Responsiveness**: Parameter changes apply smoothly with visual feedback
 
 ## Known Issues & Status
 
@@ -107,9 +117,59 @@ config/system_parameters.json # All configurable parameters
 - **UI Terminology**: Updated "Games Display" → "Blender Display" and "Upload Form Data" → "Upload Weekly Game Data"
 
 ### Active Development Areas
-- Configuration refinement based on weekly usage
-- Performance monitoring and optimization
-- Feature polish and UX improvements
+- **Formula Optimization**: Using calculation-research/ prompts for LLM analysis
+- **Parameter Validation**: Statistical validation of multiplier effectiveness
+- **Performance Monitoring**: Ongoing optimization for efficient weekly analysis workflow
+- **User Experience**: Feature polish and dashboard improvements
+
+## Formula Optimization v2.0
+
+### Research-Based Enhancement Plan
+Following comprehensive mathematical research analysis, the system is ready for major formula optimization:
+
+**Key Findings:**
+- Current multiplicative approach validated and strong
+- Critical issue: Price mixed with prediction (needs separation)
+- Exponential decay superior to fixed weights for form
+- Dynamic blending better than hard cutoffs
+- xGI needs normalization around 1.0
+
+### Implementation Documentation
+Located in `docs/` folder:
+1. **FORMULA_OPTIMIZATION_SPRINTS.md** - Complete 5-sprint implementation plan
+2. **GEMINI_INTEGRATION_PLAN.md** - AI-powered insights strategy  
+3. **FORMULA_MIGRATION_GUIDE.md** - Technical migration from v1.0 → v2.0
+
+### Sprint Overview
+- **Sprint 1**: Foundation fixes (separate True Value from ROI, exponential fixture)
+- **Sprint 2**: Advanced calculations (EWMA form, dynamic blending, xGI normalization)
+- **Sprint 3**: Validation framework (backtesting, RMSE/MAE metrics)
+- **Sprint 4**: UI integration (new columns, parameter controls)
+- **Sprint 5**: Future features (team style, position-specific models)
+
+### Expected Improvements
+- **Accuracy**: 10-15% better predictions (RMSE < 2.85, Spearman > 0.30)
+- **User Experience**: Enhanced controls, AI insights, visual indicators
+- **Mathematical Rigor**: Research-validated formulas with proper scaling
+
+## Calculation Research Framework
+
+### Research Prompts Available
+Located in `calculation-research/` folder:
+1. **01_Overall_Formula_Analysis.md** - Comprehensive system validation
+2. **02_Form_Component_Analysis.md** - Form multiplier optimization  
+3. **03_Blender_Display_Analysis.md** - Historical-to-current transition strategy
+4. **04_Fixture_Difficulty_Analysis.md** - Odds-based difficulty system
+5. **05_Starter_Prediction_Analysis.md** - Rotation penalty framework
+6. **06_xGI_Integration_Analysis.md** - Expected Goals Involvement optimization
+7. **Fantasy Football Model Analysis & Optimization.md** - Deep research analysis results
+
+### Usage Strategy
+- **Start with #1** for overall formula validation and system architecture review
+- **Use #2-6** for deep dives into specific multiplier components  
+- **Reference #7** for comprehensive research findings and mathematical validation
+- Each prompt includes current parameter values, technical constraints, and performance requirements
+- Designed for deep research LLMs to provide mathematical validation and optimization recommendations
 
 ## Command Reference
 

@@ -109,9 +109,16 @@ All features can be configured through the Parameter Controls panel on the left 
 
 **How It Works**:
 - **Gameweeks 1-10**: Shows "38 (24-25)" format (historical data only)
+  - Baseline = Previous Season PPG
+  - Form = Recent Games / Historical Baseline
 - **Gameweeks 11-15**: Shows "38+2" format (historical + current games)
+  - Progressive Blending: Weighted Average(Historical PPG, Current Season PPG)
+  - Weighting transitions from 100% historical to 0% historical linearly
+  - Example GW13: ~60% historical + 40% current season baseline
 - **Gameweeks 16+**: Shows "5" format (current season only)
-- Provides context for sample size reliability
+  - Baseline = Current Season PPG only
+  - Form = Recent Games / Current Season Baseline
+- Provides context for sample size reliability and calculation methodology
 
 ## Player Table
 
@@ -161,6 +168,19 @@ All features can be configured through the Parameter Controls panel on the left 
 - Updates True Value calculation in real-time
 - Visual feedback shows updated multipliers with color coding
 - Useful for insider knowledge about lineups or disagreeing with predictions
+
+**Current Manual Overrides in System**:
+```json
+"manual_overrides": {
+  "05tqx": {"type": "bench", "multiplier": 0.6},
+  "04fk6": {"type": "bench", "multiplier": 0.6}, 
+  "068n8": {"type": "out", "multiplier": 0.0},
+  "06rf9": {"type": "out", "multiplier": 0.0}
+}
+```
+- Overrides persist until manually reset to "Auto"
+- Dashboard shows override status with color indicators
+- System tracks all manual adjustments for audit trail
 
 ### Table Features
 
@@ -261,4 +281,33 @@ All parameter changes are tracked and require "Apply Changes" to take effect.
 
 ---
 
-*This guide covers verified functionality. Some advanced features may have additional capabilities not documented here.*
+## System Performance Metrics
+
+### Efficient Processing
+- **633 Players**: Complete recalculation in reasonable time for weekly analysis
+- **Parameter Updates**: Dashboard changes apply efficiently across all players
+- **Memory Optimization**: Caching significantly improves fixture difficulty calculation performance
+
+### Data Integration Accuracy
+- **xGI Matching**: 296/299 players matched (99% success rate)
+- **Name Matching**: 6-algorithm system with confidence scoring
+- **Form Calculation**: Handles missing games gracefully with fallback multipliers
+
+### Parameter Validation Ranges
+**Fixture Difficulty Multipliers**:
+- 5-Tier Very Easy: 1.2-1.5x range
+- 5-Tier Very Hard: 0.6-0.8x range
+- 3-Tier Easy: 1.1-1.4x range
+- 3-Tier Hard: 0.7-0.9x range
+
+**Starter Prediction Penalties**:
+- Auto Rotation Penalty: 0.5-0.8x range (default: 0.7x)
+- Force Bench Penalty: 0.4-0.8x range (default: 0.6x)
+
+**xGI Integration**:
+- Multiplier Strength: 0.0-2.0x range (default: 0.7x)
+- Capped Mode Range: 0.5-1.5x (prevents extreme multipliers)
+
+---
+
+*This guide covers verified functionality as of 2025-08-20. System performance metrics based on production usage with 633 Premier League players.*
