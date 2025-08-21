@@ -422,4 +422,42 @@ After completing each Formula Optimization sprint, the following documents MUST 
 
 ---
 
-*Last updated: 2025-08-21 - Post Formula Optimization v2.0 Sprint 1 completion*
+## Sprint 4 Phase 1 Development Notes (2025-08-21)
+
+### New Development Considerations
+
+**Database NULL Handling Best Practices:**
+- When adding new calculated columns (like ROI), always consider NULL value scenarios
+- PostgreSQL sorts NULLs first by default - use `NULLS LAST` for better UX
+- Test sorting behavior on new columns during development
+- Add NULL handling documentation to database schema changes
+
+**Dual Formula Engine Architecture:**
+- v1.0 and v2.0 engines can coexist safely in the same codebase
+- Use body classes for conditional CSS styling instead of JavaScript style manipulation
+- Toggle functionality should be tested across all browser states (F5, back/forward navigation)
+- Consider state management complexity early when building UI toggles
+
+**Frontend Development Patterns:**
+- Use body classes (`v2-enabled`, `v1-enabled`) for feature-specific styling
+- Add console logging for debugging complex state management
+- Test edge cases like switching between formula versions multiple times
+- Consider visual feedback for all user interactions
+
+### Testing Workflow Updates
+```bash
+# New testing steps for v2.0 features:
+1. Test ROI column sorting (both directions)
+2. Verify NULL value handling in new columns  
+3. Test formula version toggle functionality
+4. Validate visual indicators show correct state
+5. Check validation system connectivity (should show "Not Available" with insufficient data)
+```
+
+### Development Environment Notes
+- Validation system requires 5+ gameweeks of data for meaningful results
+- Current environment has 2 gameweeks (testing phase appropriate)
+- Formula toggle is intended for testing/development - not critical for production
+- Backend transaction errors may occur if database connections aren't properly closed
+
+*Last updated: 2025-08-21 - Post Sprint 4 Phase 1 completion (Dashboard Integration)*

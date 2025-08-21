@@ -993,3 +993,434 @@ body {
         height: 18px;
     }
 }
+
+/* ===== SPRINT 4: v2.0 FORMULA UI INTEGRATION ===== */
+
+/* Formula Version Section */
+.formula-version-section {
+    background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+    color: white;
+    border-radius: 12px;
+    padding: 20px;
+    margin-bottom: 20px;
+    box-shadow: 0 4px 15px rgba(102, 126, 234, 0.3);
+}
+
+.formula-version-section h3 {
+    color: white;
+    margin-bottom: 15px;
+    display: flex;
+    align-items: center;
+    gap: 10px;
+}
+
+.version-badge {
+    background: #4CAF50;
+    color: white;
+    padding: 4px 8px;
+    border-radius: 4px;
+    font-size: 0.8em;
+    font-weight: bold;
+}
+
+.toggle-group {
+    display: flex;
+    gap: 10px;
+    margin-bottom: 15px;
+}
+
+.toggle-label {
+    background: rgba(255, 255, 255, 0.2);
+    border: 2px solid rgba(255, 255, 255, 0.3);
+    color: rgba(255, 255, 255, 0.8);
+    padding: 8px 16px;
+    border-radius: 6px;
+    cursor: pointer;
+    transition: all 0.3s ease;
+    font-weight: 500;
+}
+
+.toggle-label.active,
+input[type="radio"]:checked + .toggle-label {
+    background: rgba(255, 255, 255, 0.9);
+    color: #667eea;
+    border-color: white;
+    font-weight: bold;
+}
+
+.toggle-label:hover {
+    background: rgba(255, 255, 255, 0.3);
+    color: white;
+}
+
+input[type="radio"][name="formula-version"] {
+    display: none;
+}
+
+.version-info {
+    background: rgba(255, 255, 255, 0.1);
+    padding: 12px;
+    border-radius: 6px;
+    margin-bottom: 10px;
+    font-size: 0.9em;
+    line-height: 1.4;
+}
+
+.formula-controls .help-text {
+    color: rgba(255, 255, 255, 0.9);
+    font-size: 0.85em;
+    margin: 0;
+}
+
+/* v2.0 Column Styling */
+.v2-column {
+    background: linear-gradient(135deg, #e3f2fd 0%, #bbdefb 100%);
+    position: relative;
+}
+
+.v2-badge {
+    position: absolute;
+    top: 2px;
+    right: 2px;
+    background: #4CAF50;
+    color: white;
+    font-size: 0.6em;
+    padding: 2px 4px;
+    border-radius: 2px;
+    font-weight: bold;
+    z-index: 10;
+}
+
+.v2-column .header-text {
+    color: #1565c0;
+    font-weight: bold;
+}
+
+/* ROI Value Styling */
+.roi-value {
+    font-weight: bold;
+    padding: 4px 8px;
+    border-radius: 4px;
+    text-align: center;
+}
+
+.roi-excellent {
+    background: #c8e6c9;
+    color: #2e7d32;
+}
+
+.roi-good {
+    background: #dcedc8;
+    color: #558b2f;
+}
+
+.roi-average {
+    background: #fff3e0;
+    color: #ef6c00;
+}
+
+.roi-poor {
+    background: #ffcdd2;
+    color: #c62828;
+}
+
+/* True Value Enhancement */
+.true-value-enhanced {
+    background: linear-gradient(135deg, #e8f5e8 0%, #c8e6c9 100%);
+    border-left: 4px solid #4CAF50;
+    font-weight: bold;
+    position: relative;
+}
+
+/* Dark Theme Adjustments for v2.0 */
+[data-theme="dark"] .formula-version-section {
+    background: linear-gradient(135deg, #2c3e50 0%, #34495e 100%);
+    box-shadow: 0 4px 15px rgba(44, 62, 80, 0.5);
+}
+
+[data-theme="dark"] .version-badge {
+    background: #27ae60;
+}
+
+[data-theme="dark"] .v2-column {
+    background: linear-gradient(135deg, #263238 0%, #37474f 100%);
+}
+
+[data-theme="dark"] .v2-column .header-text {
+    color: #4fc3f7;
+}
+
+[data-theme="dark"] .true-value-enhanced {
+    background: linear-gradient(135deg, #1e3a23 0%, #2c5530 100%);
+    border-left-color: #4CAF50;
+}
+
+[data-theme="dark"] .roi-excellent {
+    background: #1e4620;
+    color: #81c784;
+}
+
+[data-theme="dark"] .roi-good {
+    background: #33511a;
+    color: #9ccc65;
+}
+
+[data-theme="dark"] .roi-average {
+    background: #4a2c0a;
+    color: #ffb74d;
+}
+
+[data-theme="dark"] .roi-poor {
+    background: #4a1a1a;
+    color: #ef5350;
+}
+
+/* ===================================================================
+   SPRINT 4: VALIDATION STATUS INDICATORS (v2.0)
+   =================================================================== */
+
+.validation-status-section {
+    background: linear-gradient(135deg, #4c9a2a 0%, #68b92f 100%);
+    color: white;
+    border-radius: 12px;
+    padding: 20px;
+    margin-bottom: 20px;
+    box-shadow: 0 4px 15px rgba(76, 154, 42, 0.3);
+}
+
+.validation-status-section h3 {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    margin-bottom: 15px;
+    font-size: 1.1em;
+}
+
+.status-badge {
+    background: rgba(255, 255, 255, 0.2);
+    color: white;
+    padding: 4px 10px;
+    border-radius: 12px;
+    font-size: 0.85em;
+    font-weight: bold;
+    border: 1px solid rgba(255, 255, 255, 0.3);
+}
+
+.status-badge.good {
+    background: rgba(76, 175, 80, 0.8);
+}
+
+.status-badge.warning {
+    background: rgba(255, 152, 0, 0.8);
+}
+
+.status-badge.error {
+    background: rgba(244, 67, 54, 0.8);
+}
+
+.validation-indicators {
+    display: flex;
+    flex-direction: column;
+    gap: 15px;
+}
+
+.validation-metrics {
+    display: grid;
+    grid-template-columns: 1fr 1fr 1fr;
+    gap: 10px;
+}
+
+.metric-item {
+    background: rgba(255, 255, 255, 0.1);
+    padding: 12px;
+    border-radius: 8px;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    text-align: center;
+}
+
+.metric-label {
+    font-size: 0.9em;
+    opacity: 0.9;
+    margin-bottom: 5px;
+}
+
+.metric-value {
+    font-size: 1.3em;
+    font-weight: bold;
+    margin-bottom: 3px;
+}
+
+.metric-status {
+    font-size: 0.8em;
+    padding: 2px 6px;
+    border-radius: 4px;
+    background: rgba(255, 255, 255, 0.2);
+}
+
+.metric-status.excellent {
+    background: rgba(76, 175, 80, 0.8);
+}
+
+.metric-status.good {
+    background: rgba(139, 195, 74, 0.8);
+}
+
+.metric-status.needs-work {
+    background: rgba(255, 152, 0, 0.8);
+}
+
+.metric-status.poor {
+    background: rgba(244, 67, 54, 0.8);
+}
+
+.validation-actions {
+    display: flex;
+    gap: 10px;
+    justify-content: center;
+}
+
+.validation-btn {
+    background: rgba(255, 255, 255, 0.2);
+    color: white;
+    border: 1px solid rgba(255, 255, 255, 0.3);
+    padding: 8px 16px;
+    border-radius: 6px;
+    cursor: pointer;
+    font-size: 0.9em;
+    transition: all 0.3s ease;
+}
+
+.validation-btn:hover {
+    background: rgba(255, 255, 255, 0.3);
+    transform: translateY(-1px);
+}
+
+.validation-btn:disabled {
+    opacity: 0.5;
+    cursor: not-allowed;
+    transform: none;
+}
+
+.validation-info {
+    text-align: center;
+}
+
+.validation-info .help-text {
+    font-size: 0.85em;
+    opacity: 0.9;
+    margin-bottom: 5px;
+}
+
+.quality-text {
+    font-size: 0.9em;
+    font-style: italic;
+    opacity: 0.8;
+}
+
+/* Dark theme adjustments for validation section */
+[data-theme="dark"] .validation-status-section {
+    background: linear-gradient(135deg, #2e5d1a 0%, #4c9a2a 100%);
+    box-shadow: 0 4px 15px rgba(46, 93, 26, 0.4);
+}
+
+[data-theme="dark"] .metric-item {
+    background: rgba(0, 0, 0, 0.2);
+}
+
+[data-theme="dark"] .validation-btn {
+    background: rgba(0, 0, 0, 0.3);
+    border: 1px solid rgba(255, 255, 255, 0.2);
+}
+
+[data-theme="dark"] .validation-btn:hover {
+    background: rgba(0, 0, 0, 0.4);
+}
+
+/* Responsive design for validation indicators */
+@media (max-width: 768px) {
+    .validation-metrics {
+        grid-template-columns: 1fr;
+        gap: 8px;
+    }
+    
+    .validation-actions {
+        flex-direction: column;
+        align-items: stretch;
+    }
+    
+    .validation-btn {
+        margin-bottom: 5px;
+    }
+}
+
+/* =================================================================
+   SPRINT 4: v2.0 VISUAL INDICATORS
+   ================================================================= */
+
+/* v2.0 Enhanced column styling - only show when v2.0 is enabled */
+body.v2-enabled .player-table th[data-sort="roi"] {
+    background: linear-gradient(135deg, #28a745, #20c997);
+    color: white;
+}
+
+body.v2-enabled .player-table th[data-sort="roi"] .header-text {
+    font-weight: bold;
+}
+
+/* v2.0 Enhanced True Value column when v2.0 is active */
+body.v2-enabled .true-value-enhanced {
+    border-left: 3px solid #28a745;
+    background: rgba(40, 167, 69, 0.1);
+}
+
+/* Remove v2.0 styling when in v1.0 mode */
+body.v1-enabled .player-table th[data-sort="roi"] {
+    background: #f8f9fa;
+    color: #495057;
+}
+
+body.v1-enabled .true-value-enhanced {
+    border-left: none;
+    background: transparent;
+}
+
+/* ROI Column styling improvements */
+.player-table th[data-sort="roi"] {
+    position: relative;
+}
+
+.player-table th[data-sort="roi"]::after {
+    content: "v2.0";
+    position: absolute;
+    top: 2px;
+    right: 2px;
+    font-size: 8px;
+    background: rgba(255, 255, 255, 0.8);
+    color: #28a745;
+    padding: 1px 3px;
+    border-radius: 2px;
+    font-weight: bold;
+}
+
+/* ROI value color coding */
+.roi-excellent { 
+    color: #28a745; 
+    font-weight: bold; 
+}
+
+.roi-good { 
+    color: #17a2b8; 
+    font-weight: bold; 
+}
+
+.roi-average { 
+    color: #ffc107; 
+    font-weight: bold; 
+}
+
+.roi-poor { 
+    color: #dc3545; 
+    font-weight: bold; 
+}

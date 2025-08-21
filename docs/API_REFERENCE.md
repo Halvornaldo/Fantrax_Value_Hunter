@@ -40,7 +40,7 @@
 - `gameweek` (int, optional, default=1): Gameweek data to retrieve
 - `limit` (int, optional, default=100): Results per page (50, 100, 200, 1000)
 - `offset` (int, optional, default=0): Pagination offset
-- `sort_by` (string, optional, default='true_value'): Sort field (games_total supported for numeric Games sorting)
+- `sort_by` (string, optional, default='true_value'): Sort field (games_total supported for numeric Games sorting, roi supported with NULLS LAST handling)
 - `sort_direction` (string, optional, default='desc'): Sort direction (asc/desc)
 
 **Returns**: JSON object with pagination info and player array
@@ -368,6 +368,7 @@
   "ppg": "number",
   "value_score": "number",
   "true_value": "number",
+  "roi": "number",
   "form_multiplier": "number",
   "fixture_multiplier": "number", 
   "starter_multiplier": "number",
@@ -427,4 +428,22 @@
 
 **Maintenance Note**: This document must be updated after each Formula Optimization sprint with new endpoints, response formats, and API changes. See `docs/DOCUMENTATION_MAINTENANCE.md` for complete update requirements.
 
-*Last updated: 2025-08-21 - Post Formula Optimization v2.0 Sprint 3 completion (Validation Framework)*
+## Sprint 4 Phase 1 Updates (2025-08-21)
+
+### New UI Features
+- **ROI Column**: Added to player table with proper NULL handling via `NULLS LAST` sorting
+- **Formula Toggle**: Dashboard includes v1.0/v2.0 formula version switching  
+- **Validation Status**: Indicators show validation system connectivity (awaiting sufficient data)
+- **Visual Indicators**: v2.0 features marked with version badges and conditional CSS styling
+
+### Database Considerations
+- **NULL Handling**: ROI column may contain NULL values - API automatically applies `NULLS LAST` clause when sorting by ROI
+- **Dual Engine**: v1.0 and v2.0 formulas run in parallel, switchable via toggle without data conflicts
+- **Data Requirements**: Validation system requires 5+ gameweeks for meaningful backtesting (currently 2 GWs available)
+
+### Frontend Integration
+- **CSS Classes**: Body classes (`v2-enabled`, `v1-enabled`) control conditional styling for formula versions
+- **State Management**: Formula toggle affects visual styling but maintains functional consistency
+- **Performance**: New features add minimal overhead to existing API response times
+
+*Last updated: 2025-08-21 - Post Sprint 4 Phase 1 completion (Dashboard Integration)*

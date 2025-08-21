@@ -172,6 +172,8 @@ document.addEventListener('DOMContentLoaded', function() {
     setupTableControls();
     setupFilterControls();
     setupThemeToggle();
+    setupFormulaVersionToggle();
+    setupValidationStatusIndicators();
     
     console.log('✅ Dashboard initialization complete');
 });
@@ -434,7 +436,7 @@ function updatePlayerTable() {
     const tbody = document.getElementById('player-table-body');
     
     if (!playersData || playersData.length === 0) {
-        tbody.innerHTML = '<tr class="loading-row"><td colspan="17">No players found</td></tr>';
+        tbody.innerHTML = '<tr class="loading-row"><td colspan="18">No players found</td></tr>';
         return;
     }
     
@@ -446,6 +448,10 @@ function updatePlayerTable() {
         const ppValue = parseFloat(player.value_score || 0);
         const ppClass = ppValue >= 0.7 ? 'pp-excellent' : ppValue >= 0.5 ? 'pp-good' : ppValue >= 0.3 ? 'pp-average' : 'pp-poor';
         
+        // ROI calculation and styling
+        const roiValue = parseFloat(player.roi || 0);
+        const roiClass = roiValue >= 1.2 ? 'roi-excellent' : roiValue >= 1.0 ? 'roi-good' : roiValue >= 0.8 ? 'roi-average' : 'roi-poor';
+        
         return `
             <tr>
                 <td><strong>${escapeHtml(player.name || 'Unknown')}</strong></td>
@@ -455,7 +461,8 @@ function updatePlayerTable() {
                 <td>${parseFloat(player.ppg || 0).toFixed(1)}</td>
                 <td class="${ppClass}">${ppValue.toFixed(3)}</td>
                 <td class="${getGamesClass(player)}" data-sort="${player.games_total || 0}">${player.games_display || '0'}</td>
-                <td class="${valueClass}">${trueValue.toFixed(3)}</td>
+                <td class="${valueClass} ${getFormulaVersion() === 'v2.0' ? 'true-value-enhanced' : ''}">${trueValue.toFixed(3)}</td>
+                <td class="roi-value ${roiClass}">${roiValue.toFixed(3)}</td>
                 <td>${parseFloat(player.form_multiplier || 1.0).toFixed(2)}x</td>
                 <td>${parseFloat(player.fixture_multiplier || 1.0).toFixed(2)}x</td>
                 <td>${parseFloat(player.starter_multiplier || 1.0).toFixed(2)}x</td>
@@ -1516,4 +1523,435 @@ function refreshTooltips() {
         icon.addEventListener('touchstart', handleTooltipTouch);
         icon.addEventListener('touchend', handleTooltipTouchEnd);
     });
+}
+
+// =================================================================
+// SPRINT 4: FORMULA VERSION TOGGLE (v2.0 UI INTEGRATION)
+// =================================================================
+
+// Global variable to track current formula version
+let currentFormulaVersion = 'v2.0'; // Default to v2.0
+
+function setupFormulaVersionToggle() {
+    console.log('🔧 Setting up formula version toggle...');
+    
+    // Load current formula version from server
+    loadCurrentFormulaVersion();
+    
+    // Set up radio button event listeners
+    const formulaRadios = document.querySelectorAll('input[name="formula-version"]');
+    formulaRadios.forEach(radio => {
+        radio.addEventListener('change', handleFormulaVersionChange);
+    });
+    
+    console.log('✅ Formula version toggle setup complete');
+}
+
+async function loadCurrentFormulaVersion() {
+    try {
+        const response = await fetch('/api/get-formula-version');
+        const result = await response.json();
+        
+        if (result.current_version) {
+            currentFormulaVersion = result.current_version;
+            
+            // Update UI to reflect current version
+            const versionRadio = document.getElementById(`formula-${result.current_version}`);
+            if (versionRadio) {
+                versionRadio.checked = true;
+                updateFormulaInfoDisplay(result.current_version);
+            }
+            
+            // Update v2.0 column visibility
+            updateV2ColumnVisibility(result.current_version === 'v2.0');
+            
+            console.log('✅ Formula version loaded:', result.current_version);
+        }
+    } catch (error) {
+        console.error('❌ Error loading formula version:', error);
+        // Default to v2.0 on error
+        currentFormulaVersion = 'v2.0';
+    }
+}
+
+function getFormulaVersion() {
+    return currentFormulaVersion;
+}
+
+async function handleFormulaVersionChange(event) {
+    const newVersion = event.target.value;
+    console.log('🔄 Formula version change requested:', newVersion);
+    
+    if (newVersion === currentFormulaVersion) {
+        console.log('⏭️ No change needed - already using', newVersion);
+        return;
+    }
+    
+    try {
+        showLoadingOverlay(`Switching to Formula ${newVersion}...`);
+        
+        // Call API to switch formula version
+        const response = await fetch('/api/toggle-formula-version', {
+            method: 'POST',
+            headers: {
+                'Content-Type': 'application/json'
+            },
+            body: JSON.stringify({
+                version: newVersion
+            })
+        });
+        
+        const result = await response.json();
+        
+        if (result.success) {
+            console.log(`✅ Formula switched to ${result.new_version}`);
+            currentFormulaVersion = result.new_version;
+            
+            // Update UI elements
+            updateFormulaInfoDisplay(result.new_version);
+            updateV2ColumnVisibility(result.new_version === 'v2.0');
+            
+            // Show success feedback
+            showBriefSuccess(`Formula switched to ${result.new_version}`);
+            
+            // Reload player data to get updated calculations
+            await loadPlayersData();
+            
+        } else {
+            throw new Error(result.error || 'Failed to switch formula version');
+        }
+    } catch (error) {
+        console.error('❌ Error switching formula version:', error);
+        showError('Failed to switch formula: ' + error.message);
+        
+        // Revert radio button selection
+        const currentRadio = document.getElementById(`formula-${currentFormulaVersion}`);
+        if (currentRadio) {
+            currentRadio.checked = true;
+        }
+    } finally {
+        hideLoadingOverlay();
+    }
+}
+
+function updateFormulaInfoDisplay(version) {
+    const v1Info = document.getElementById('formula-v1-info');
+    const v2Info = document.getElementById('formula-v2-info');
+    
+    if (version === 'v2.0') {
+        v2Info.style.display = 'block';
+        v1Info.style.display = 'none';
+    } else {
+        v1Info.style.display = 'block';
+        v2Info.style.display = 'none';
+    }
+    
+    // Update version badge
+    const versionBadge = document.querySelector('.version-badge');
+    if (versionBadge) {
+        versionBadge.textContent = version;
+    }
+}
+
+function updateV2ColumnVisibility(showV2Columns) {
+    console.log('🎯 Updating v2.0 column visibility:', showV2Columns);
+    
+    const roiColumn = document.querySelector('th[data-sort="roi"]');
+    
+    if (roiColumn) {
+        roiColumn.style.display = showV2Columns ? '' : 'none';
+        console.log('📊 ROI column visibility:', showV2Columns ? 'shown' : 'hidden');
+    }
+    
+    // Update ROI cells in table rows
+    const roiCells = document.querySelectorAll('td:nth-child(9)'); // ROI is 9th column
+    roiCells.forEach(cell => {
+        if (cell.classList.contains('roi-value')) {
+            cell.style.display = showV2Columns ? '' : 'none';
+        }
+    });
+    
+    // Update colspan for loading/empty rows
+    const loadingRows = document.querySelectorAll('.loading-row td');
+    loadingRows.forEach(cell => {
+        cell.setAttribute('colspan', showV2Columns ? '18' : '17');
+    });
+    
+    // Update v2.0 visual indicators
+    const body = document.body;
+    if (showV2Columns) {
+        body.classList.add('v2-enabled');
+        body.classList.remove('v1-enabled');
+    } else {
+        body.classList.add('v1-enabled');
+        body.classList.remove('v2-enabled');
+    }
+}
+
+// Add ROI column info to the tooltip system
+columnInfo['roi'] = {
+    title: 'Return on Investment',
+    description: 'v2.0 value efficiency metric - True Value divided by Player Price',
+    interpretation: {
+        'excellent': '🟢 ≥1.2 - Elite ROI',
+        'good': '🔵 1.0-1.2 - Good ROI',
+        'average': '🟡 0.8-1.0 - Fair ROI',
+        'poor': '🔴 <0.8 - Poor ROI'
+    },
+    formula: 'True Value ÷ Price',
+    usage: '⭐ v2.0 Primary value metric - considers all multipliers relative to cost',
+    note: 'Only available with Formula v2.0 - provides cleaner separation of prediction vs value'
+};
+
+// =================================================================
+// SPRINT 4: VALIDATION STATUS INDICATORS (v2.0 UI INTEGRATION)
+// =================================================================
+
+// Global validation status
+let validationStatus = {
+    loaded: false,
+    lastValidation: null,
+    metrics: {
+        rmse: null,
+        correlation: null,
+        precision: null
+    }
+};
+
+function setupValidationStatusIndicators() {
+    console.log('🔧 Setting up validation status indicators...');
+    
+    // Load current validation status from server
+    loadValidationStatus();
+    
+    console.log('✅ Validation status indicators setup complete');
+}
+
+async function loadValidationStatus() {
+    try {
+        // Check if there's a recent validation history
+        const response = await fetch('/api/validation-history');
+        const validationHistory = await response.json();
+        
+        if (validationHistory && validationHistory.length > 0) {
+            // Get the most recent validation
+            const latestValidation = validationHistory[0];
+            updateValidationDisplay(latestValidation);
+        } else {
+            // No validation history found
+            updateValidationDisplay(null);
+        }
+    } catch (error) {
+        console.warn('⚠️ Could not load validation status:', error);
+        updateValidationDisplay(null);
+    }
+}
+
+function updateValidationDisplay(validationData) {
+    const badge = document.getElementById('validation-badge');
+    const rmseValue = document.getElementById('rmse-value');
+    const rmseStatus = document.getElementById('rmse-status');
+    const correlationValue = document.getElementById('correlation-value');
+    const correlationStatus = document.getElementById('correlation-status');
+    const precisionValue = document.getElementById('precision-value');
+    const precisionStatus = document.getElementById('precision-status');
+    const lastValidation = document.getElementById('last-validation');
+    const qualitySummary = document.getElementById('quality-summary');
+    
+    if (validationData && validationData.metrics) {
+        // Update validation badge status
+        const overallQuality = assessOverallQuality(validationData.metrics);
+        badge.textContent = overallQuality.label;
+        badge.className = 'status-badge ' + overallQuality.class;
+        
+        // Update RMSE
+        rmseValue.textContent = validationData.metrics.rmse ? validationData.metrics.rmse.toFixed(2) : '--';
+        const rmseQuality = assessRMSE(validationData.metrics.rmse);
+        rmseStatus.textContent = rmseQuality.label;
+        rmseStatus.className = 'metric-status ' + rmseQuality.class;
+        
+        // Update Correlation
+        correlationValue.textContent = validationData.metrics.spearman_correlation ? 
+            validationData.metrics.spearman_correlation.toFixed(3) : '--';
+        const corrQuality = assessCorrelation(validationData.metrics.spearman_correlation);
+        correlationStatus.textContent = corrQuality.label;
+        correlationStatus.className = 'metric-status ' + corrQuality.class;
+        
+        // Update Precision@20
+        precisionValue.textContent = validationData.metrics.precision_at_20 ? 
+            validationData.metrics.precision_at_20.toFixed(3) : '--';
+        const precQuality = assessPrecision(validationData.metrics.precision_at_20);
+        precisionStatus.textContent = precQuality.label;
+        precisionStatus.className = 'metric-status ' + precQuality.class;
+        
+        // Update last validation time
+        if (validationData.timestamp) {
+            const date = new Date(validationData.timestamp);
+            lastValidation.textContent = date.toLocaleDateString() + ' ' + date.toLocaleTimeString();
+        }
+        
+        // Update quality summary
+        qualitySummary.textContent = generateQualitySummary(validationData.metrics);
+        
+        validationStatus.loaded = true;
+        validationStatus.lastValidation = validationData.timestamp;
+        validationStatus.metrics = validationData.metrics;
+        
+    } else {
+        // No validation data available
+        badge.textContent = 'Not Available';
+        badge.className = 'status-badge warning';
+        
+        rmseValue.textContent = '--';
+        rmseStatus.textContent = '--';
+        rmseStatus.className = 'metric-status';
+        
+        correlationValue.textContent = '--';
+        correlationStatus.textContent = '--';
+        correlationStatus.className = 'metric-status';
+        
+        precisionValue.textContent = '--';
+        precisionStatus.textContent = '--';
+        precisionStatus.className = 'metric-status';
+        
+        lastValidation.textContent = 'Not run';
+        qualitySummary.textContent = 'Run validation to assess model quality and performance metrics.';
+    }
+}
+
+function assessOverallQuality(metrics) {
+    const rmseQuality = assessRMSE(metrics.rmse);
+    const corrQuality = assessCorrelation(metrics.spearman_correlation);
+    const precQuality = assessPrecision(metrics.precision_at_20);
+    
+    // Calculate overall score (0-3, where 3 is best)
+    const scores = [rmseQuality, corrQuality, precQuality].map(q => {
+        if (q.class === 'excellent') return 3;
+        if (q.class === 'good') return 2;
+        if (q.class === 'needs-work') return 1;
+        return 0;
+    });
+    
+    const avgScore = scores.reduce((a, b) => a + b, 0) / scores.length;
+    
+    if (avgScore >= 2.5) return { label: 'Excellent', class: 'good' };
+    if (avgScore >= 2.0) return { label: 'Good', class: 'good' };
+    if (avgScore >= 1.5) return { label: 'Fair', class: 'warning' };
+    return { label: 'Needs Work', class: 'error' };
+}
+
+function assessRMSE(rmse) {
+    if (!rmse) return { label: 'Unknown', class: '' };
+    
+    if (rmse < 2.8) return { label: 'Excellent', class: 'excellent' };
+    if (rmse < 3.0) return { label: 'Good', class: 'good' };
+    if (rmse < 3.5) return { label: 'Fair', class: 'needs-work' };
+    return { label: 'Poor', class: 'poor' };
+}
+
+function assessCorrelation(correlation) {
+    if (!correlation) return { label: 'Unknown', class: '' };
+    
+    if (correlation > 0.35) return { label: 'Excellent', class: 'excellent' };
+    if (correlation > 0.25) return { label: 'Good', class: 'good' };
+    if (correlation > 0.15) return { label: 'Fair', class: 'needs-work' };
+    return { label: 'Poor', class: 'poor' };
+}
+
+function assessPrecision(precision) {
+    if (!precision) return { label: 'Unknown', class: '' };
+    
+    if (precision > 0.40) return { label: 'Excellent', class: 'excellent' };
+    if (precision > 0.30) return { label: 'Good', class: 'good' };
+    if (precision > 0.20) return { label: 'Fair', class: 'needs-work' };
+    return { label: 'Poor', class: 'poor' };
+}
+
+function generateQualitySummary(metrics) {
+    const rmseQuality = assessRMSE(metrics.rmse);
+    const corrQuality = assessCorrelation(metrics.spearman_correlation);
+    const precQuality = assessPrecision(metrics.precision_at_20);
+    
+    const strengths = [];
+    const concerns = [];
+    
+    if (rmseQuality.class === 'excellent' || rmseQuality.class === 'good') {
+        strengths.push('prediction accuracy');
+    } else {
+        concerns.push('prediction accuracy');
+    }
+    
+    if (corrQuality.class === 'excellent' || corrQuality.class === 'good') {
+        strengths.push('player ranking');
+    } else {
+        concerns.push('player ranking');
+    }
+    
+    if (precQuality.class === 'excellent' || precQuality.class === 'good') {
+        strengths.push('top player identification');
+    } else {
+        concerns.push('top player identification');
+    }
+    
+    if (strengths.length >= 2) {
+        return `Model performing well in ${strengths.join(' and ')}.${concerns.length > 0 ? ` Opportunity to improve ${concerns[0]}.` : ''}`;
+    } else if (concerns.length >= 2) {
+        return `Model needs improvement in ${concerns.join(' and ')}.${strengths.length > 0 ? ` Strong ${strengths[0]} performance.` : ''}`;
+    } else {
+        return 'Mixed model performance - some metrics strong, others need attention.';
+    }
+}
+
+async function runValidation() {
+    const runButton = document.getElementById('run-validation');
+    const badge = document.getElementById('validation-badge');
+    
+    // Disable button and show loading state
+    runButton.disabled = true;
+    runButton.innerHTML = '⏳ Running...';
+    badge.textContent = 'Running...';
+    badge.className = 'status-badge warning';
+    
+    try {
+        const response = await fetch('/api/run-validation', {
+            method: 'POST',
+            headers: {
+                'Content-Type': 'application/json'
+            },
+            body: JSON.stringify({
+                validation_type: 'temporal'
+            })
+        });
+        
+        const result = await response.json();
+        
+        if (result.validation_id) {
+            showBriefSuccess('Validation completed successfully!');
+            
+            // Wait a moment then reload validation status
+            setTimeout(() => {
+                loadValidationStatus();
+            }, 1000);
+            
+        } else {
+            throw new Error(result.error || 'Validation failed');
+        }
+        
+    } catch (error) {
+        console.error('❌ Error running validation:', error);
+        showError('Failed to run validation: ' + error.message);
+        
+        // Reset to previous state
+        badge.textContent = 'Error';
+        badge.className = 'status-badge error';
+        
+    } finally {
+        runButton.disabled = false;
+        runButton.innerHTML = '🔍 Run Validation';
+    }
+}
+
+function viewValidationResults() {
+    // Open validation dashboard in new window
+    window.open('/api/validation-dashboard', '_blank');
 }

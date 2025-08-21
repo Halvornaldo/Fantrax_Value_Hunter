@@ -17,6 +17,7 @@
 - **Sprint 1 COMPLETED**: Foundation & Critical Fixes implemented and tested
 - **Sprint 2 COMPLETED**: Advanced calculations implemented and tested
 - **Sprint 3 COMPLETED**: Validation Framework & Critical Data Fixes
+- **Sprint 4 Phase 1 COMPLETED**: Dashboard Integration - v2.0 toggle, ROI column, validation status
 - **Core Formula Fixed**: Separated True Value (point prediction) from ROI (value/price ratio)
 - **Exponential Fixture Calculation**: Implemented base^(-difficulty) instead of linear multipliers
 - **EWMA Form Calculation**: Exponential weighted moving average with configurable α=0.87
@@ -213,11 +214,11 @@ conn = psycopg2.connect(
 ## Development Context
 
 ### Recent Session Focus (2025-08-21)  
-- **Sprint 3 Completed**: Validation Framework & Critical Data Fixes
-- **Data Quality**: Identified and fixed 63 players with corrupted baseline data from Championship/lower leagues
-- **Validation System**: Built production-ready validation framework with temporal separation requirements
-- **Formula Discovery**: Found v1.0 vs v2.0 validation issues and documented data leakage risks
-- **Framework Testing**: Created comprehensive validation pipeline ready for deployment when more gameweek data available
+- **Sprint 4 Phase 1 Completed**: Dashboard Integration with v2.0 formula toggle and ROI column
+- **UI Integration**: Successfully surfaced v2.0 ROI calculations with proper NULL handling and visual indicators
+- **Validation System**: Backend properly connected, awaiting sufficient gameweek data (currently 2 GWs, need 5+)
+- **Technical Discoveries**: Database NULL sorting issues resolved, formula engine coexistence validated
+- **Issues Tracking**: Created comprehensive issues list for Phase 4 polish (minor toggle bugs identified)
 
 ### System Maturity
 The system is production-ready with:
@@ -230,4 +231,4 @@ The system is production-ready with:
 The dashboard successfully handles all 633 Premier League players with real-time parameter adjustments, making it effective for weekly fantasy lineup optimization.
 
 ---
-*Last Updated: 2025-08-21 - Focus: Sprint 3 validation framework completion with critical data quality fixes*
+*Last Updated: 2025-08-21 - Focus: Sprint 4 Phase 1 completion - Dashboard Integration with v2.0 ROI column and validation system*

@@ -13,8 +13,8 @@ The Fantrax Value Hunter dashboard provides configurable analytics for Premier L
 - ✅ **Sprint 2**: Dynamic PPG blending (smooth historical-to-current transition)
 - ✅ **Sprint 2**: Normalized xGI (ratio-based with 2024/25 baselines)
 - ✅ **Sprint 2**: Position-specific adjustments (defenders, goalkeepers)
-- 🔄 **Sprint 3**: Validation framework (backtesting, RMSE/MAE metrics)
-- 🔄 **Sprint 4**: Dashboard integration (new parameter controls)
+- ✅ **Sprint 3**: Validation framework (backtesting, RMSE/MAE metrics)
+- 🔄 **Sprint 4**: Dashboard integration (Phase 1 Complete - ROI column, formula toggle, validation status)
 
 **Current Dashboard**: Shows v1.0 calculations (for user familiarity)
 **v2.0 Engine**: Available via API (`/api/calculate-values-v2`) with all Sprint 2 features
@@ -177,6 +177,7 @@ All features can be configured through the Parameter Controls panel on the left 
 - **PP$**: Points per dollar (PPG ÷ Price) - value indicator
 - **Games**: Games played with format indicating data source
 - **True Value**: Final calculated rating incorporating all multipliers
+- **ROI**: Return on Investment (True Value ÷ Price) - v2.0 feature with green gradient styling
 - **Form**: Form calculation multiplier (1.00x = neutral)
 - **Fixture**: Fixture difficulty multiplier (>1.00x = easy fixture)
 - **Starter**: Starter prediction multiplier (1.00x = predicted starter)
@@ -357,4 +358,53 @@ All parameter changes are tracked and require "Apply Changes" to take effect.
 
 **Maintenance Note**: This document must be updated after each Formula Optimization sprint with new dashboard features, UI changes, and parameter controls. See `docs/DOCUMENTATION_MAINTENANCE.md` for complete update requirements.
 
-*Last updated: 2025-08-21 - Post Formula Optimization v2.0 Sprint 1 completion*
+## Sprint 4 Phase 1 New Features (2025-08-21)
+
+### Formula Version Selection
+**Purpose**: Switch between v1.0 (legacy) and v2.0 (enhanced) formula engines for comparison and testing
+
+**Controls**:
+- **Formula Version Toggle**: Radio buttons in Parameter Controls panel
+  - v1.0 Legacy: Original formula calculations (historical baseline)
+  - v2.0 Enhanced: Advanced calculations (EWMA form, dynamic blending, normalized xGI)
+- **Version Badges**: Visual indicators on v2.0-specific features
+- **Conditional Styling**: v2.0 features highlighted when v2.0 formula active
+
+**Technical Implementation**:
+- Dual engine architecture allows safe switching between formula versions
+- Body classes control conditional CSS styling (`v2-enabled`, `v1-enabled`)
+- Backend API endpoints maintain data consistency across versions
+- Real-time switching without data loss or corruption
+
+### ROI Column (v2.0 Feature)
+**Purpose**: Displays Return on Investment as separate metric from True Value prediction
+
+**Display Features**:
+- **Green Gradient Styling**: Visually distinguishes v2.0 enhancement
+- **ROI Calculation**: True Value ÷ Price (value-per-dollar ratio)  
+- **NULL Handling**: Proper sorting with NULL values displayed last
+- **Conditional Visibility**: Highlighted only when v2.0 formula active
+
+**Color Coding**:
+- Higher ROI values receive stronger green gradient
+- Helps identify best value players regardless of absolute price
+- Separates prediction accuracy (True Value) from price efficiency (ROI)
+
+### Validation Status Indicators
+**Purpose**: Display validation system connectivity and data availability status
+
+**Status Display**:
+- **Not Available**: Insufficient gameweek data for meaningful validation (current status)
+- **Backend Connected**: Validation system properly integrated and ready
+- **Data Requirements**: 5+ gameweeks needed for reliable backtesting (currently 2 GWs available)
+- **Future Activation**: Will automatically show metrics when sufficient data exists
+
+**Quality Metrics** (when available):
+- RMSE (Root Mean Square Error) for prediction accuracy
+- Spearman Correlation for ranking effectiveness  
+- Precision@20 for top player identification
+- Statistical significance indicators
+
+---
+
+*Last updated: 2025-08-21 - Post Sprint 4 Phase 1 completion (Dashboard Integration)*

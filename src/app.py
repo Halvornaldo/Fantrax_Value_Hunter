@@ -421,6 +421,7 @@ def get_players():
         'ppg': 'pm.ppg',
         'value_score': 'pm.value_score',
         'true_value': 'pm.true_value',
+        'roi': 'p.roi',
         'minutes': 'p.minutes',
         'xg90': 'p.xg90',
         'xa90': 'p.xa90',
@@ -450,6 +451,7 @@ def get_players():
                 p.id, p.name, p.team, p.position,
                 p.minutes, p.xg90, p.xa90, p.xgi90,
                 pm.price, pm.ppg, pm.value_score, pm.true_value,
+                p.roi,
                 pm.form_multiplier, pm.fixture_multiplier, pm.starter_multiplier, pm.xgi_multiplier,
                 pm.last_updated,
                 COALESCE(pgd.games_played, 0) as games_played,
@@ -500,7 +502,12 @@ def get_players():
         
         # Add ordering and pagination
         sort_column = valid_sort_fields[sort_by]
-        final_query = base_query + f" ORDER BY {sort_column} {sort_direction.upper()} LIMIT %s OFFSET %s"
+        
+        # Special handling for ROI sorting to put NULL values last
+        if sort_by == 'roi':
+            final_query = base_query + f" ORDER BY {sort_column} {sort_direction.upper()} NULLS LAST LIMIT %s OFFSET %s"
+        else:
+            final_query = base_query + f" ORDER BY {sort_column} {sort_direction.upper()} LIMIT %s OFFSET %s"
         params.extend([limit, offset])
         
         cursor.execute(final_query, params)
@@ -3086,10 +3093,10 @@ def store_v2_calculations(calculations: List[Dict], version: str):
         
         conn.commit()
         conn.close()
-        print(f"✅ Stored {len(calculations)} calculations for {version}")
+        print(f"[SUCCESS] Stored {len(calculations)} calculations for {version}")
         
     except Exception as e:
-        print(f"❌ Error storing v2.0 calculations: {e}")
+        print(f"[ERROR] Error storing v2.0 calculations: {e}")
         if conn:
             conn.rollback()
             conn.close()

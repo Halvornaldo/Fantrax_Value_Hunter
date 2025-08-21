@@ -2370,13 +2370,26 @@ document.addEventListener('DOMContentLoaded', function() {
 ```
 
 ### **Sprint 4 Success Metrics**
-- [ ] Dashboard displays True Value and ROI columns correctly
+**Phase 1: Dashboard Integration** ✅ COMPLETED (2025-08-21)
+- [x] ROI column added with proper NULL handling and green gradient styling
+- [x] Formula version toggle implemented (v1.0/v2.0 switching)
+- [x] Validation status indicators integrated (backend connected, awaiting data)
+- [x] Visual indicators for v2.0 features with conditional CSS
+- [x] Database NULL sorting issues resolved (NULLS LAST clause)
+
+**Phase 2: Enhanced Controls** 🔄 PENDING
 - [ ] Parameter sliders functional and update calculations
 - [ ] Blending indicator shows current/historical weights
-- [ ] AI insights displayed for relevant players
+
+**Phase 3: Validation Integration** 🔄 PENDING  
 - [ ] Validation results viewer accessible and informative
+- [ ] AI insights displayed for relevant players
+
+**Phase 4: Polish** 🔄 PENDING
 - [ ] UI responsive and intuitive
 - [ ] Performance maintains sub-3 second calculation time
+- [ ] Formula toggle JavaScript state management fixed
+- [ ] Visual styling edge cases resolved
 
 ---
 
