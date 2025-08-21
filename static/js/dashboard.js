@@ -820,7 +820,88 @@ function buildParameterChanges() {
         changes.starter_prediction.manual_overrides = manualOverrides;
     }
     
+    // v2.0 Parameter Changes Detection
+    const v2Enabled = document.getElementById('formula-v2')?.checked;
+    if (v2Enabled) {
+        const currentV2Config = currentConfig.formula_optimization_v2 || {};
+        
+        // Check EWMA Form parameters
+        const ewmaAlpha = parseFloat(document.getElementById('ewma-alpha-slider')?.value || 0.87);
+        if (Math.abs(ewmaAlpha - (currentV2Config.ewma_form?.alpha || 0.87)) > 0.01) {
+            if (!changes.formula_optimization_v2) changes.formula_optimization_v2 = {};
+            changes.formula_optimization_v2.ewma_form = { alpha: ewmaAlpha };
+        }
+        
+        // Check Dynamic Blending parameters
+        const adaptationGameweek = parseInt(document.getElementById('adaptation-gameweek')?.value || 15);
+        if (adaptationGameweek !== (currentV2Config.dynamic_blending?.adaptation_gameweek || 15)) {
+            if (!changes.formula_optimization_v2) changes.formula_optimization_v2 = {};
+            if (!changes.formula_optimization_v2.dynamic_blending) changes.formula_optimization_v2.dynamic_blending = {};
+            changes.formula_optimization_v2.dynamic_blending.adaptation_gameweek = adaptationGameweek;
+        }
+        
+        // Check Normalized xGI parameters
+        const xgiStrength = parseFloat(document.getElementById('xgi-normalization-strength')?.value || 1.0);
+        const xgiDefenders = document.getElementById('xgi-defenders')?.checked;
+        const xgiMidfielders = document.getElementById('xgi-midfielders')?.checked;
+        const xgiForwards = document.getElementById('xgi-forwards')?.checked;
+        
+        const currentXgi = currentV2Config.normalized_xgi || {};
+        if (Math.abs(xgiStrength - (currentXgi.normalization_strength || 1.0)) > 0.01 ||
+            xgiDefenders !== (currentXgi.position_adjustments?.defenders !== false) ||
+            xgiMidfielders !== (currentXgi.position_adjustments?.midfielders !== false) ||
+            xgiForwards !== (currentXgi.position_adjustments?.forwards !== false)) {
+            if (!changes.formula_optimization_v2) changes.formula_optimization_v2 = {};
+            changes.formula_optimization_v2.normalized_xgi = {
+                normalization_strength: xgiStrength,
+                position_adjustments: {
+                    defenders: xgiDefenders,
+                    midfielders: xgiMidfielders,
+                    forwards: xgiForwards
+                }
+            };
+        }
+        
+        // Check Multiplier Cap parameters
+        const formCap = parseFloat(document.getElementById('form-cap-slider')?.value || 2.0);
+        const fixtureCap = parseFloat(document.getElementById('fixture-cap-slider')?.value || 1.8);
+        const xgiCap = parseFloat(document.getElementById('xgi-cap-slider')?.value || 2.5);
+        const globalCap = parseFloat(document.getElementById('global-cap-slider')?.value || 3.0);
+        
+        const currentCaps = currentV2Config.multiplier_caps || {};
+        if (Math.abs(formCap - (currentCaps.form || 2.0)) > 0.01 ||
+            Math.abs(fixtureCap - (currentCaps.fixture || 1.8)) > 0.01 ||
+            Math.abs(xgiCap - (currentCaps.xgi || 2.5)) > 0.01 ||
+            Math.abs(globalCap - (currentCaps.global || 3.0)) > 0.01) {
+            if (!changes.formula_optimization_v2) changes.formula_optimization_v2 = {};
+            changes.formula_optimization_v2.multiplier_caps = {
+                form: formCap,
+                fixture: fixtureCap,
+                xgi: xgiCap,
+                global: globalCap
+            };
+        }
+    }
+    
     return changes;
+}
+
+// =================================================================
+// PARAMETER CHANGE DETECTION
+// =================================================================
+
+function markParameterChanged() {
+    console.log('🎯 Parameter changed - checking for updates...');
+    
+    // Build changes and update UI
+    pendingChanges = buildParameterChanges();
+    
+    // Show pending indicator and enable Apply Changes button
+    const hasPendingChanges = Object.keys(pendingChanges).length > 0;
+    document.getElementById('pending-changes').style.display = hasPendingChanges ? 'block' : 'none';
+    document.getElementById('apply-changes').disabled = !hasPendingChanges;
+    
+    console.log('📝 Parameter changes detected:', pendingChanges);
 }
 
 // =================================================================
@@ -1703,6 +1784,111 @@ columnInfo['roi'] = {
     note: 'Only available with Formula v2.0 - provides cleaner separation of prediction vs value'
 };
 
+// Add v2.0 Parameter Control tooltips
+const v2ParameterInfo = {
+    'ewma-alpha': {
+        title: 'EWMA Alpha (α)',
+        description: 'Controls exponential decay rate for form calculation weights',
+        interpretation: {
+            'high': '🔥 α > 0.8 - Heavy recent game weighting',
+            'balanced': '⚖️ α = 0.6-0.8 - Balanced recent/historical',
+            'conservative': '🐌 α < 0.6 - More historical emphasis'
+        },
+        formula: 'Weight_i = α × (1-α)^i where i is games back',
+        note: 'v2.0 Enhancement: Exponential weights replace fixed lookback periods'
+    },
+    'adaptation-gameweek': {
+        title: 'Dynamic Blending Adaptation Point',
+        description: 'Gameweek when current season data reaches 100% weight',
+        interpretation: 'Smooth transition from historical (100%) to current season (100%) data',
+        formula: 'w_current = min(1, (N-1)/(K-1)) where N=gameweek, K=adaptation',
+        note: 'v2.0 Enhancement: Replaces hard baseline switchover with gradual transition'
+    },
+    'xgi-normalization': {
+        title: 'xGI Normalization Strength',
+        description: 'Controls how strongly position-specific xGI adjustments are applied',
+        interpretation: {
+            'strong': '💪 > 1.5x - Maximum position differentiation',
+            'balanced': '⚖️ 1.0x - Standard normalization',
+            'light': '🪶 < 1.0x - Minimal position adjustment'
+        },
+        note: 'v2.0 Enhancement: Ratio-based xGI calculation normalized around 1.0'
+    },
+    'multiplier-caps': {
+        title: 'Multiplier Cap System',
+        description: 'Prevents extreme outlier values that could skew predictions',
+        interpretation: 'Applied individually to each multiplier, then globally to final result',
+        formula: 'min(calculated_multiplier, cap_value)',
+        note: 'v2.0 Enhancement: Maintains balanced predictions while allowing variance'
+    }
+};
+
+// Initialize v2.0 parameter tooltips
+function initializeV2Tooltips() {
+    // Add hover handlers for v2.0 parameter labels and controls
+    Object.keys(v2ParameterInfo).forEach(paramKey => {
+        const elements = document.querySelectorAll(`[data-v2-param="${paramKey}"], #${paramKey}, label[for*="${paramKey}"]`);
+        elements.forEach(element => {
+            if (element && !element.hasAttribute('data-tooltip-initialized')) {
+                element.setAttribute('data-tooltip-initialized', 'true');
+                element.addEventListener('mouseenter', function(e) {
+                    showV2ParameterTooltip(e, paramKey);
+                });
+                element.addEventListener('mouseleave', function() {
+                    hideTooltip();
+                });
+            }
+        });
+    });
+}
+
+function showV2ParameterTooltip(event, paramKey) {
+    const info = v2ParameterInfo[paramKey];
+    if (!info) return;
+    
+    const tooltip = document.createElement('div');
+    tooltip.className = 'tooltip v2-tooltip';
+    tooltip.innerHTML = `
+        <div class="tooltip-title">${info.title}</div>
+        <div class="tooltip-description">${info.description}</div>
+        ${info.formula ? `<div class="tooltip-formula">${info.formula}</div>` : ''}
+        ${info.interpretation ? `
+            <div class="tooltip-interpretation">
+                ${typeof info.interpretation === 'string' ? 
+                    `<div class="tooltip-interpretation-item">${info.interpretation}</div>` :
+                    Object.entries(info.interpretation).map(([key, value]) => 
+                        `<div class="tooltip-interpretation-item">${value}</div>`
+                    ).join('')
+                }
+            </div>
+        ` : ''}
+        ${info.note ? `<div class="tooltip-note">${info.note}</div>` : ''}
+        <div class="tooltip-source">v2.0 Enhanced Controls</div>
+    `;
+    
+    document.body.appendChild(tooltip);
+    
+    // Position tooltip
+    const rect = event.target.getBoundingClientRect();
+    const tooltipRect = tooltip.getBoundingClientRect();
+    
+    let left = rect.left + (rect.width / 2) - (tooltipRect.width / 2);
+    let top = rect.top - tooltipRect.height - 8;
+    
+    // Adjust if tooltip goes off screen
+    if (left < 8) left = 8;
+    if (left + tooltipRect.width > window.innerWidth - 8) {
+        left = window.innerWidth - tooltipRect.width - 8;
+    }
+    if (top < 8) {
+        top = rect.bottom + 8;
+        tooltip.classList.add('tooltip-top');
+    }
+    
+    tooltip.style.left = left + 'px';
+    tooltip.style.top = top + 'px';
+}
+
 // =================================================================
 // SPRINT 4: VALIDATION STATUS INDICATORS (v2.0 UI INTEGRATION)
 // =================================================================
@@ -1954,4 +2140,262 @@ async function runValidation() {
 function viewValidationResults() {
     // Open validation dashboard in new window
     window.open('/api/validation-dashboard', '_blank');
+}
+
+// =================================================================
+// v2.0 Enhanced Parameter Controls JavaScript
+// =================================================================
+
+// Initialize v2.0 controls when DOM is loaded
+document.addEventListener('DOMContentLoaded', function() {
+    initializeV2Controls();
+    setupFormulaVersionToggle();
+    updateV2ControlsVisibility();
+    initializeV2Tooltips();
+});
+
+function initializeV2Controls() {
+    console.log('🔬 Initializing v2.0 parameter controls...');
+    
+    // EWMA Form Controls
+    setupEWMAControls();
+    
+    // Dynamic Blending Controls  
+    setupBlendingControls();
+    
+    // Normalized xGI Controls
+    setupXGIControls();
+    
+    // Multiplier Cap Controls
+    setupCapControls();
+    
+    console.log('✅ v2.0 controls initialized');
+}
+
+function setupEWMAControls() {
+    const alphaSlider = document.getElementById('ewma-alpha-slider');
+    const alphaDisplay = document.getElementById('ewma-alpha-display');
+    const halfLifeDisplay = document.getElementById('ewma-half-life');
+    const recentWeightDisplay = document.getElementById('ewma-recent-weight');
+    
+    if (alphaSlider) {
+        alphaSlider.addEventListener('input', function() {
+            const alpha = parseFloat(this.value);
+            alphaDisplay.textContent = alpha.toFixed(2);
+            
+            // Calculate half-life: ln(0.5) / ln(1 - alpha)
+            const halfLife = Math.log(0.5) / Math.log(1 - alpha);
+            halfLifeDisplay.textContent = `~${halfLife.toFixed(1)} games`;
+            
+            // Recent game weight is just alpha * 100
+            recentWeightDisplay.textContent = `${Math.round(alpha * 100)}%`;
+            
+            // Mark as pending change
+            markParameterChanged();
+        });
+        
+        // Initialize displays
+        alphaSlider.dispatchEvent(new Event('input'));
+    }
+}
+
+function setupBlendingControls() {
+    const adaptationInput = document.getElementById('adaptation-gameweek');
+    const historicalBar = document.getElementById('historical-weight-bar');
+    const currentBar = document.getElementById('current-weight-bar');
+    
+    if (adaptationInput) {
+        adaptationInput.addEventListener('input', function() {
+            updateBlendingVisualization();
+            markParameterChanged();
+        });
+        
+        // Initialize visualization
+        updateBlendingVisualization();
+    }
+}
+
+function updateBlendingVisualization() {
+    const adaptationGameweek = parseInt(document.getElementById('adaptation-gameweek').value);
+    const currentGameweek = 2; // TODO: Get from API or config
+    
+    // Calculate current weight: min(1, (N-1)/(K-1))
+    const currentWeight = Math.min(1, Math.max(0, (currentGameweek - 1) / (adaptationGameweek - 1)));
+    const historicalWeight = 1 - currentWeight;
+    
+    // Update visualization bars
+    const historicalBar = document.getElementById('historical-weight-bar');
+    const currentBar = document.getElementById('current-weight-bar');
+    
+    if (historicalBar && currentBar) {
+        const historicalPercent = Math.round(historicalWeight * 100);
+        const currentPercent = Math.round(currentWeight * 100);
+        
+        historicalBar.style.width = `${historicalPercent}%`;
+        historicalBar.querySelector('span').textContent = `Historical: ${historicalPercent}%`;
+        
+        currentBar.style.width = `${currentPercent}%`;
+        currentBar.querySelector('span').textContent = `Current: ${currentPercent}%`;
+    }
+}
+
+function setupXGIControls() {
+    const normalizationSlider = document.getElementById('xgi-normalization-strength');
+    const normalizationDisplay = document.getElementById('xgi-normalization-display');
+    
+    // Position toggles
+    const defenderToggle = document.getElementById('xgi-defenders');
+    const midfielderToggle = document.getElementById('xgi-midfielders');
+    const forwardToggle = document.getElementById('xgi-forwards');
+    
+    if (normalizationSlider) {
+        normalizationSlider.addEventListener('input', function() {
+            normalizationDisplay.textContent = `${parseFloat(this.value).toFixed(1)}x`;
+            markParameterChanged();
+        });
+    }
+    
+    // Position toggle handlers
+    [defenderToggle, midfielderToggle, forwardToggle].forEach(toggle => {
+        if (toggle) {
+            toggle.addEventListener('change', function() {
+                markParameterChanged();
+            });
+        }
+    });
+}
+
+function setupCapControls() {
+    const capSliders = [
+        { id: 'form-cap-slider', display: 'form-cap-display' },
+        { id: 'fixture-cap-slider', display: 'fixture-cap-display' },
+        { id: 'xgi-cap-slider', display: 'xgi-cap-display' },
+        { id: 'global-cap-slider', display: 'global-cap-display' }
+    ];
+    
+    capSliders.forEach(({ id, display }) => {
+        const slider = document.getElementById(id);
+        const displayElement = document.getElementById(display);
+        
+        if (slider && displayElement) {
+            slider.addEventListener('input', function() {
+                displayElement.textContent = `${parseFloat(this.value).toFixed(1)}x`;
+                markParameterChanged();
+                updateCapsAppliedIndicator();
+            });
+        }
+    });
+}
+
+function updateCapsAppliedIndicator() {
+    // This would typically show how many players are affected by caps
+    // For now, we'll show a placeholder
+    const indicator = document.getElementById('caps-applied-indicator');
+    const countElement = document.getElementById('caps-applied-count');
+    
+    if (indicator && countElement) {
+        // TODO: Get actual count from API
+        countElement.textContent = '12'; // Placeholder
+        indicator.style.display = 'block';
+    }
+}
+
+function setupFormulaVersionToggle() {
+    const v1Radio = document.getElementById('formula-v1');
+    const v2Radio = document.getElementById('formula-v2');
+    
+    if (v1Radio && v2Radio) {
+        v1Radio.addEventListener('change', function() {
+            if (this.checked) {
+                updateV2ColumnVisibility(false);
+                updateV2ControlsVisibility();
+                console.log('🔄 Switched to v1.0 formula');
+            }
+        });
+        
+        v2Radio.addEventListener('change', function() {
+            if (this.checked) {
+                updateV2ColumnVisibility(true);
+                updateV2ControlsVisibility();
+                console.log('🎯 Switched to v2.0 formula');
+            }
+        });
+    }
+}
+
+function updateV2ControlsVisibility() {
+    const v2Enabled = document.getElementById('formula-v2').checked;
+    const v2Sections = document.querySelectorAll('.v2-enhanced-section');
+    
+    console.log('🎯 Updating v2.0 controls visibility:', v2Enabled);
+    
+    // Update body classes for CSS rules
+    document.body.classList.toggle('v2-enabled', v2Enabled);
+    document.body.classList.toggle('v1-enabled', !v2Enabled);
+    
+    // Show/hide v2.0 sections
+    v2Sections.forEach(section => {
+        section.style.display = v2Enabled ? 'block' : 'none';
+    });
+}
+
+// Collect v2.0 parameters for API submission
+function collectV2Parameters() {
+    const v2Params = {
+        ewma_form: {
+            alpha: parseFloat(document.getElementById('ewma-alpha-slider').value)
+        },
+        dynamic_blending: {
+            adaptation_gameweek: parseInt(document.getElementById('adaptation-gameweek').value)
+        },
+        normalized_xgi: {
+            normalization_strength: parseFloat(document.getElementById('xgi-normalization-strength').value),
+            position_adjustments: {
+                defenders: document.getElementById('xgi-defenders').checked,
+                midfielders: document.getElementById('xgi-midfielders').checked,
+                forwards: document.getElementById('xgi-forwards').checked
+            }
+        },
+        multiplier_caps: {
+            form: parseFloat(document.getElementById('form-cap-slider').value),
+            fixture: parseFloat(document.getElementById('fixture-cap-slider').value),
+            xgi: parseFloat(document.getElementById('xgi-cap-slider').value),
+            global: parseFloat(document.getElementById('global-cap-slider').value)
+        }
+    };
+    
+    console.log('📊 Collected v2.0 parameters:', v2Params);
+    return v2Params;
+}
+
+// Wire v2.0 parameters to API update
+function updateV2ParametersAPI() {
+    const v2Enabled = document.getElementById('formula-v2').checked;
+    
+    if (!v2Enabled) {
+        console.log('⚠️ Skipping v2.0 parameter update - v1.0 mode active');
+        return;
+    }
+    
+    const v2Params = collectV2Parameters();
+    
+    // Add to pending changes
+    pendingChanges.formula_optimization_v2 = v2Params;
+    
+    console.log('✅ v2.0 parameters added to pending changes');
+}
+
+// Override the existing applyChanges function to include v2.0 params
+const originalApplyChanges = window.applyChanges;
+window.applyChanges = async function() {
+    const v2Enabled = document.getElementById('formula-v2').checked;
+    
+    if (v2Enabled) {
+        updateV2ParametersAPI();
+    }
+    
+    // Call original function
+    if (originalApplyChanges) {
+        return await originalApplyChanges();
+    }
 }

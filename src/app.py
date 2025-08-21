@@ -636,6 +636,12 @@ def update_parameters():
             
         if 'xgi_integration' in data:
             current_params['xgi_integration'].update(data['xgi_integration'])
+            
+        # v2.0 Formula Optimization Parameters
+        if 'formula_optimization_v2' in data:
+            if 'formula_optimization_v2' not in current_params:
+                current_params['formula_optimization_v2'] = {}
+            current_params['formula_optimization_v2'].update(data['formula_optimization_v2'])
         
         # Save updated parameters
         if not save_system_parameters(current_params):

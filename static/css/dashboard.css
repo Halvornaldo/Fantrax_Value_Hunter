@@ -1424,3 +1424,221 @@ body.v1-enabled .true-value-enhanced {
     color: #dc3545; 
     font-weight: bold; 
 }
+
+/* =================================================================
+   v2.0 Enhanced Parameter Controls Styling
+   ================================================================= */
+
+/* v2.0 Enhanced Section Base */
+.v2-enhanced-section {
+    border: 2px solid #28a745;
+    border-radius: 8px;
+    background: rgba(40, 167, 69, 0.05);
+    margin-bottom: 20px;
+    transition: all 0.3s ease;
+}
+
+.v2-enhanced-section h3 {
+    background: linear-gradient(135deg, #28a745, #20c997);
+    color: white;
+    margin: 0;
+    padding: 12px 15px;
+    border-radius: 6px 6px 0 0;
+    display: flex;
+    align-items: center;
+    gap: 10px;
+}
+
+.v2-badge {
+    background: rgba(255, 255, 255, 0.2);
+    padding: 2px 8px;
+    border-radius: 12px;
+    font-size: 0.75em;
+    font-weight: bold;
+}
+
+/* v2.0 Help Text Styling */
+.v2-help {
+    background: rgba(40, 167, 69, 0.1);
+    border-left: 3px solid #28a745;
+    padding: 10px;
+    margin-top: 10px;
+    border-radius: 0 4px 4px 0;
+    font-size: 0.9em;
+}
+
+/* EWMA Form Controls */
+.v2-form-controls {
+    padding: 15px;
+}
+
+.info-display {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    background: rgba(40, 167, 69, 0.1);
+    padding: 8px 12px;
+    border-radius: 4px;
+    margin: 8px 0;
+    border: 1px solid rgba(40, 167, 69, 0.2);
+}
+
+.info-label {
+    font-weight: bold;
+    color: #28a745;
+}
+
+/* Dynamic Blending Controls */
+.v2-blending-controls {
+    padding: 15px;
+}
+
+.blending-visualization {
+    margin: 15px 0;
+    background: rgba(255, 255, 255, 0.5);
+    border-radius: 8px;
+    padding: 15px;
+    border: 1px solid rgba(40, 167, 69, 0.3);
+}
+
+.weight-bar {
+    display: flex;
+    height: 30px;
+    border-radius: 15px;
+    overflow: hidden;
+    border: 2px solid #28a745;
+    margin-bottom: 10px;
+}
+
+.historical-weight {
+    background: linear-gradient(135deg, #6c757d, #495057);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    color: white;
+    font-size: 0.85em;
+    font-weight: bold;
+    transition: width 0.3s ease;
+}
+
+.current-weight {
+    background: linear-gradient(135deg, #28a745, #20c997);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    color: white;
+    font-size: 0.85em;
+    font-weight: bold;
+    transition: width 0.3s ease;
+}
+
+.weight-formula {
+    font-family: 'Courier New', monospace;
+    font-size: 0.8em;
+    color: #6c757d;
+    text-align: center;
+    background: rgba(108, 117, 125, 0.1);
+    padding: 5px;
+    border-radius: 4px;
+}
+
+/* Normalized xGI Controls */
+.v2-xgi-controls {
+    padding: 15px;
+}
+
+.position-toggles {
+    margin-bottom: 15px;
+}
+
+.position-toggles h4 {
+    color: #28a745;
+    margin-bottom: 10px;
+    font-size: 1em;
+}
+
+.position-toggles .toggle-group {
+    margin: 8px 0;
+    display: flex;
+    align-items: center;
+    gap: 8px;
+}
+
+.position-toggles input[type="checkbox"] {
+    transform: scale(1.2);
+    accent-color: #28a745;
+}
+
+.position-toggles label {
+    font-weight: 500;
+    cursor: pointer;
+}
+
+/* Multiplier Cap Controls */
+.v2-cap-controls {
+    padding: 15px;
+}
+
+.cap-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+    gap: 15px;
+    margin-bottom: 15px;
+}
+
+.cap-item {
+    background: rgba(255, 255, 255, 0.5);
+    padding: 12px;
+    border-radius: 6px;
+    border: 1px solid rgba(40, 167, 69, 0.3);
+}
+
+.cap-item label {
+    display: block;
+    font-weight: bold;
+    color: #28a745;
+    margin-bottom: 8px;
+}
+
+.cap-item input[type="range"] {
+    width: 100%;
+    margin-bottom: 5px;
+}
+
+.cap-item span {
+    display: block;
+    text-align: center;
+    font-weight: bold;
+    color: #495057;
+}
+
+.cap-info {
+    margin-top: 15px;
+}
+
+.caps-applied {
+    background: rgba(255, 193, 7, 0.1);
+    border: 1px solid #ffc107;
+    padding: 8px 12px;
+    border-radius: 4px;
+    color: #856404;
+    font-weight: bold;
+}
+
+/* Version-specific visibility */
+body.v1-enabled .v2-enhanced-section {
+    display: none !important;
+}
+
+body.v2-enabled .v2-enhanced-section {
+    display: block !important;
+}
+
+/* Hide v1.0 legacy controls when v2.0 is active */
+body.v2-enabled .v1-legacy-section {
+    display: none !important;
+}
+
+body.v1-enabled .v1-legacy-section {
+    display: block !important;
+}

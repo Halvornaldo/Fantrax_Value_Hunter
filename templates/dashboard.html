@@ -211,7 +211,7 @@
                 </div>
 
                 <!-- xGI Integration -->
-                <div class="parameter-section">
+                <div class="parameter-section v1-legacy-section">
                     <h3>
                         <input type="checkbox" id="xgiEnabled">
                         <label for="xgiEnabled">xGI Integration (Understat)</label>
@@ -241,7 +241,7 @@
                 </div>
 
                 <!-- Blender Display Configuration -->
-                <div class="parameter-section">
+                <div class="parameter-section v1-legacy-section">
                     <h3>
                         <input type="checkbox" id="gamesDisplayEnabled" checked>
                         <label for="gamesDisplayEnabled">Blender Display</label>
@@ -261,6 +261,149 @@
                             <input type="checkbox" id="showHistorical" checked>
                             <label for="showHistorical">Show Historical Data (24-25)</label>
                         </div>
+                    </div>
+                </div>
+
+                <!-- v2.0 Enhanced Parameter Controls - Only visible when v2.0 is enabled -->
+                
+                <!-- EWMA Form Calculation Controls (v2.0) -->
+                <div class="parameter-section v2-enhanced-section" style="display: none;">
+                    <h3>
+                        <span class="version-badge v2-badge">v2.0</span>
+                        <label>EWMA Form Calculation</label>
+                    </h3>
+                    <div class="v2-form-controls">
+                        <div class="slider-group">
+                            <label for="ewma-alpha-slider">EWMA Alpha (α):</label>
+                            <input type="range" id="ewma-alpha-slider" min="0.1" max="1.0" step="0.01" value="0.87">
+                            <span id="ewma-alpha-display">0.87</span>
+                        </div>
+                        <div class="info-display">
+                            <span class="info-label">Half-life:</span>
+                            <span id="ewma-half-life">~5.0 games</span>
+                        </div>
+                        <div class="info-display">
+                            <span class="info-label">Recent Game Weight:</span>
+                            <span id="ewma-recent-weight">87%</span>
+                        </div>
+                        <p class="help-text v2-help">
+                            🔬 <strong>v2.0 Enhancement:</strong> Exponential Weighted Moving Average gives exponentially decreasing weights to older games. Higher α = more weight on recent games.
+                        </p>
+                    </div>
+                </div>
+
+                <!-- Dynamic Blending Controls (v2.0) -->
+                <div class="parameter-section v2-enhanced-section" style="display: none;">
+                    <h3>
+                        <span class="version-badge v2-badge">v2.0</span>
+                        <label>Dynamic Blending</label>
+                    </h3>
+                    <div class="v2-blending-controls">
+                        <div class="control-group">
+                            <label for="adaptation-gameweek">Adaptation Gameweek (K):</label>
+                            <input type="number" id="adaptation-gameweek" min="10" max="20" value="15">
+                            <span class="help-text">Gameweek when current season reaches 100% weight</span>
+                        </div>
+                        <div class="blending-visualization">
+                            <div class="blend-info">
+                                <div class="current-weights">
+                                    <div class="weight-bar">
+                                        <div class="historical-weight" id="historical-weight-bar" style="width: 70%;">
+                                            <span>Historical: 70%</span>
+                                        </div>
+                                        <div class="current-weight" id="current-weight-bar" style="width: 30%;">
+                                            <span>Current: 30%</span>
+                                        </div>
+                                    </div>
+                                    <div class="weight-formula">
+                                        Current Weight = min(1, (N-1)/(K-1)) where N=GW, K=adaptation
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+                        <p class="help-text v2-help">
+                            🔬 <strong>v2.0 Enhancement:</strong> Smooth transition from historical to current season data. Weight automatically adjusts based on gameweek progression.
+                        </p>
+                    </div>
+                </div>
+
+                <!-- Normalized xGI Controls (v2.0) -->
+                <div class="parameter-section v2-enhanced-section" style="display: none;">
+                    <h3>
+                        <span class="version-badge v2-badge">v2.0</span>
+                        <label>Normalized xGI</label>
+                    </h3>
+                    <div class="v2-xgi-controls">
+                        <div class="position-toggles">
+                            <h4>Position-Specific Adjustments</h4>
+                            <div class="toggle-group">
+                                <input type="checkbox" id="xgi-defenders" checked>
+                                <label for="xgi-defenders">Defenders: Baseline Focus</label>
+                            </div>
+                            <div class="toggle-group">
+                                <input type="checkbox" id="xgi-midfielders" checked>
+                                <label for="xgi-midfielders">Midfielders: xGI Enhancement</label>
+                            </div>
+                            <div class="toggle-group">
+                                <input type="checkbox" id="xgi-forwards" checked>
+                                <label for="xgi-forwards">Forwards: Maximum xGI Impact</label>
+                            </div>
+                        </div>
+                        <div class="slider-group">
+                            <label for="xgi-normalization-strength">Normalization Strength:</label>
+                            <input type="range" id="xgi-normalization-strength" min="0.5" max="2.0" step="0.1" value="1.0">
+                            <span id="xgi-normalization-display">1.0x</span>
+                        </div>
+                        <div class="control-group">
+                            <button id="syncUnderstat" class="btn-sync">Sync Understat Data</button>
+                            <span id="syncStatus"></span>
+                        </div>
+                        <div class="stats-display">
+                            <span id="xgiStats">Loading stats...</span>
+                        </div>
+                        <p class="help-text v2-help">
+                            🔬 <strong>v2.0 Enhancement:</strong> Ratio-based xGI calculation normalized around 1.0 with position-specific adjustments for defensive vs attacking roles.
+                        </p>
+                    </div>
+                </div>
+
+                <!-- Multiplier Cap Controls (v2.0) -->
+                <div class="parameter-section v2-enhanced-section" style="display: none;">
+                    <h3>
+                        <span class="version-badge v2-badge">v2.0</span>
+                        <label>Multiplier Caps</label>
+                    </h3>
+                    <div class="v2-cap-controls">
+                        <div class="cap-grid">
+                            <div class="cap-item">
+                                <label for="form-cap-slider">Form Cap:</label>
+                                <input type="range" id="form-cap-slider" min="1.0" max="3.0" step="0.1" value="2.0">
+                                <span id="form-cap-display">2.0x</span>
+                            </div>
+                            <div class="cap-item">
+                                <label for="fixture-cap-slider">Fixture Cap:</label>
+                                <input type="range" id="fixture-cap-slider" min="1.0" max="2.5" step="0.1" value="1.8">
+                                <span id="fixture-cap-display">1.8x</span>
+                            </div>
+                            <div class="cap-item">
+                                <label for="xgi-cap-slider">xGI Cap:</label>
+                                <input type="range" id="xgi-cap-slider" min="1.0" max="3.0" step="0.1" value="2.5">
+                                <span id="xgi-cap-display">2.5x</span>
+                            </div>
+                            <div class="cap-item">
+                                <label for="global-cap-slider">Global Cap:</label>
+                                <input type="range" id="global-cap-slider" min="2.0" max="5.0" step="0.1" value="3.0">
+                                <span id="global-cap-display">3.0x</span>
+                            </div>
+                        </div>
+                        <div class="cap-info">
+                            <div class="caps-applied" id="caps-applied-indicator" style="display: none;">
+                                ⚠️ <span id="caps-applied-count">0</span> players affected by caps
+                            </div>
+                        </div>
+                        <p class="help-text v2-help">
+                            🔬 <strong>v2.0 Enhancement:</strong> Prevents extreme outlier multipliers that could skew results. Caps applied individually then globally to maintain balanced predictions.
+                        </p>
                     </div>
                 </div>
 
