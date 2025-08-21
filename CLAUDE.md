@@ -13,11 +13,15 @@
 - **Enhanced Table Features**: Numeric Games sorting, pagination (50/100/200/All), improved filtering
 - **Calculation Research Framework**: 6 specialized LLM research prompts for formula optimization
 
-### Formula Optimization Initiative (2025-08-21)
-- **Research Analysis**: Deep mathematical research completed identifying critical formula improvements
-- **Sprint Planning**: 5-sprint roadmap created for implementing research-based optimizations
-- **Gemini AI Integration**: Strategic plan for AI-powered insights and analytics
-- **Migration Framework**: Comprehensive technical guide for v1.0 → v2.0 transition
+### Formula Optimization v2.0 Implementation (2025-08-21)
+- **Sprint 1 COMPLETED**: Foundation & Critical Fixes implemented and tested
+- **Core Formula Fixed**: Separated True Value (point prediction) from ROI (value/price ratio)
+- **Exponential Fixture Calculation**: Implemented base^(-difficulty) instead of linear multipliers
+- **Multiplier Cap System**: Prevents extreme outliers (form: 2.0, fixture: 1.8, xGI: 2.5, global: 3.0)
+- **Dual Engine System**: v1.0 and v2.0 engines running in parallel for safe A/B testing
+- **Database Migration**: Added v2.0 schema with new columns (true_value, roi, exponential_form_score)
+- **API Integration**: New /api/calculate-values-v2 endpoints functional
+- **Ready for Sprint 2**: EWMA form calculation, dynamic blending, normalized xGI
 
 ## Core Architecture
 

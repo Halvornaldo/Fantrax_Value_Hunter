@@ -22,6 +22,10 @@ from name_matching import UnifiedNameMatcher
 sys.path.append('C:/Users/halvo/.claude/Fantrax_Expected_Stats')
 from integration_package import IntegrationPipeline, UnderstatIntegrator, ValueHunterExtension
 
+# Add v2.0 calculation engine
+sys.path.append(os.path.join(os.path.dirname(__file__), '..'))
+from calculation_engine_v2 import FormulaEngineV2, LegacyFormulaEngine
+
 app = Flask(__name__, 
             template_folder='../templates',
             static_folder='../static')
@@ -2873,6 +2877,223 @@ def lookup_player_position(cursor, player_name, team):
     except Exception as e:
         print(f"Database lookup error for {player_name}: {e}")
         return None
+
+
+# =============================================================================
+# FORMULA OPTIMIZATION v2.0 ENDPOINTS
+# =============================================================================
+
+@app.route('/api/calculate-values-v2', methods=['POST'])
+def calculate_values_v2():
+    """
+    Calculate player values using Formula Optimization v2.0
+    Supports both v2.0 and legacy v1.0 for comparison
+    """
+    try:
+        data = request.get_json() or {}
+        formula_version = data.get('formula_version', 'v2.0')
+        gameweek = data.get('gameweek', 1)
+        compare_versions = data.get('compare_versions', False)
+        
+        # Load current parameters
+        parameters = load_system_parameters()
+        
+        # Choose engine
+        if formula_version == 'v2.0':
+            engine = FormulaEngineV2(DB_CONFIG, parameters)
+        else:
+            engine = LegacyFormulaEngine(DB_CONFIG, parameters)
+        
+        # Get player data from database
+        conn = get_db_connection()
+        cursor = conn.cursor(cursor_factory=psycopg2.extras.RealDictCursor)
+        
+        # Enhanced query to get all necessary data
+        cursor.execute("""
+            SELECT 
+                p.id as player_id,
+                p.name,
+                p.team,
+                p.position,
+                p.xgi90,
+                pm.price,
+                pm.ppg,
+                pm.form_multiplier,
+                pm.fixture_multiplier,
+                pm.starter_multiplier,
+                pm.xgi_multiplier,
+                tf.difficulty_score as fixture_difficulty
+            FROM players p
+            JOIN player_metrics pm ON p.id = pm.player_id
+            LEFT JOIN team_fixtures tf ON p.team = tf.team_code AND tf.gameweek = %s
+            WHERE pm.gameweek = %s
+            ORDER BY pm.true_value DESC NULLS LAST
+            LIMIT 100
+        """, [gameweek, gameweek])
+        
+        players = cursor.fetchall()
+        conn.close()
+        
+        # Calculate values for all players
+        results = []
+        for player in players:
+            calculation = engine.calculate_player_value(dict(player))
+            results.append(calculation)
+        
+        # Optional: Compare versions
+        comparison = None
+        if compare_versions and formula_version == 'v2.0':
+            legacy_engine = LegacyFormulaEngine(DB_CONFIG, parameters)
+            comparison = []
+            
+            for player in players[:10]:  # Limited comparison for performance
+                v2_calc = engine.calculate_player_value(dict(player))
+                v1_calc = legacy_engine.calculate_player_value(dict(player))
+                
+                comparison.append({
+                    'player_id': player['player_id'],
+                    'name': player['name'],
+                    'v1_value': v1_calc['value_score'],
+                    'v2_true_value': v2_calc['true_value'],
+                    'v2_roi': v2_calc['roi'],
+                    'difference_points': v2_calc['true_value'] - (v1_calc['value_score'] * player['price']),
+                    'difference_roi': v2_calc['roi'] - v1_calc['value_score']
+                })
+        
+        # Store calculations in database
+        if results:
+            store_v2_calculations(results, formula_version)
+        
+        return jsonify({
+            'success': True,
+            'formula_version': formula_version,
+            'player_count': len(results),
+            'gameweek': gameweek,
+            'results': results[:50],  # Limit response size
+            'comparison': comparison,
+            'calculation_time': time.time(),
+            'summary': {
+                'avg_true_value': sum(r['true_value'] for r in results) / len(results) if results else 0,
+                'avg_roi': sum(r['roi'] for r in results) / len(results) if results else 0,
+                'top_true_value': max((r['true_value'] for r in results), default=0),
+                'top_roi': max((r['roi'] for r in results), default=0)
+            }
+        })
+        
+    except Exception as e:
+        return jsonify({
+            'success': False,
+            'error': str(e),
+            'formula_version': formula_version if 'formula_version' in locals() else 'unknown'
+        }), 500
+
+
+@app.route('/api/toggle-formula-version', methods=['POST'])
+def toggle_formula_version():
+    """Toggle between v1.0 and v2.0 formulas"""
+    try:
+        data = request.get_json() or {}
+        new_version = data.get('version', 'v2.0')
+        
+        # Update parameters
+        parameters = load_system_parameters()
+        
+        # Update v2.0 config
+        if 'formula_optimization_v2' not in parameters:
+            parameters['formula_optimization_v2'] = {}
+        
+        parameters['formula_optimization_v2']['enabled'] = (new_version == 'v2.0')
+        parameters['metadata']['version'] = new_version
+        parameters['metadata']['last_updated'] = datetime.now().strftime('%Y-%m-%d')
+        
+        # Save updated parameters
+        config_path = os.path.join(os.path.dirname(__file__), '..', 'config', 'system_parameters.json')
+        with open(config_path, 'w', encoding='utf-8') as f:
+            json.dump(parameters, f, indent=2, ensure_ascii=False)
+        
+        return jsonify({
+            'success': True,
+            'formula_version': new_version,
+            'message': f'Switched to formula {new_version}',
+            'v2_enabled': parameters['formula_optimization_v2']['enabled']
+        })
+        
+    except Exception as e:
+        return jsonify({
+            'success': False,
+            'error': str(e)
+        }), 500
+
+
+@app.route('/api/get-formula-version', methods=['GET'])
+def get_formula_version():
+    """Get current formula version"""
+    try:
+        parameters = load_system_parameters()
+        v2_enabled = parameters.get('formula_optimization_v2', {}).get('enabled', False)
+        current_version = 'v2.0' if v2_enabled else 'v1.0'
+        
+        return jsonify({
+            'success': True,
+            'version': current_version,
+            'v2_config': parameters.get('formula_optimization_v2', {}),
+            'metadata': parameters.get('metadata', {})
+        })
+        
+    except Exception as e:
+        return jsonify({
+            'success': False,
+            'error': str(e)
+        }), 500
+
+
+def store_v2_calculations(calculations: List[Dict], version: str):
+    """Store v2.0 calculation results in database"""
+    try:
+        conn = get_db_connection()
+        cursor = conn.cursor()
+        
+        for calc in calculations:
+            # Update player_metrics with v2.0 values
+            cursor.execute("""
+                UPDATE player_metrics 
+                SET 
+                    true_value = %s,
+                    value_score = %s
+                WHERE player_id = %s AND gameweek = 1
+            """, [
+                calc['true_value'],
+                calc['roi'],  # In v2.0, value_score becomes ROI
+                calc['player_id']
+            ])
+            
+            # Store in players table (new v2.0 columns)
+            cursor.execute("""
+                UPDATE players 
+                SET 
+                    true_value = %s,
+                    roi = %s,
+                    formula_version = %s,
+                    blended_ppg = %s
+                WHERE id = %s
+            """, [
+                calc['true_value'],
+                calc['roi'],
+                version,
+                calc.get('base_ppg'),
+                calc['player_id']
+            ])
+        
+        conn.commit()
+        conn.close()
+        print(f"✅ Stored {len(calculations)} calculations for {version}")
+        
+    except Exception as e:
+        print(f"❌ Error storing v2.0 calculations: {e}")
+        if conn:
+            conn.rollback()
+            conn.close()
+
 
 if __name__ == '__main__':
     print("Starting Fantrax Value Hunter Flask Backend...")
