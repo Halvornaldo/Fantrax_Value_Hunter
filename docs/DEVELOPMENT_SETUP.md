@@ -38,6 +38,13 @@ pip install python-dateutil  # Date parsing
 - **Host**: localhost
 - **Port**: 5433 (custom port, not default 5432)
 - **Database**: fantrax_value_hunter
+- **Admin User**: postgres / Password (with capital P)
+- **App User**: fantrax_user / fantrax_password
+
+**v2.0 Migration Status**: ✅ Complete (2025-08-21)
+- All v2.0 schema changes applied
+- Database permissions fixed for fantrax_user
+- Ready for v2.0 testing and development
 - **Username**: fantrax_user
 - **Password**: fantrax_password
 
@@ -135,6 +142,38 @@ python run_migration.py               # Run database migrations
 - Games column sorts numerically
 - Manual override controls work in real-time
 - Import pages accessible at `/form-upload` and `/odds-upload`
+
+**Formula Optimization v2.0 Testing** (added 2025-08-21):
+```bash
+# Test v2.0 calculation engine
+python test_v2_api.py
+
+# Expected output:
+# - SUCCESS: v2.0 API integration test PASSED!
+# - True Values: 0.05-0.10 range
+# - ROI values: 0.010-0.021
+# - Exponential fixture multipliers: 0.958-1.029
+```
+
+**v2.0 API Testing**:
+```bash
+# Test v2.0 endpoints via curl
+curl -X POST http://localhost:5000/api/calculate-values-v2 \
+  -H "Content-Type: application/json" \
+  -d '{"formula_version": "v2.0", "gameweek": 1}'
+
+# Get formula version
+curl http://localhost:5000/api/get-formula-version
+```
+
+**v2.0 Feature Status**:
+- ✅ Core formula fixed (True Value separated from price)
+- ✅ Exponential fixture calculation (base^(-difficulty))
+- ✅ Multiplier caps (form: 2.0, fixture: 1.8, global: 3.0)
+- ✅ Data type handling (Decimal/float compatibility)
+- ✅ Database schema migration complete
+- 🔄 Dashboard integration pending (Sprint 4)
+- 🔄 EWMA form calculation pending (Sprint 2)
 
 ### Code Quality
 

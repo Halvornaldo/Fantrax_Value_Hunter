@@ -3,6 +3,20 @@
 ## Overview
 The Fantrax Value Hunter dashboard provides configurable analytics for Premier League fantasy football players, combining multiple data sources to calculate optimized "True Value" ratings.
 
+## Formula Optimization v2.0 Status (2025-08-21)
+
+**Current Status**: Sprint 1 Complete - Foundation implemented but not yet live in dashboard
+- ✅ **Core Formula Fixed**: True Value now separate from price (calculation engine only)
+- ✅ **Exponential Fixture Calculation**: Implemented base^(-difficulty) transformation
+- ✅ **Multiplier Cap System**: Prevents extreme outliers in calculations
+- 🔄 **Dashboard Integration**: Will be added in Sprint 4
+- 🔄 **Advanced Features**: EWMA form, dynamic blending pending Sprint 2
+
+**Current Dashboard**: Still shows v1.0 calculations (mixed price/prediction formula)
+**Testing**: v2.0 calculations available via API endpoints (`/api/calculate-values-v2`)
+
+> **Note**: The dashboard features described below reflect the current v1.0 system. v2.0 improvements will be integrated into the dashboard in future sprints while maintaining backward compatibility.
+
 ## Parameter Controls Panel
 
 All features can be configured through the Parameter Controls panel on the left side of the dashboard.

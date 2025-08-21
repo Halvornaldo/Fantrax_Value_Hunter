@@ -82,6 +82,73 @@
 **Body**: JSON configuration object  
 **Returns**: Success/error response
 
+### Formula Optimization v2.0 API
+
+#### `POST /api/calculate-values-v2`
+**Description**: Calculate player values using Formula Optimization v2.0  
+**Body**: 
+```json
+{
+  "formula_version": "v2.0|v1.0",
+  "gameweek": "number",
+  "player_ids": ["array", "optional"]
+}
+```
+**Returns**: 
+```json
+{
+  "success": true,
+  "version": "v2.0",
+  "players_calculated": 647,
+  "sample_results": [
+    {
+      "player_id": "string",
+      "true_value": 8.68,
+      "roi": 1.021,
+      "value_score": 1.021,
+      "multipliers": {
+        "form": 1.000,
+        "fixture": 1.006,
+        "starter": 1.000,
+        "xgi": 1.000
+      },
+      "metadata": {
+        "formula_version": "2.0",
+        "caps_applied": {...}
+      }
+    }
+  ]
+}
+```
+
+#### `POST /api/toggle-formula-version`
+**Description**: Toggle between v1.0 and v2.0 formulas (admin only)  
+**Body**: 
+```json
+{
+  "version": "v2.0|v1.0"
+}
+```
+**Returns**: 
+```json
+{
+  "success": true,
+  "new_version": "v2.0",
+  "message": "Formula switched to v2.0"
+}
+```
+
+#### `GET /api/get-formula-version`
+**Description**: Get current formula version  
+**Returns**: 
+```json
+{
+  "current_version": "v2.0",
+  "v2_enabled": true,
+  "legacy_support": true
+}
+```
+
 ### Data Import API
 
 #### `POST /api/import-form-data`
