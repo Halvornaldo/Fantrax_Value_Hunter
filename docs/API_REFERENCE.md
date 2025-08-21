@@ -316,3 +316,9 @@
   }
 }
 ```
+
+---
+
+**Maintenance Note**: This document must be updated after each Formula Optimization sprint with new endpoints, response formats, and API changes. See `docs/DOCUMENTATION_MAINTENANCE.md` for complete update requirements.
+
+*Last updated: 2025-08-21 - Post Formula Optimization v2.0 Sprint 1 completion*

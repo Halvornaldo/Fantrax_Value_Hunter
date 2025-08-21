@@ -324,4 +324,6 @@ All parameter changes are tracked and require "Apply Changes" to take effect.
 
 ---
 
-*This guide covers verified functionality as of 2025-08-20. System performance metrics based on production usage with 633 Premier League players.*
+**Maintenance Note**: This document must be updated after each Formula Optimization sprint with new dashboard features, UI changes, and parameter controls. See `docs/DOCUMENTATION_MAINTENANCE.md` for complete update requirements.
+
+*Last updated: 2025-08-21 - Post Formula Optimization v2.0 Sprint 1 completion*

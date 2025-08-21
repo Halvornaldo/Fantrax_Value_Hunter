@@ -313,4 +313,47 @@ FLASK_DEBUG=True
 DATABASE_URL=postgresql://fantrax_user:fantrax_password@localhost:5433/fantrax_value_hunter
 ```
 
-*Last updated: 2025-08-20 - Based on production system running 633 Premier League players*
+## Documentation Maintenance
+
+### Post-Sprint Documentation Updates
+
+After completing each Formula Optimization sprint, the following documents MUST be updated:
+
+**Core Documentation (Always Update):**
+- `docs/DATABASE_SCHEMA.md` - Add new columns, tables, migrations
+- `docs/API_REFERENCE.md` - Document new endpoints, response formats  
+- `docs/DEVELOPMENT_SETUP.md` - Update testing procedures, feature status
+- `docs/FEATURE_GUIDE.md` - Add new dashboard features, update status
+
+**Additional Documentation (Update As Relevant):**
+- `docs/FORMULA_OPTIMIZATION_SPRINTS.md` - Mark sprints complete, update status
+- `docs/FORMULA_REFERENCE.md` - Update calculation formulas and examples
+- `docs/FORMULA_MIGRATION_GUIDE.md` - Add new migration steps
+- `CLAUDE.md` - Update system status and recent features
+- `README.md` - Update feature highlights if user-facing changes
+
+**Sprint-Specific Updates:**
+- **Sprint 2 (EWMA/Dynamic Blending)**: Update FORMULA_REFERENCE.md with new calculations
+- **Sprint 3 (Validation)**: Update TESTING_METHODOLOGY.md with new validation procedures  
+- **Sprint 4 (Dashboard)**: Major updates to FEATURE_GUIDE.md and API_REFERENCE.md
+- **Sprint 5 (Future Features)**: Update FUTURE_IDEAS.md with implemented features
+
+**Maintenance Checklist:**
+```bash
+# After each sprint completion:
+1. Update all "Core Documentation" files above
+2. Review and update relevant "Additional Documentation" 
+3. Run documentation consistency check
+4. Commit with semantic message: "docs: Update documentation for Sprint X completion"
+5. Tag sprint completion: git tag "vX.X-sprintX-complete"
+```
+
+**Documentation Standards:**
+- Always include implementation dates (YYYY-MM-DD format)
+- Mark features as ✅ Complete, 🔄 Pending, or ⏸️ Deferred  
+- Use consistent status indicators across all docs
+- Update "Last updated" dates at bottom of files
+
+---
+
+*Last updated: 2025-08-21 - Post Formula Optimization v2.0 Sprint 1 completion*

@@ -270,3 +270,9 @@ All tables include appropriate indexes for:
 - Common query patterns (gameweek, team, position)
 - Time-based queries (created_at, updated_at)
 - Games tracking queries
+
+---
+
+**Maintenance Note**: This document must be updated after each Formula Optimization sprint with new columns, tables, and migration status. See `docs/DOCUMENTATION_MAINTENANCE.md` for complete update requirements.
+
+*Last updated: 2025-08-21 - Post Formula Optimization v2.0 Sprint 1 completion*
