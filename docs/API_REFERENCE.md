@@ -85,7 +85,9 @@
 ### Formula Optimization v2.0 API
 
 #### `POST /api/calculate-values-v2`
-**Description**: Calculate player values using Formula Optimization v2.0  
+**Description**: Calculate player values using Formula Optimization v2.0 (Sprint 1 & 2 features)  
+**Sprint 2 Features**: EWMA form calculation, dynamic PPG blending, normalized xGI
+
 **Body**: 
 ```json
 {
@@ -94,27 +96,52 @@
   "player_ids": ["array", "optional"]
 }
 ```
+
 **Returns**: 
 ```json
 {
   "success": true,
   "version": "v2.0",
   "players_calculated": 647,
+  "sprint_features": {
+    "ewma_form": true,
+    "dynamic_blending": true,
+    "normalized_xgi": true,
+    "exponential_fixture": true
+  },
   "sample_results": [
     {
       "player_id": "string",
+      "name": "Erling Haaland",
       "true_value": 8.68,
       "roi": 1.021,
       "value_score": 1.021,
       "multipliers": {
-        "form": 1.000,
+        "form": 0.952,
         "fixture": 1.006,
         "starter": 1.000,
-        "xgi": 1.000
+        "xgi": 0.895
+      },
+      "sprint2_data": {
+        "blended_ppg": 8.45,
+        "current_season_weight": 0.125,
+        "exponential_form_score": 0.952,
+        "normalized_xgi_ratio": 0.895,
+        "baseline_xgi": 2.064
       },
       "metadata": {
-        "formula_version": "2.0",
-        "caps_applied": {...}
+        "formula_version": "v2.0",
+        "caps_applied": {
+          "form": false,
+          "fixture": false,
+          "xgi": false,
+          "global": false
+        },
+        "blending_info": {
+          "weight_current": 0.125,
+          "weight_historical": 0.875,
+          "adaptation_gameweek": 16
+        }
       }
     }
   ]
@@ -321,4 +348,4 @@
 
 **Maintenance Note**: This document must be updated after each Formula Optimization sprint with new endpoints, response formats, and API changes. See `docs/DOCUMENTATION_MAINTENANCE.md` for complete update requirements.
 
-*Last updated: 2025-08-21 - Post Formula Optimization v2.0 Sprint 1 completion*
+*Last updated: 2025-08-21 - Post Formula Optimization v2.0 Sprint 2 completion*

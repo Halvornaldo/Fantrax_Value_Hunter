@@ -15,13 +15,18 @@
 
 ### Formula Optimization v2.0 Implementation (2025-08-21)
 - **Sprint 1 COMPLETED**: Foundation & Critical Fixes implemented and tested
+- **Sprint 2 COMPLETED**: Advanced calculations implemented and tested
 - **Core Formula Fixed**: Separated True Value (point prediction) from ROI (value/price ratio)
 - **Exponential Fixture Calculation**: Implemented base^(-difficulty) instead of linear multipliers
+- **EWMA Form Calculation**: Exponential weighted moving average with configurable α=0.87
+- **Dynamic Blending**: Smooth transition between historical and current season data using w_current = min(1, (N-1)/(K-1))
+- **Normalized xGI**: Ratio-based calculation with position-specific adjustments
 - **Multiplier Cap System**: Prevents extreme outliers (form: 2.0, fixture: 1.8, xGI: 2.5, global: 3.0)
+- **Enhanced Metadata**: Blending information, feature flags, caps applied tracking
 - **Dual Engine System**: v1.0 and v2.0 engines running in parallel for safe A/B testing
 - **Database Migration**: Added v2.0 schema with new columns (true_value, roi, exponential_form_score)
-- **API Integration**: New /api/calculate-values-v2 endpoints functional
-- **Ready for Sprint 2**: EWMA form calculation, dynamic blending, normalized xGI
+- **API Integration**: New /api/calculate-values-v2 endpoints functional with Sprint 2 features
+- **Ready for Sprint 3**: Validation framework with backtesting and performance metrics
 
 ## Core Architecture
 

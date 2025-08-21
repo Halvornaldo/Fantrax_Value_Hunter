@@ -19,10 +19,10 @@ Primary player data table
   - `roi` (DECIMAL 8,3) - Return on investment (true_value/price)
   - `formula_version` (VARCHAR 10, DEFAULT 'v2.0') - Formula version used
   - `exponential_form_score` (DECIMAL 5,3) - EWMA form calculation
-  - `baseline_xgi` (DECIMAL 5,3) - Position-specific xGI baseline
-  - `blended_ppg` (DECIMAL 5,2) - Dynamic blend of historical/current PPG
-  - `current_season_weight` (DECIMAL 4,3) - Current season data weight
-- **Description**: Contains basic player information, xG statistics, and v2.0 formula enhancements
+  - `baseline_xgi` (DECIMAL 5,3) - **Sprint 2: Historical 2024/25 xGI baseline for normalization**
+  - `blended_ppg` (DECIMAL 5,2) - **Sprint 2: Dynamic blend of historical/current PPG**
+  - `current_season_weight` (DECIMAL 4,3) - **Sprint 2: Current season data weight for blending**
+- **Description**: Contains basic player information, xG statistics, and v2.0 Sprint 2 enhancements
 
 ### `player_metrics`
 Player performance metrics by gameweek
@@ -116,11 +116,11 @@ Raw betting odds data for CSV imports
 - `away_odds` (DECIMAL 6,2) - Away win odds
 - `imported_at` (TIMESTAMP, DEFAULT NOW()) - Import timestamp
 
-## v2.0 Formula Optimization Tables
+## v2.0 Formula Optimization Tables (Sprint 1 & 2)
 
 ### `player_predictions` 
-Validation tracking for formula accuracy (added 2025-08-21)
-- **Primary Key**: `(player_id, gameweek)`
+**Sprint 3 Ready**: Validation tracking for formula accuracy (added 2025-08-21)
+- **Primary Key**: `(player_id, gameweek, model_version)`
 - **Foreign Key**: `player_id` → `players.id`
 
 **Columns**:
@@ -128,26 +128,43 @@ Validation tracking for formula accuracy (added 2025-08-21)
 - `gameweek` (INTEGER) - Gameweek number
 - `predicted_value` (DECIMAL 8,2) - v2.0 true value prediction
 - `actual_points` (DECIMAL 5,2) - Actual points scored
-- `prediction_error` (DECIMAL 6,2) - Absolute prediction error
-- `formula_version` (VARCHAR 10) - Formula version ('v1.0', 'v2.0')
+- `model_version` (VARCHAR 50) - Model version identifier
+- `error_abs` (DECIMAL 8,2) GENERATED - Absolute prediction error |predicted - actual|
+- `error_signed` (DECIMAL 8,2) GENERATED - Signed prediction error (predicted - actual)
 - `created_at` (TIMESTAMP, DEFAULT NOW()) - Prediction timestamp
 
-### `formula_validation_results`
-Backtesting and validation metrics (added 2025-08-21)
+### `validation_results`
+**Sprint 3 Ready**: Backtesting and validation metrics (added 2025-08-21)
 - **Primary Key**: `id` (SERIAL)
 
 **Columns**:
 - `id` (SERIAL PRIMARY KEY)
-- `test_name` (VARCHAR 100) - Test identifier
-- `formula_version` (VARCHAR 10) - Version tested
-- `gameweek_range` (VARCHAR 20) - GW range tested
-- `sample_size` (INTEGER) - Number of predictions
-- `rmse` (DECIMAL 6,3) - Root Mean Square Error
-- `mae` (DECIMAL 6,3) - Mean Absolute Error
-- `spearman_correlation` (DECIMAL 5,3) - Rank correlation
-- `precision_at_20` (DECIMAL 5,3) - Top 20 precision
+- `model_version` (VARCHAR 50) - Model version tested
+- `season` (VARCHAR 10) - Season tested ('2025-26')
+- `rmse` (DECIMAL 5,3) - Root Mean Square Error
+- `mae` (DECIMAL 5,3) - Mean Absolute Error
+- `spearman_correlation` (DECIMAL 5,3) - Rank correlation coefficient
+- `spearman_p_value` (DECIMAL 6,4) - Statistical significance
+- `precision_at_20` (DECIMAL 5,3) - Top 20 prediction precision
+- `r_squared` (DECIMAL 5,3) - Coefficient of determination
+- `n_predictions` (INTEGER) - Number of predictions in test
 - `test_date` (TIMESTAMP, DEFAULT NOW()) - Test execution date
+- `parameters` (JSONB) - Model parameters used
 - `notes` (TEXT) - Additional test notes
+
+### `parameter_optimization`
+**Sprint 3 Ready**: Parameter tuning results (added 2025-08-21)
+- **Primary Key**: `id` (SERIAL)
+
+**Columns**:
+- `id` (SERIAL PRIMARY KEY)
+- `test_date` (TIMESTAMP, DEFAULT NOW()) - Test execution date
+- `parameters` (JSONB) - Parameter configuration tested
+- `rmse` (DECIMAL 5,3) - Resulting RMSE
+- `mae` (DECIMAL 5,3) - Resulting MAE
+- `spearman_correlation` (DECIMAL 5,3) - Resulting correlation
+- `fitness_score` (DECIMAL 6,3) - Combined fitness metric
+- `notes` (TEXT) - Optimization notes
 
 ## Name Mapping System
 

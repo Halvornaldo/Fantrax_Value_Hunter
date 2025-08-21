@@ -5,17 +5,21 @@ The Fantrax Value Hunter dashboard provides configurable analytics for Premier L
 
 ## Formula Optimization v2.0 Status (2025-08-21)
 
-**Current Status**: Sprint 1 Complete - Foundation implemented but not yet live in dashboard
-- ✅ **Core Formula Fixed**: True Value now separate from price (calculation engine only)
-- ✅ **Exponential Fixture Calculation**: Implemented base^(-difficulty) transformation
-- ✅ **Multiplier Cap System**: Prevents extreme outliers in calculations
-- 🔄 **Dashboard Integration**: Will be added in Sprint 4
-- 🔄 **Advanced Features**: EWMA form, dynamic blending pending Sprint 2
+**Current Status**: Sprint 1 & 2 Complete - Advanced calculations implemented
+- ✅ **Sprint 1**: Core formula fixed (True Value separate from price)
+- ✅ **Sprint 1**: Exponential fixture calculation (base^(-difficulty))
+- ✅ **Sprint 1**: Multiplier cap system (prevents extreme outliers)
+- ✅ **Sprint 2**: EWMA form calculation (α=0.87 exponential decay)
+- ✅ **Sprint 2**: Dynamic PPG blending (smooth historical-to-current transition)
+- ✅ **Sprint 2**: Normalized xGI (ratio-based with 2024/25 baselines)
+- ✅ **Sprint 2**: Position-specific adjustments (defenders, goalkeepers)
+- 🔄 **Sprint 3**: Validation framework (backtesting, RMSE/MAE metrics)
+- 🔄 **Sprint 4**: Dashboard integration (new parameter controls)
 
-**Current Dashboard**: Still shows v1.0 calculations (mixed price/prediction formula)
-**Testing**: v2.0 calculations available via API endpoints (`/api/calculate-values-v2`)
+**Current Dashboard**: Shows v1.0 calculations (for user familiarity)
+**v2.0 Engine**: Available via API (`/api/calculate-values-v2`) with all Sprint 2 features
 
-> **Note**: The dashboard features described below reflect the current v1.0 system. v2.0 improvements will be integrated into the dashboard in future sprints while maintaining backward compatibility.
+> **Note**: The dashboard features described below reflect the current v1.0 system. Sprint 2's advanced calculations (EWMA form, dynamic blending, normalized xGI) are ready but will be integrated in Sprint 4 for seamless user experience.
 
 ## Parameter Controls Panel
 
@@ -25,26 +29,31 @@ All features can be configured through the Parameter Controls panel on the left 
 
 **Purpose**: Adjusts player values based on recent performance versus season average
 
-**Controls**:
+**Current Dashboard (v1.0)**:
 - **Enable/Disable**: Checkbox to toggle form calculation
 - **Lookback Period**: 3 or 5 games (dropdown)
 - **Minimum Games**: Minimum games required for form calculation (default: 3)
 - **Baseline Switchover Gameweek**: When to switch from historical to current data (default: 10)
 - **Form Strength**: How much form affects True Value (slider, default: 1.00x)
 
-**Technical Implementation**:
+**v1.0 Technical Implementation**:
 - **Before GW10**: Uses 2024-25 season baseline + form adjustment
 - **After GW10**: Uses current season average + form adjustment
 - **Weighted Calculation**: Recent games weighted 0.5, 0.3, 0.2 for last 3 games
 - **Constraints**: Multipliers capped between 0.5x and 1.5x
-- **Minimum Threshold**: Requires 3+ games for calculation, otherwise returns 1.0x
+
+**Sprint 2 Enhancement (API Only)**:
+- **EWMA Calculation**: Exponential Weighted Moving Average with α=0.87
+- **Exponential Decay**: Recent games weighted exponentially higher (α^0, α^1, α^2...)
+- **Dynamic Baseline**: Uses blended PPG instead of fixed baseline
+- **5-Game Half-Life**: α=0.87 provides 5-game half-life for form decay
+- **Enhanced Caps**: [0.5, 2.0] range for more responsive form calculation
 
 **How It Works**:
-- Calculates weighted average of recent games vs season performance
+- v1.0: Fixed weighted average vs historical/current baseline
+- v2.0: Sophisticated exponential decay with smooth baseline transition
 - Form data stored in `player_form` table with weekly Fantrax CSV uploads
-- Earlier in season: Uses 2024-25 historical data as baseline
-- Later in season: Uses current season form data
-- Higher form strength = bigger impact on True Value
+- v2.0 available via `/api/calculate-values-v2` endpoint
 
 ### Odds-Based Fixture Difficulty
 
@@ -97,7 +106,7 @@ All features can be configured through the Parameter Controls panel on the left 
 
 **Purpose**: Incorporates Expected Goals Involvement (xG + xA) data from Understat
 
-**Controls**:
+**Current Dashboard (v1.0)**:
 - **Enable/Disable**: Checkbox to toggle xGI integration
 - **Multiplier Mode**: How xGI affects True Value
   - Direct: xGI90 × strength
@@ -106,8 +115,21 @@ All features can be configured through the Parameter Controls panel on the left 
 - **Multiplier Strength**: xGI impact factor (default: 1.0)
 - **Sync Button**: Manually sync with Understat data
 
+**Sprint 2 Enhancement (API Only)**:
+- **Normalized xGI**: Ratio-based calculation (current_xGI90 / baseline_xGI90)
+- **Historical Baselines**: Uses 2024/25 season data for proper comparison
+- **Position-Specific Logic**:
+  - **Goalkeepers**: xGI disabled (not relevant)
+  - **Defenders**: 60% impact reduction (less xGI relevance)
+  - **Midfielders/Forwards**: Full impact (100%)
+- **Enhanced Range**: [0.4, 2.5] multiplier caps
+- **Data Integration**: 335 players with historical baselines from extract_baseline_xgi.py
+
 **How It Works**:
-- Higher xGI90 values = higher multipliers
+- v1.0: Direct/adjusted/capped modes using raw xGI90 values
+- v2.0: Normalized ratio comparing current vs historical performance
+- Baseline data extracted from Understat 2024/25 season
+- Position awareness ensures realistic impact per player role
 - Accounts for underlying performance metrics
 - Helps identify undervalued attacking players
 
@@ -115,23 +137,32 @@ All features can be configured through the Parameter Controls panel on the left 
 
 **Purpose**: Configures how games played data is displayed and when to switch between historical/current data
 
-**Controls**:
+**Current Dashboard (v1.0)**:
 - **Enable/Disable**: Always enabled (checkbox for future use)
 - **Baseline Switchover Gameweek**: When to start blending historical + current data (default: 10)
 - **Transition Period End**: When to switch from blended to current-only (default: 15)  
 - **Show Historical Data**: Whether to display 2024-25 season data (default: checked)
 
-**How It Works**:
+**v1.0 Implementation**:
 - **Gameweeks 1-10**: Shows "38 (24-25)" format (historical data only)
   - Baseline = Previous Season PPG
   - Form = Recent Games / Historical Baseline
 - **Gameweeks 11-15**: Shows "38+2" format (historical + current games)
-  - Progressive Blending: Weighted Average(Historical PPG, Current Season PPG)
-  - Weighting transitions from 100% historical to 0% historical linearly
-  - Example GW13: ~60% historical + 40% current season baseline
+  - Linear transition from historical to current baseline
 - **Gameweeks 16+**: Shows "5" format (current season only)
   - Baseline = Current Season PPG only
-  - Form = Recent Games / Current Season Baseline
+
+**Sprint 2 Enhancement (API Only)**:
+- **Dynamic PPG Blending**: Smooth mathematical transition using `w_current = min(1, (N-1)/(K-1))`
+- **Configurable Adaptation**: Full adaptation gameweek (default: 16) 
+- **Enhanced Formula**: `blended_ppg = w_current × current_ppg + w_historical × historical_ppg`
+- **Seamless Transition**: No hard cutoffs, gradual weight shift
+- **Metadata Tracking**: Includes blending weights and adaptation progress in API response
+
+**How It Works**:
+- v1.0: Hard switches between historical/current baselines at fixed gameweeks
+- v2.0: Mathematical blending with configurable parameters and smooth transitions
+- Display format remains consistent for user familiarity
 - Provides context for sample size reliability and calculation methodology
 
 ## Player Table

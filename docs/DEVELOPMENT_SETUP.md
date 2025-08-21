@@ -166,14 +166,80 @@ curl -X POST http://localhost:5000/api/calculate-values-v2 \
 curl http://localhost:5000/api/get-formula-version
 ```
 
-**v2.0 Feature Status**:
-- ✅ Core formula fixed (True Value separated from price)
-- ✅ Exponential fixture calculation (base^(-difficulty))
-- ✅ Multiplier caps (form: 2.0, fixture: 1.8, global: 3.0)
-- ✅ Data type handling (Decimal/float compatibility)
-- ✅ Database schema migration complete
-- 🔄 Dashboard integration pending (Sprint 4)
-- 🔄 EWMA form calculation pending (Sprint 2)
+**v2.0 Sprint 1 & 2 Feature Status** (Updated 2025-08-21):
+- ✅ **Sprint 1**: Core formula fixed (True Value separated from price)
+- ✅ **Sprint 1**: Exponential fixture calculation (base^(-difficulty))
+- ✅ **Sprint 1**: Multiplier caps (form: 2.0, fixture: 1.8, global: 3.0)
+- ✅ **Sprint 1**: Data type handling (Decimal/float compatibility)
+- ✅ **Sprint 1**: Database schema migration complete
+- ✅ **Sprint 2**: EWMA form calculation with α=0.87 exponential decay
+- ✅ **Sprint 2**: Dynamic PPG blending with smooth transition weights
+- ✅ **Sprint 2**: Normalized xGI with 2024/25 historical baselines
+- ✅ **Sprint 2**: Position-specific adjustments (defenders, goalkeepers)
+- 🔄 **Sprint 3**: Validation framework pending
+- 🔄 **Sprint 4**: Dashboard integration pending
+
+## Sprint 2 Testing Procedures (Added 2025-08-21)
+
+### Sprint 2 Validation Tests
+```bash
+# Test complete Sprint 2 implementation
+python test_complete_sprint2.py
+
+# Expected output:
+# OK: Dynamic PPG blending working (w_current = 0.125)
+# OK: EWMA form calculation working (α = 0.87)
+# OK: Normalized xGI calculation working (ratio-based)
+# OK: All Sprint 2 features validated successfully
+```
+
+### Sprint 2 Feature Testing
+```bash
+# Test individual Sprint 2 components
+python -c "
+from calculation_engine_v2 import CalculationEngineV2
+engine = CalculationEngineV2()
+
+# Test dynamic blending
+test_player = {'ppg': 8.5, 'games_played': 2, 'historical_ppg': 8.9}
+blended, weight = engine._calculate_blended_ppg(test_player)
+print(f'Dynamic blending: {blended:.2f} (weight: {weight:.3f})')
+
+# Test EWMA form
+test_player['recent_points'] = [9.0, 7.5, 8.2, 6.8, 8.5]
+form_mult = engine._calculate_exponential_form_multiplier(test_player)
+print(f'EWMA form multiplier: {form_mult:.3f}')
+
+# Test normalized xGI
+test_player.update({'xgi90': 1.85, 'baseline_xgi': 2.06, 'position': 'F'})
+xgi_mult = engine._calculate_normalized_xgi_multiplier(test_player)
+print(f'Normalized xGI multiplier: {xgi_mult:.3f}')
+"
+```
+
+### Sprint 2 Data Validation
+```bash
+# Verify Sprint 2 database enhancements
+python -c "
+import psycopg2
+conn = psycopg2.connect(host='localhost', port=5433, 
+    user='fantrax_user', password='fantrax_password', 
+    database='fantrax_value_hunter')
+cur = conn.cursor()
+
+# Check baseline_xgi data
+cur.execute('SELECT COUNT(*) FROM players WHERE baseline_xgi IS NOT NULL')
+baseline_count = cur.fetchone()[0]
+print(f'Players with historical baselines: {baseline_count}')
+
+# Check v2.0 columns
+cur.execute('SELECT COUNT(*) FROM players WHERE true_value IS NOT NULL')
+v2_count = cur.fetchone()[0] 
+print(f'Players with v2.0 data: {v2_count}')
+
+conn.close()
+"
+```
 
 ### Code Quality
 

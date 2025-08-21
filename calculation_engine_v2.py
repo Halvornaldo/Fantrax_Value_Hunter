@@ -54,8 +54,8 @@ class FormulaEngineV2:
         player_id = player_data.get('player_id', 'unknown')
         
         try:
-            # Step 1: Calculate base PPG (will be enhanced in Sprint 2 with dynamic blending)
-            base_ppg = self._calculate_base_ppg(player_data)
+            # Step 1: SPRINT 2 - Calculate dynamically blended PPG
+            base_ppg, current_weight = self._calculate_blended_ppg(player_data)
             
             # Step 2: Calculate all multipliers with v2.0 improvements
             form_mult = self._calculate_form_multiplier(player_data)
@@ -95,12 +95,17 @@ class FormulaEngineV2:
             # Step 7: Calculate legacy "value_score" for backward compatibility
             value_score = roi  # In v2.0, value_score becomes ROI
             
+            # SPRINT 2: Enhanced result structure with blending information
+            blended_ppg, current_weight = self._calculate_blended_ppg(player_data)
+            
             result = {
                 'player_id': player_id,
                 'true_value': round(true_value, 2),
                 'roi': round(roi, 3),
                 'value_score': round(value_score, 3),  # For compatibility
                 'base_ppg': round(base_ppg, 2),
+                'blended_ppg': round(blended_ppg, 2),  # SPRINT 2: Dynamic blending
+                'current_season_weight': round(current_weight, 3),  # SPRINT 2: Blending weight
                 'multipliers': {
                     'form': round(form_mult, 3),
                     'fixture': round(fixture_mult, 3),
@@ -109,13 +114,24 @@ class FormulaEngineV2:
                 },
                 'metadata': {
                     'formula_version': '2.0',
+                    'sprint_version': '2.0',  # SPRINT 2 features
                     'calculation_time': datetime.now().isoformat(),
                     'gameweek': self.current_gameweek,
+                    'blending_info': {  # SPRINT 2: Blending metadata
+                        'current_weight': round(current_weight, 3),
+                        'historical_weight': round(1.0 - current_weight, 3),
+                        'adaptation_gw': self.v2_config.get('dynamic_blending', {}).get('full_adaptation_gw', 16)
+                    },
                     'caps_applied': {
                         'form': form_mult != self._calculate_form_multiplier(player_data),
                         'fixture': fixture_mult != self._calculate_exponential_fixture_multiplier_raw(player_data),
                         'xgi': xgi_mult != self._calculate_xgi_multiplier_raw(player_data),
                         'global': true_value == max_allowed
+                    },
+                    'feature_flags': {  # SPRINT 2: Feature status
+                        'exponential_form': self.v2_config.get('exponential_form', {}).get('enabled', True),
+                        'dynamic_blending': self.v2_config.get('dynamic_blending', {}).get('enabled', True),
+                        'normalized_xgi': self.v2_config.get('normalized_xgi', {}).get('enabled', True)
                     }
                 }
             }
@@ -142,18 +158,63 @@ class FormulaEngineV2:
     
     def _calculate_form_multiplier(self, player_data: Dict[str, Any]) -> float:
         """
-        Calculate form multiplier
-        Sprint 1: Uses existing form logic
-        Sprint 2: Will implement exponential decay (EWMA)
+        SPRINT 2: Calculate form multiplier using EWMA with α=0.87
         """
-        # For Sprint 1, use existing form multiplier or default
-        existing_form = player_data.get('form_multiplier', 1.0)
-        # Handle None and convert Decimal to float if needed
-        if existing_form is None:
-            existing_form = 1.0
-        elif hasattr(existing_form, 'quantize'):
-            existing_form = float(existing_form)
-        return max(0.5, existing_form)  # Apply minimum floor
+        return self._calculate_exponential_form_multiplier(player_data)
+    
+    def _calculate_exponential_form_multiplier(self, player_data: Dict[str, Any]) -> float:
+        """
+        SPRINT 2: Calculate form using Exponential Weighted Moving Average (EWMA)
+        Algorithm: More recent games have exponentially higher weights (α=0.87)
+        """
+        try:
+            alpha = self.v2_config.get('exponential_form', {}).get('alpha', 0.87)
+            recent_games = player_data.get('recent_points', [])
+            
+            if not recent_games or len(recent_games) == 0:
+                return 1.0  # No recent data
+            
+            # Ensure we have numeric data
+            numeric_games = []
+            for game in recent_games:
+                try:
+                    numeric_games.append(float(game))
+                except (ValueError, TypeError):
+                    continue
+                    
+            if not numeric_games:
+                return 1.0  # No valid numeric data
+                
+            # Generate exponential decay weights (most recent = highest weight)
+            weights = []
+            for i in range(len(numeric_games)):
+                weight = alpha ** i  # Exponential decay: α^0, α^1, α^2, ...
+                weights.append(weight)
+            
+            # Normalize weights to sum to 1
+            total_weight = sum(weights)
+            if total_weight == 0:
+                return 1.0
+                
+            normalized_weights = [w / total_weight for w in weights]
+            
+            # Calculate weighted average form score
+            form_score = sum(points * weight for points, weight in zip(numeric_games, normalized_weights))
+            
+            # Get dynamic baseline using blended PPG for normalization
+            blended_baseline, _ = self._calculate_blended_ppg(player_data)
+            
+            if blended_baseline > 0:
+                form_multiplier = form_score / blended_baseline
+            else:
+                form_multiplier = 1.0
+                
+            # Apply Sprint 2 bounds (wider than v1.0 for more sensitivity)
+            return max(0.5, min(2.0, form_multiplier))
+            
+        except Exception as e:
+            logger.warning(f"Error calculating exponential form multiplier: {e}")
+            return 1.0
     
     def _calculate_exponential_fixture_multiplier(self, player_data: Dict[str, Any]) -> float:
         """
@@ -164,8 +225,10 @@ class FormulaEngineV2:
             difficulty_score = player_data.get('fixture_difficulty', 0)
             position = player_data.get('position', 'M')
             
-            # Convert Decimal to float if needed
-            if hasattr(difficulty_score, 'quantize'):
+            # Handle None values
+            if difficulty_score is None:
+                difficulty_score = 0
+            elif hasattr(difficulty_score, 'quantize'):
                 difficulty_score = float(difficulty_score)
             
             # Get exponential base from v2.0 config
@@ -206,22 +269,63 @@ class FormulaEngineV2:
     
     def _calculate_xgi_multiplier(self, player_data: Dict[str, Any]) -> float:
         """
-        Calculate xGI multiplier
-        Sprint 1: Uses existing xGI logic  
-        Sprint 2: Will implement normalized ratio-based calculation
+        Calculate xGI multiplier using Sprint 2 normalized ratio calculation
         """
-        # For Sprint 1, use existing xGI multiplier or default
-        existing_xgi = player_data.get('xgi_multiplier', 1.0)
-        # Handle None and convert Decimal to float if needed
-        if existing_xgi is None:
-            existing_xgi = 1.0
-        elif hasattr(existing_xgi, 'quantize'):
-            existing_xgi = float(existing_xgi)
-        return max(0.5, existing_xgi)  # Apply minimum floor
+        return self._calculate_normalized_xgi_multiplier(player_data)
+    
+    def _calculate_normalized_xgi_multiplier(self, player_data: Dict[str, Any]) -> float:
+        """
+        SPRINT 2: Calculate normalized xGI as ratio to historical baseline
+        Formula: Current_xGI90 / Historical_Baseline_xGI90
+        """
+        try:
+            # Get current and baseline xGI values
+            current_xgi = float(player_data.get('xgi90', 0.0) or 0.0)
+            baseline_xgi = float(player_data.get('baseline_xgi', 0.0) or 0.0)
+            position = player_data.get('position', 'M')
+            
+            # Position-specific logic for xGI relevance
+            if position == 'G':
+                # Goalkeepers - xGI not relevant
+                return 1.0
+            
+            # Calculate ratio if baseline exists and is meaningful
+            if baseline_xgi > 0.1:  # Avoid division by very small numbers
+                xgi_ratio = current_xgi / baseline_xgi
+                
+                # Position-specific scaling
+                if position == 'D' and baseline_xgi < 0.2:
+                    # Defensive players with low baseline xGI - reduce impact
+                    impact_factor = 0.3  # 30% impact for defenders
+                    xgi_multiplier = 1.0 + (xgi_ratio - 1.0) * impact_factor
+                else:
+                    # Full impact for midfielders and forwards
+                    xgi_multiplier = xgi_ratio
+                
+                # Apply reasonable bounds to prevent extreme outliers
+                return max(0.5, min(2.5, xgi_multiplier))
+            
+            else:
+                # No meaningful baseline - use neutral multiplier
+                return 1.0
+                
+        except Exception as e:
+            logger.warning(f"Error calculating normalized xGI multiplier: {e}")
+            return 1.0
     
     def _calculate_xgi_multiplier_raw(self, player_data: Dict[str, Any]) -> float:
         """Raw calculation without caps for metadata tracking"""
-        return player_data.get('xgi_multiplier', 1.0)
+        try:
+            current_xgi = float(player_data.get('xgi90', 0.0) or 0.0)
+            baseline_xgi = float(player_data.get('baseline_xgi', 0.0) or 0.0)
+            position = player_data.get('position', 'M')
+            
+            if position == 'G' or baseline_xgi <= 0.1:
+                return 1.0
+                
+            return current_xgi / baseline_xgi
+        except:
+            return 1.0
     
     def _apply_multiplier_cap(self, value: float, multiplier_type: str) -> float:
         """
@@ -234,6 +338,37 @@ class FormulaEngineV2:
         cap = caps.get(multiplier_type, 2.0)
         
         return max(0.5, min(cap, value))
+    
+    def _calculate_blended_ppg(self, player_data: Dict[str, Any]) -> Tuple[float, float]:
+        """
+        SPRINT 2: Calculate dynamically blended PPG using smooth transition
+        Returns (blended_ppg, current_weight)
+        """
+        current_ppg = player_data.get('ppg', 0.0)
+        historical_ppg = player_data.get('historical_ppg', current_ppg)
+        
+        # Handle Decimal conversion
+        if hasattr(current_ppg, 'quantize'):
+            current_ppg = float(current_ppg)
+        if hasattr(historical_ppg, 'quantize'):
+            historical_ppg = float(historical_ppg)
+        
+        # Get dynamic blending parameters
+        K = self.v2_config.get('dynamic_blending', {}).get('full_adaptation_gw', 16)
+        
+        # Calculate current weight using smooth transition formula
+        if self.current_gameweek <= 1:
+            w_current = 0.0
+            w_historical = 1.0
+        else:
+            # Smooth transition: w_current = min(1, (N-1)/(K-1))
+            w_current = min(1.0, (self.current_gameweek - 1) / (K - 1))
+            w_historical = 1.0 - w_current
+        
+        # Blend the PPG values
+        blended_ppg = (w_current * current_ppg) + (w_historical * historical_ppg)
+        
+        return max(0.1, blended_ppg), w_current
     
     def _get_current_gameweek(self) -> int:
         """Get current gameweek from database or parameters"""

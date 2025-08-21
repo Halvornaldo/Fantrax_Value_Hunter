@@ -2,102 +2,176 @@
 
 ## Core Formula Overview
 
-The Fantrax Value Hunter system calculates player value using a cascading multiplier approach:
+The Fantrax Value Hunter system uses Formula Optimization v2.0 with separate True Value and ROI calculations:
 
+**Formula v2.0 (Current - 2025-08-21)**:
 ```
-True Value = Base Value × Form Multiplier × Fixture Multiplier × Starter Multiplier × xGI Multiplier
+True Value = Blended PPG × Form Multiplier × Fixture Multiplier × Starter Multiplier × xGI Multiplier
+ROI = True Value ÷ Player Price
 ```
 
-Where:
+**Sprint 2 Enhancements**:
+- **EWMA Form**: Exponential weighted moving average with α=0.87
+- **Dynamic Blending**: Smooth transition using w_current = min(1, (N-1)/(K-1))
+- **Normalized xGI**: Ratio-based calculation (Recent_xGI/Historical_Baseline)
+
+**Legacy Formula v1.0 (Deprecated)**:
 ```
-Base Value = Points Per Game (PPG) ÷ Player Price
+Base Value = Points Per Game (PPG) ÷ Player Price  [MIXED PREDICTION WITH VALUE]
 ```
 
 ## Detailed Formula Breakdown
 
-### 1. Base Value Calculation (`app.py:301`)
+### 1. Dynamic PPG Blending (`calculation_engine_v2.py:_calculate_blended_ppg`)
+
+**Sprint 2 Enhancement**: Replaces static PPG with dynamically blended historical and current season data.
 
 ```python
-base_value = ppg / price if price > 0 else 0
+def _calculate_blended_ppg(self, player_data):
+    K = 16  # Full adaptation gameweek
+    w_current = min(1.0, (current_gameweek - 1) / (K - 1)) if current_gameweek > 1 else 0.0
+    w_historical = 1.0 - w_current
+    
+    blended_ppg = (w_current * current_ppg) + (w_historical * historical_ppg)
+    return max(0.1, blended_ppg), w_current
 ```
 
 **Components:**
-- **PPG**: Points per game from Fantrax data
-- **Price**: Current player price in millions (e.g., 5.5)
-- **Protection**: Division by zero protection returns 0 for invalid prices
+- **Current PPG**: Points per game this season
+- **Historical PPG**: Points per game previous season  
+- **K**: Full adaptation gameweek (default: 16)
+- **Smooth Transition**: No hard cutoffs, gradual weight shift
 
-### 2. Form Multiplier (`app.py:69-129`)
-
-The form multiplier compares recent performance to baseline performance using weighted averages.
-
-#### Calculation Process:
-
-**Step 1: Calculate Recent Form Average**
+**Legacy v1.0 (Deprecated):**
 ```python
-# Weighted average of recent games (default: last 4 games)
-total_weighted_points = sum(points * weight for points, weight in recent_games_with_weights)
-total_weights = sum(weights)
-recent_avg = total_weighted_points / total_weights if total_weights > 0 else 0
+base_value = ppg / price if price > 0 else 0  # Mixed prediction with value
 ```
 
-**Step 2: Determine Baseline**
-- **Historical Phase** (GW 1-10): `baseline = previous_season_ppg`
-- **Transition Phase** (GW 11-15): `baseline = weighted_blend(historical_ppg, current_season_ppg)`  
-- **Current Phase** (GW 16+): `baseline = current_season_ppg`
+### 2. EWMA Form Multiplier (`calculation_engine_v2.py:_calculate_exponential_form_multiplier`)
 
-**Step 3: Calculate Multiplier**
+**Sprint 2 Enhancement**: Exponential Weighted Moving Average with configurable decay factor.
+
 ```python
-form_multiplier = recent_avg / baseline if baseline > 0 else 1.0
-# Capped between 0.5x and 1.5x
-form_multiplier = max(0.5, min(1.5, form_multiplier))
+def _calculate_exponential_form_multiplier(self, player_data):
+    alpha = 0.87  # Exponential decay factor (5-game half-life)
+    recent_games = player_data.get('recent_points', [])
+    
+    # Generate exponential decay weights: α^0, α^1, α^2, ...
+    weights = [alpha ** i for i in range(len(recent_games))]
+    total_weight = sum(weights)
+    normalized_weights = [w / total_weight for w in weights]
+    
+    # Calculate weighted form score
+    form_score = sum(points * weight for points, weight in zip(recent_games, normalized_weights))
+    
+    # Normalize against blended baseline
+    blended_baseline, _ = self._calculate_blended_ppg(player_data)
+    form_multiplier = form_score / blended_baseline if blended_baseline > 0 else 1.0
+    
+    return max(0.5, min(2.0, form_multiplier))  # Capped at [0.5, 2.0]
 ```
 
-#### Weighting System:
-- **Game 1** (most recent): Weight = 4
-- **Game 2**: Weight = 3  
-- **Game 3**: Weight = 2
-- **Game 4** (oldest): Weight = 1
+**Key Features:**
+- **α = 0.87**: 5-game half-life (most recent games weighted highest)
+- **Exponential Decay**: More sophisticated than linear weights
+- **Dynamic Baseline**: Uses blended PPG instead of static baseline
+- **Multiplier Caps**: Prevents extreme outliers [0.5, 2.0]
 
-### 3. Fixture Difficulty Multiplier (`app.py:131-180`)
-
-Adjusts player value based on upcoming fixture difficulty using betting odds data.
-
-#### Calculation Process:
-
-**Step 1: Get Fixture Difficulty Score**
-```sql
-SELECT difficulty_score FROM team_fixtures 
-WHERE team_code = %s AND gameweek = %s
-```
-- **Range**: -10 (easiest) to +10 (hardest)
-- **Source**: Betting odds-based difficulty assessment
-
-**Step 2: Apply Position Weights**
+**Legacy v1.0 (Deprecated):**
 ```python
-position_weights = {
-    'G': 1.10,  # Goalkeepers: 110% (more saves vs stronger teams)
-    'D': 1.20,  # Defenders: 120% (clean sheets vs weaker teams)  
-    'M': 1.00,  # Midfielders: 100% (baseline)
-    'F': 1.05   # Forwards: 105% (goals vs weaker teams)
-}
+# Fixed weights: [0.4, 0.25, 0.2, 0.1, 0.05] for 5 games
+weighted_form = sum(points[i] * weights[i] for i in range(len(points)))
 ```
 
-**Step 3: Calculate Final Multiplier**
+### 3. Normalized xGI Multiplier (`calculation_engine_v2.py:_calculate_normalized_xgi_multiplier`)
+
+**Sprint 2 Enhancement**: Ratio-based xGI comparison against historical baseline.
+
 ```python
-base_strength = 0.2  # 20% default impact
-position_weight = position_weights.get(position, 1.0)
-multiplier_adjustment = (difficulty_score / 10.0) * base_strength * position_weight
-final_multiplier = 1.0 - multiplier_adjustment
-
-# Constrained between 0.5x and 1.5x
-return max(0.5, min(1.5, final_multiplier))
+def _calculate_normalized_xgi_multiplier(self, player_data):
+    current_xgi = float(player_data.get('xgi90', 0.0) or 0.0)
+    baseline_xgi = float(player_data.get('baseline_xgi', 0.0) or 0.0)
+    position = player_data.get('position', 'M')
+    
+    # Position-specific logic
+    if position == 'G':
+        return 1.0  # Goalkeepers - xGI not relevant
+    
+    # Calculate ratio-based multiplier
+    if baseline_xgi > 0.1:
+        xgi_ratio = current_xgi / baseline_xgi
+    else:
+        # Use position defaults for missing baseline
+        xgi_ratio = 1.0
+    
+    # Position-specific impact adjustments
+    if position == 'D':
+        # Reduce impact for defenders (less xGI relevance)
+        xgi_ratio = 1.0 + (xgi_ratio - 1.0) * 0.6
+    
+    return max(0.4, min(2.5, xgi_ratio))  # Capped at [0.4, 2.5]
 ```
 
-#### Examples:
-- **Easy fixture** (score = -5): Multiplier ≈ 1.1x (boost)
-- **Hard fixture** (score = +5): Multiplier ≈ 0.9x (penalty)
+**Key Features:**
+- **Ratio Calculation**: `current_xGI90 / baseline_xGI90`
+- **Historical Baseline**: 2024/25 season data from Understat
+- **Position Awareness**: Reduced impact for defenders, disabled for goalkeepers
+- **Multiplier Caps**: Prevents extreme outliers [0.4, 2.5]
 
-### 4. Starter Prediction Multiplier (`app.py:218-284`)
+**Data Sources:**
+- **Current**: `xgi90` column (2025/26 season Expected Goals Involvement)
+- **Baseline**: `baseline_xgi` column (2024/25 historical data)
+
+**Legacy v1.0 (Deprecated):**
+```python
+# Fixed modes: direct, adjusted, capped (no normalization)
+```
+
+### 4. Exponential Fixture Multiplier (Enhanced in Sprint 1)
+
+**Sprint 1 Enhancement**: Exponential transformation instead of linear adjustment.
+
+```python
+def _calculate_exponential_fixture_multiplier(self, player_data):
+    difficulty_score = player_data.get('fixture_difficulty', 0)
+    position = player_data.get('position', 'M')
+    
+    # Get exponential base (configurable, default: 1.05)
+    exponential_base = 1.05
+    
+    # Position-specific impact weights
+    position_weights = {
+        'G': 1.1,   # Goalkeepers: 110%
+        'D': 1.2,   # Defenders: 120% 
+        'M': 1.0,   # Midfielders: 100% (baseline)
+        'F': 1.05   # Forwards: 105%
+    }
+    
+    pos_weight = position_weights.get(position, 1.0)
+    adjusted_difficulty = difficulty_score * pos_weight / 10.0
+    
+    # Exponential transformation: base^(-difficulty)
+    fixture_multiplier = exponential_base ** (-adjusted_difficulty)
+    
+    return max(0.5, min(1.8, fixture_multiplier))  # Capped at [0.5, 1.8]
+```
+
+**Key Features:**
+- **Exponential Transformation**: `base^(-difficulty)` instead of linear
+- **Configurable Base**: Default 1.05 (5% per difficulty point)
+- **Position Weights**: Enhanced impact for goalkeepers and defenders
+- **Multiplier Caps**: Prevents extreme outliers [0.5, 1.8]
+
+**Examples:**
+- **Easy fixture** (-5 difficulty): 1.05^(0.5) ≈ 1.25x (25% boost)
+- **Hard fixture** (+5 difficulty): 1.05^(-0.5) ≈ 0.81x (19% penalty)
+
+**Legacy v1.0 (Linear):**
+```python
+final_multiplier = 1.0 - (difficulty_score / 10.0) * 0.2
+```
+
+### 5. Starter Prediction Multiplier (`app.py:218-284`)
 
 Adjusts value based on predicted starting likelihood with manual override support.
 
@@ -133,38 +207,7 @@ else:
     return calculated_starter_multiplier
 ```
 
-### 5. xGI (Expected Goals Involvement) Multiplier (`app.py:285-292`)
-
-Incorporates underlying performance metrics from Understat data.
-
-#### Data Source:
-- **Metric**: xGI90 = (Expected Goals + Expected Assists) per 90 minutes
-- **Provider**: Understat via ScraperFC integration  
-- **Coverage**: 99% player match rate
-- **Update**: Weekly manual sync
-
-#### Calculation Modes:
-
-**Capped Mode (Default):**
-```python
-multiplier = max(0.5, min(1.5, xGI90))
-```
-
-**Direct Mode:**
-```python  
-multiplier = xGI90 * strength_parameter  # strength = 0.7 default
-```
-
-**Adjusted Mode:**
-```python
-multiplier = 1 + (xGI90 * strength_parameter)
-```
-
-#### Fallback:
-```python
-# For unmatched players
-xgi_multiplier = 1.0  # Neutral impact
-```
+**Note:** xGI multiplier calculation is covered in Section 3 (Normalized xGI Multiplier) above.
 
 ## Blender Display System
 
@@ -211,70 +254,77 @@ else:
     display = "0"
 ```
 
-## Parameter Validation Ranges
+## Sprint 2 Parameter Validation Ranges
 
-### Form Multiplier Parameters:
-- **Recent Games Window**: 1-8 games (default: 4)
-- **Baseline Switchover**: GW 5-15 (default: 10)
-- **Transition End**: GW 10-20 (default: 15)
-- **Form Impact Strength**: 0.0-2.0 (default: 1.0)
+### Dynamic Blending Parameters:
+- **Full Adaptation GW**: 10-20 games (default: 16)
+- **Current Weight Formula**: `min(1, (N-1)/(K-1))`
+- **Minimum Baseline**: Historical PPG > 0.1
 
-### Fixture Difficulty Parameters:
-- **Enable/Disable**: Boolean toggle
-- **Multiplier Strength**: 0.0-1.0 (default: 0.2)
-- **Position Weights**: 0.5-2.0 per position
+### EWMA Form Parameters:
+- **Alpha (α)**: 0.70-0.995 (default: 0.87)
+  - 0.70: Highly reactive (2-game focus)
+  - 0.87: 5-game half-life (recommended)  
+  - 0.95: Sticky form (10-game influence)
+- **Multiplier Caps**: [0.5, 2.0]
 
-### Starter Prediction Parameters:
-- **Manual Override**: JSON object format
-- **Confidence Thresholds**: 0.0-1.0
-- **Default Penalties**: Configurable per status level
+### Exponential Fixture Parameters:
+- **Base**: 1.01-1.10 (default: 1.05)
+- **Position Weights**: G=1.1, D=1.2, M=1.0, F=1.05
+- **Multiplier Caps**: [0.5, 1.8]
 
-### xGI Integration Parameters:
-- **Calculation Mode**: Capped/Direct/Adjusted
-- **Multiplier Strength**: 0.0-2.0 (default: 0.7)
-- **Enable/Disable**: Boolean toggle
-- **Display Stats**: Boolean toggle
+### Normalized xGI Parameters:
+- **Position Impact**: D=60%, M/F=100%, G=disabled
+- **Minimum Baseline**: 0.1 xGI90
+- **Multiplier Caps**: [0.4, 2.5]
 
-## Performance Specifications
+### Legacy v1.0 Parameters (Deprecated):
+- **Fixed Form Weights**: [0.4, 0.25, 0.2, 0.1, 0.05]
+- **Linear Fixture**: 20% base strength
+- **xGI Modes**: Direct/Adjusted/Capped (no normalization)
+
+## Sprint 2 Performance Specifications
 
 ### Processing Targets:
-- **Player Count**: 633 Premier League players
-- **Calculation Time**: Efficient for weekly analysis workflow
-- **Parameter Updates**: Smooth real-time responsiveness
-- **Database Queries**: Optimized with caching where possible
+- **Player Count**: 647+ Premier League players
+- **Calculation Engine**: v2.0 dual-engine system (v1.0 + v2.0)
+- **API Endpoints**: `/api/calculate-values-v2` with Sprint 2 features
+- **Response Time**: ~2-3 seconds for parameter changes
+- **Data Integration**: 335 historical baselines from Understat 2024/25
 
-### Data Dependencies:
-- **Fantrax**: Player prices, positions, points data
-- **Historical**: Previous season PPG baselines
-- **Fixtures**: Team difficulty scores via betting odds
-- **xGI**: Understat data via ScraperFC integration
+### Sprint 2 Data Dependencies:
+- **Current Season**: 2025/26 xGI data (xgi90 column)
+- **Historical Baseline**: 2024/25 xGI data (baseline_xgi column) 
+- **Dynamic Blending**: Historical + current PPG data
+- **EWMA Form**: Recent points array for exponential calculation
 
-## Error Handling and Fallbacks
+## Sprint 2 Error Handling
 
-### Missing Data Handling:
+### Missing Data Fallbacks:
 ```python
-# Form calculation
-if no_recent_games:
-    form_multiplier = 1.0  # Neutral
+# Dynamic blending
+if historical_ppg == 0:
+    return current_ppg, 1.0  # Use current only
 
-# Fixture difficulty  
-if no_fixture_data:
-    fixture_multiplier = 1.0  # Neutral
+# EWMA form calculation
+if not recent_games:
+    return 1.0  # Neutral multiplier
 
-# Starter prediction
-if unknown_status:
-    starter_multiplier = 1.0  # No penalty
+# Normalized xGI  
+if baseline_xgi < 0.1:
+    baseline_xgi = position_default  # Use position average
 
-# xGI integration
-if no_xgi_match:
-    xgi_multiplier = 1.0  # Neutral
+# Exponential fixture
+if difficulty_score is None:
+    return 1.0  # Neutral multiplier
 ```
 
-### Validation Constraints:
-- All multipliers constrained between 0.5x and 1.5x (except where noted)
-- Division by zero protection throughout
-- Database connection error handling with graceful degradation
-- Parameter range validation before application
+### Sprint 2 Validation Constraints:
+- **Form Multiplier**: [0.5, 2.0] with exponential decay
+- **Fixture Multiplier**: [0.5, 1.8] with exponential transformation  
+- **xGI Multiplier**: [0.4, 2.5] with position-specific adjustments
+- **Division Protection**: All ratios checked for zero denominators
+- **Global Cap**: 3.0 maximum total multiplier (configurable)
 
 ## Integration with Dashboard
 
