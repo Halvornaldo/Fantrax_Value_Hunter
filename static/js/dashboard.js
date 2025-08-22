@@ -719,25 +719,44 @@ function handleParameterChange() {
 function buildParameterChanges() {
     const changes = {};
     
-    // Form calculation changes
+    // Check current formula version
+    const isV2Enhanced = currentFormulaVersion === 'v2.0';
+    
+    // Form calculation changes - different parameters for v1.0 vs v2.0
     const formEnabled = document.getElementById('form-enabled').checked;
     const lookbackPeriod = parseInt(document.getElementById('lookback-period').value);
     const minGames = parseInt(document.getElementById('min-games').value);
     const baselineSwitchover = parseInt(document.getElementById('baseline-switchover').value);
     const formStrength = parseFloat(document.getElementById('form-strength-slider').value);
     
-    if (formEnabled !== (currentConfig.form_calculation?.enabled || false) ||
-        lookbackPeriod !== (currentConfig.form_calculation?.lookback_period || 5) ||
-        minGames !== (currentConfig.form_calculation?.minimum_games_for_form || 3) ||
-        baselineSwitchover !== (currentConfig.form_calculation?.baseline_switchover_gameweek || 10) ||
-        Math.abs(formStrength - (currentConfig.form_calculation?.form_strength || 1.0)) > 0.01) {
-        changes.form_calculation = {
-            enabled: formEnabled,
-            lookback_period: lookbackPeriod,
-            minimum_games_for_form: minGames,
-            baseline_switchover_gameweek: baselineSwitchover,
-            form_strength: formStrength
-        };
+    if (isV2Enhanced) {
+        // v2.0 Enhanced: Use EWMA exponential form parameters
+        const currentV2Config = currentConfig.formula_optimization_v2?.exponential_form || {};
+        
+        if (formEnabled !== (currentV2Config.enabled !== false) ||
+            Math.abs(formStrength - (currentV2Config.alpha || 0.87)) > 0.01) {
+            changes.formula_optimization_v2 = {
+                exponential_form: {
+                    enabled: formEnabled,
+                    alpha: formStrength  // In v2.0, form strength slider controls EWMA alpha (0.87 default)
+                }
+            };
+        }
+    } else {
+        // v1.0 Legacy: Use traditional form calculation parameters
+        if (formEnabled !== (currentConfig.form_calculation?.enabled || false) ||
+            lookbackPeriod !== (currentConfig.form_calculation?.lookback_period || 5) ||
+            minGames !== (currentConfig.form_calculation?.minimum_games_for_form || 3) ||
+            baselineSwitchover !== (currentConfig.form_calculation?.baseline_switchover_gameweek || 10) ||
+            Math.abs(formStrength - (currentConfig.form_calculation?.form_strength || 1.0)) > 0.01) {
+            changes.form_calculation = {
+                enabled: formEnabled,
+                lookback_period: lookbackPeriod,
+                minimum_games_for_form: minGames,
+                baseline_switchover_gameweek: baselineSwitchover,
+                form_strength: formStrength
+            };
+        }
     }
     
     // Fixture difficulty changes (odds-based)

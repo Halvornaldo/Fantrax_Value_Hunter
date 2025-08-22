@@ -456,7 +456,12 @@ def get_players():
                 pm.last_updated,
                 COALESCE(pgd.games_played, 0) as games_played,
                 COALESCE(pgd.games_played_historical, 0) as games_played_historical,
-                COALESCE(pgd.data_source, 'current') as data_source
+                COALESCE(pgd.data_source, 'current') as data_source,
+                CASE 
+                    WHEN COALESCE(pgd.games_played_historical, 0) > 0 
+                    THEN COALESCE(pgd.total_points_historical, 0) / pgd.games_played_historical 
+                    ELSE pm.ppg 
+                END as historical_ppg
             FROM players p
             JOIN player_metrics pm ON p.id = pm.player_id
             LEFT JOIN player_games_data pgd ON p.id = pgd.player_id AND pm.gameweek = pgd.gameweek
@@ -617,8 +622,14 @@ def update_parameters():
         # Load current parameters
         current_params = load_system_parameters()
         
+        # Check if configuration loaded successfully
+        if not current_params:
+            return jsonify({'error': 'Failed to load current system configuration'}), 500
+        
         # Update parameters based on request
         if 'form_calculation' in data:
+            if 'form_calculation' not in current_params:
+                current_params['form_calculation'] = {}
             current_params['form_calculation'].update(data['form_calculation'])
             
         if 'fixture_difficulty' in data:
@@ -680,7 +691,16 @@ def manual_override():
         
         player_id = data.get('player_id')
         override_type = data.get('override_type')  # 'starter', 'bench', 'out', 'auto'
-        gameweek = data.get('gameweek', 1)
+        
+        # Get current gameweek from database (latest gameweek with data)
+        conn_temp = get_db_connection()
+        cursor_temp = conn_temp.cursor()
+        cursor_temp.execute('SELECT MAX(gameweek) FROM player_metrics WHERE gameweek IS NOT NULL')
+        current_gameweek = cursor_temp.fetchone()[0] or 1
+        cursor_temp.close()
+        conn_temp.close()
+        
+        gameweek = current_gameweek
         
         if not player_id or not override_type:
             return jsonify({'error': 'player_id and override_type required'}), 400
@@ -1797,7 +1817,11 @@ def import_odds():
             "Fulham": "FUL", "Leeds": "LEE", "Liverpool": "LIV",
             "Manchester City": "MCI", "Manchester Utd": "MUN", "Newcastle": "NEW",
             "Nottingham": "NFO", "Sunderland": "SUN", "Tottenham": "TOT",
-            "West Ham": "WHU", "Wolves": "WOL"
+            "West Ham": "WHU", "Wolves": "WOL",
+            # OddsPortal variations for missing teams
+            "Man City": "MCI", "Man United": "MUN", "Tottenham Hotspur": "TOT",
+            "West Ham United": "WHU", "Wolverhampton": "WOL", "Brighton & Hove Albion": "BHA",
+            "Nottm Forest": "NFO", "Nottingham Forest": "NFO", "Leeds United": "LEE"
         }
         
         # Parse CSV content
@@ -1813,6 +1837,7 @@ def import_odds():
         processed_matches = 0
         skipped_matches = 0
         current_date = None
+        unmatched_teams = set()
         
         conn = get_db_connection()
         cursor = conn.cursor()
@@ -1820,6 +1845,10 @@ def import_odds():
         # Clear existing odds for this gameweek
         cursor.execute("DELETE FROM fixture_odds WHERE gameweek = %s", [gameweek])
         cursor.execute("DELETE FROM team_fixtures WHERE gameweek = %s", [gameweek])
+        
+        # First pass: collect all valid matches with dates
+        all_matches = []
+        teams_seen = set()
         
         for row in csv_reader:
             if len(row) < 7:
@@ -1868,10 +1897,42 @@ def import_odds():
             away_code = ODDS_TO_FANTRAX.get(away_team)
             
             if not home_code or not away_code:
+                if not home_code:
+                    unmatched_teams.add(home_team)
+                if not away_code:
+                    unmatched_teams.add(away_team)
                 skipped_matches += 1
                 continue
-                
-            # Insert odds data
+            
+            print(f"VALID: '{home_team}' vs '{away_team}' -> {home_code} vs {away_code} on {match_date}")
+            
+            # Store match data for filtering
+            all_matches.append({
+                'date': match_date,
+                'home_team': home_team,
+                'away_team': away_team,
+                'home_code': home_code,
+                'away_code': away_code,
+                'home_odds': home_odds,
+                'draw_odds': draw_odds,
+                'away_odds': away_odds
+            })
+        
+        # Second pass: take the first 10 matches chronologically (Premier League gameweek = 10 matches)
+        # Sort matches by date (earliest first)
+        all_matches.sort(key=lambda x: x['date'])
+        
+        # Take exactly the first 10 matches
+        filtered_matches = all_matches[:10]
+        
+        # Get teams from filtered matches  
+        teams_processed = set()
+        for match in filtered_matches:
+            teams_processed.add(match['home_code'])
+            teams_processed.add(match['away_code'])
+        
+        # Third pass: process the filtered matches
+        for match in filtered_matches:
             try:
                 cursor.execute("""
                     INSERT INTO fixture_odds 
@@ -1882,14 +1943,14 @@ def import_odds():
                         home_odds = EXCLUDED.home_odds,
                         draw_odds = EXCLUDED.draw_odds,
                         away_odds = EXCLUDED.away_odds
-                """, [gameweek, match_date, home_code, away_code, home_odds, draw_odds, away_odds])
+                """, [gameweek, match['date'], match['home_code'], match['away_code'], match['home_odds'], match['draw_odds'], match['away_odds']])
                 
                 # Calculate difficulty scores
                 def calculate_difficulty_score(home_odds, away_odds, is_home_team):
                     # Calculate implied probabilities (simplified - not accounting for overround)
-                    home_prob = 1 / home_odds
-                    away_prob = 1 / away_odds
-                    total_prob = home_prob + away_prob + (1/draw_odds)
+                    home_prob = 1 / match['home_odds']
+                    away_prob = 1 / match['away_odds']
+                    total_prob = home_prob + away_prob + (1/match['draw_odds'])
                     
                     # Normalize probabilities
                     home_prob_norm = home_prob / total_prob
@@ -1902,8 +1963,8 @@ def import_odds():
                     difficulty_score = (opponent_strength - 0.5) * 20
                     return round(difficulty_score, 1)
                 
-                home_difficulty = calculate_difficulty_score(home_odds, away_odds, True)
-                away_difficulty = calculate_difficulty_score(home_odds, away_odds, False)
+                home_difficulty = calculate_difficulty_score(match['home_odds'], match['away_odds'], True)
+                away_difficulty = calculate_difficulty_score(match['home_odds'], match['away_odds'], False)
                 
                 # Insert fixture difficulty data
                 cursor.execute("""
@@ -1914,7 +1975,7 @@ def import_odds():
                         opponent_code = EXCLUDED.opponent_code,
                         is_home = EXCLUDED.is_home,
                         difficulty_score = EXCLUDED.difficulty_score
-                """, [gameweek, home_code, away_code, True, home_difficulty])
+                """, [gameweek, match['home_code'], match['away_code'], True, home_difficulty])
                 
                 cursor.execute("""
                     INSERT INTO team_fixtures 
@@ -1924,12 +1985,12 @@ def import_odds():
                         opponent_code = EXCLUDED.opponent_code,
                         is_home = EXCLUDED.is_home,
                         difficulty_score = EXCLUDED.difficulty_score
-                """, [gameweek, away_code, home_code, False, away_difficulty])
+                """, [gameweek, match['away_code'], match['home_code'], False, away_difficulty])
                 
                 processed_matches += 1
                 
             except Exception as e:
-                print(f"Error processing match {home_team} vs {away_team}: {e}")
+                print(f"Error processing match {match['home_team']} vs {match['away_team']}: {e}")
                 skipped_matches += 1
                 continue
                 
@@ -1938,13 +1999,24 @@ def import_odds():
         cursor.close()
         conn.close()
         
+        # Debug logging
+        print(f"\n=== ODDS IMPORT DEBUG (GW{gameweek}) ===")
+        print(f"Total valid matches found: {len(all_matches)}")
+        print(f"Matches after filtering: {len(filtered_matches)}")
+        print(f"Teams processed: {len(teams_processed)}")
+        print("Teams in filtered matches:", sorted(teams_processed))
+        
+        # Calculate filtering stats
+        total_valid_matches = len(all_matches)
+        skipped_due_to_filtering = total_valid_matches - len(filtered_matches)
+        
         # Return success response
         return jsonify({
             'success': True,
-            'processed_matches': processed_matches,
-            'skipped_matches': skipped_matches,
+            'processed_matches': len(filtered_matches),
+            'skipped_matches': skipped_matches + skipped_due_to_filtering,
             'gameweek': gameweek,
-            'message': f'Successfully imported {processed_matches} matches for gameweek {gameweek}'
+            'message': f'Successfully imported {len(filtered_matches)} matches for gameweek {gameweek} (filtered from {total_valid_matches} valid matches to ensure only earliest match per team)'
         })
         
     except Exception as e:
@@ -2921,7 +2993,7 @@ def calculate_values_v2():
         conn = get_db_connection()
         cursor = conn.cursor(cursor_factory=psycopg2.extras.RealDictCursor)
         
-        # Enhanced query to get all necessary data
+        # Enhanced query to get all necessary data including historical PPG
         cursor.execute("""
             SELECT 
                 p.id as player_id,
@@ -2929,16 +3001,25 @@ def calculate_values_v2():
                 p.team,
                 p.position,
                 p.xgi90,
+                p.baseline_xgi,
                 pm.price,
                 pm.ppg,
                 pm.form_multiplier,
                 pm.fixture_multiplier,
                 pm.starter_multiplier,
                 pm.xgi_multiplier,
-                tf.difficulty_score as fixture_difficulty
+                tf.difficulty_score as fixture_difficulty,
+                COALESCE(pgd.games_played, 0) as games_played,
+                COALESCE(pgd.games_played_historical, 0) as games_played_historical,
+                CASE 
+                    WHEN COALESCE(pgd.games_played_historical, 0) > 0 
+                    THEN COALESCE(pgd.total_points_historical, 0) / pgd.games_played_historical 
+                    ELSE pm.ppg 
+                END as historical_ppg
             FROM players p
             JOIN player_metrics pm ON p.id = pm.player_id
             LEFT JOIN team_fixtures tf ON p.team = tf.team_code AND tf.gameweek = %s
+            LEFT JOIN player_games_data pgd ON p.id = pgd.player_id AND pm.gameweek = pgd.gameweek
             WHERE pm.gameweek = %s
             ORDER BY pm.true_value DESC NULLS LAST
             LIMIT 100

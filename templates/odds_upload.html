@@ -277,7 +277,7 @@
             result.style.display = 'none';
             
             try {
-                const response = await fetch('/api/import-odds-data', {
+                const response = await fetch('/api/import-odds', {
                     method: 'POST',
                     body: formData
                 });
@@ -293,18 +293,21 @@
                         <h3>✅ Upload Successful!</h3>
                         <p>${data.message}</p>
                         
+                        ${data.processed_matches > 10 ? `
+                            <div style="margin-top: 15px; padding: 15px; background: #fff3cd; border-radius: 6px; border-left: 4px solid #ffc107;">
+                                <strong>⚠️ Warning:</strong> Expected 10 matches for Premier League gameweek, but processed ${data.processed_matches}.<br>
+                                <small style="color: #6c757d;">This might include non-Premier League matches or duplicate fixtures.</small>
+                            </div>
+                        ` : ''}
+                        
                         <div class="stats-grid">
                             <div class="stat-item">
-                                <div class="stat-number">${data.fixtures_imported}</div>
+                                <div class="stat-number">${data.processed_matches}</div>
                                 <div class="stat-label">Fixtures Imported</div>
                             </div>
                             <div class="stat-item">
-                                <div class="stat-number">${data.teams_updated}</div>
-                                <div class="stat-label">Teams Updated</div>
-                            </div>
-                            <div class="stat-item">
-                                <div class="stat-number">${data.error_count || 0}</div>
-                                <div class="stat-label">Errors</div>
+                                <div class="stat-number">${data.skipped_matches}</div>
+                                <div class="stat-label">Skipped/Errors</div>
                             </div>
                             <div class="stat-item">
                                 <div class="stat-number">GW${data.gameweek}</div>

@@ -169,7 +169,11 @@ class FormulaEngineV2:
         """
         try:
             alpha = self.v2_config.get('exponential_form', {}).get('alpha', 0.87)
+            
+            # Get recent points from database if not provided
             recent_games = player_data.get('recent_points', [])
+            if not recent_games:
+                recent_games = self._get_recent_points_from_db(player_data.get('player_id'))
             
             if not recent_games or len(recent_games) == 0:
                 return 1.0  # No recent data
@@ -215,6 +219,50 @@ class FormulaEngineV2:
         except Exception as e:
             logger.warning(f"Error calculating exponential form multiplier: {e}")
             return 1.0
+    
+    def _get_recent_points_from_db(self, player_id: str, limit: int = 5) -> List[float]:
+        """
+        Fetch recent points from player_form table for EWMA calculation
+        Returns points in chronological order (most recent first)
+        """
+        if not player_id:
+            return []
+            
+        try:
+            import psycopg2
+            import psycopg2.extras
+            
+            conn = psycopg2.connect(**self.db_config)
+            cursor = conn.cursor(cursor_factory=psycopg2.extras.RealDictCursor)
+            
+            # Get last N gameweeks of form data, ordered by gameweek DESC (most recent first)
+            cursor.execute("""
+                SELECT points 
+                FROM player_form 
+                WHERE player_id = %s 
+                ORDER BY gameweek DESC 
+                LIMIT %s
+            """, [player_id, limit])
+            
+            results = cursor.fetchall()
+            cursor.close()
+            conn.close()
+            
+            # Convert to list of floats
+            recent_points = []
+            for row in results:
+                try:
+                    points = float(row['points'] or 0.0)
+                    recent_points.append(points)
+                except (ValueError, TypeError):
+                    continue
+            
+            logger.debug(f"Found {len(recent_points)} recent games for player {player_id}: {recent_points}")
+            return recent_points
+            
+        except Exception as e:
+            logger.warning(f"Error fetching recent points for player {player_id}: {e}")
+            return []
     
     def _calculate_exponential_fixture_multiplier(self, player_data: Dict[str, Any]) -> float:
         """
@@ -371,9 +419,19 @@ class FormulaEngineV2:
         return max(0.1, blended_ppg), w_current
     
     def _get_current_gameweek(self) -> int:
-        """Get current gameweek from database or parameters"""
-        # This would be implemented based on your current gameweek logic
-        return 1  # Placeholder for Sprint 1
+        """Get current gameweek from database"""
+        try:
+            import psycopg2
+            conn = psycopg2.connect(**self.db_config)
+            cursor = conn.cursor()
+            cursor.execute('SELECT MAX(gameweek) FROM player_metrics WHERE gameweek IS NOT NULL')
+            current_gameweek = cursor.fetchone()[0] or 1
+            cursor.close()
+            conn.close()
+            return current_gameweek
+        except Exception as e:
+            logger.warning(f"Failed to get current gameweek from database: {e}")
+            return 1  # Fallback to GW1
     
     def _get_error_result(self, player_id: str, error_msg: str) -> Dict[str, Any]:
         """Return error result structure"""
