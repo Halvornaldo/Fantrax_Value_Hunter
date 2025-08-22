@@ -84,11 +84,18 @@ This document defines the mandatory documentation updates required after complet
 - `API_REFERENCE.md` - Add validation endpoint documentation
 - `DATABASE_SCHEMA.md` - Document validation result tables
 
-### Sprint 4: Dashboard Integration (v2.0 UI) ✅ COMPLETED (2025-08-22)
+### Sprint 4: Dashboard Integration + Dynamic Blending Complete ✅ COMPLETED (2025-08-22)
 **Priority Updates:**
-- `FEATURE_GUIDE.md` - Major update with new v2.0 dashboard features
-- `API_REFERENCE.md` - Update player endpoints with v2.0 response format
-- `DEVELOPMENT_SETUP.md` - Update testing procedures for new UI
+- `FEATURE_GUIDE.md` - Major update with new v2.0 dashboard features  
+- `API_REFERENCE.md` - Update player endpoints with v2.0 response format + historical_ppg
+- `DEVELOPMENT_SETUP.md` - Update testing procedures for dual engine system
+- `DATABASE_SCHEMA.md` - Document historical_ppg calculation and gameweek detection
+
+**🎯 CRITICAL BREAKTHROUGH: Dynamic Blending Implementation (2025-08-22):**
+- **Historical Data Integration**: Fixed missing 2024-25 season data in calculations
+- **Gameweek Detection Fix**: Replaced hardcoded GW1 with database MAX(gameweek) query
+- **API Enhancement**: Added historical_ppg calculation to both main and v2.0 endpoints  
+- **Engine Separation**: Documented critical dual engine architecture warnings
 
 **Recent Polish Fixes (2025-08-22):**
 - Fixed tooltip auto-triggering on page load
@@ -166,6 +173,92 @@ This document defines the mandatory documentation updates required after complet
 - Broken cross-references between documents
 - Unclear distinction between v1.0 and v2.0 features
 
+## 🚨 CRITICAL ARCHITECTURAL DISCOVERIES (2025-08-22)
+
+### **Dual Engine System - MUST Document in All Relevant Files**
+
+**⚠️ CRITICAL FOR LONG-TERM MAINTENANCE:**
+The system now runs two completely separate calculation engines that developers MUST NOT mix:
+
+**v1.0 Legacy Engine:**
+- Location: `src/app.py` (main calculation logic)
+- Parameters: `form_calculation.strength`, `fixture_difficulty.strength`
+- Database: Writes to `value_score` column
+- Formula: `(PPG ÷ Price) × multipliers`
+
+**v2.0 Enhanced Engine:**
+- Location: `calculation_engine_v2.py` (separate module)
+- Parameters: `formula_optimization_v2.exponential_form.alpha`
+- Database: Writes to `true_value` and `roi` columns
+- Formula: `Blended_PPG × multipliers ÷ Price`
+
+**📋 DOCUMENTATION REQUIREMENTS:**
+- `API_REFERENCE.md` - Both engines must be clearly separated in endpoint documentation
+- `DEVELOPMENT_SETUP.md` - Testing procedures must cover both engines
+- `FEATURE_GUIDE.md` - UI toggle between engines must be explained
+- `DATABASE_SCHEMA.md` - Column usage by engine must be documented
+
+### **Gameweek Detection Logic - Document in DATABASE_SCHEMA.md**
+
+**🎯 CRITICAL FIX DISCOVERED:**
+Many functions were using hardcoded `gameweek = 1` instead of database detection.
+
+**✅ CORRECT PATTERN:**
+```sql
+SELECT MAX(gameweek) FROM player_metrics WHERE gameweek IS NOT NULL
+```
+
+**❌ INCORRECT PATTERNS TO AVOID:**
+- `gameweek = 1` (hardcoded)
+- `current_gameweek = getCurrentGameweek()` without database query
+- Using parameter gameweek without validation
+
+**📋 FILES THAT NEED GAMEWEEK LOGIC:**
+- `src/app.py` (manual overrides, data imports)
+- `calculation_engine_v2.py` (dynamic blending)
+- Any new calculation or import functionality
+
+### **Historical Data Integration - Document in API_REFERENCE.md**
+
+**🎯 ESSENTIAL DATA PIPELINE:**
+v2.0 Dynamic Blending requires historical PPG calculation in ALL player queries:
+
+```sql
+CASE 
+    WHEN COALESCE(pgd.games_played_historical, 0) > 0 
+    THEN COALESCE(pgd.total_points_historical, 0) / pgd.games_played_historical 
+    ELSE pm.ppg 
+END as historical_ppg
+```
+
+**📋 AFFECTED ENDPOINTS:**
+- `/api/players` - Main dashboard data
+- `/api/calculate-values-v2` - v2.0 calculations
+- Any new player data endpoints
+
+### **Parameter Structure Conflicts - Document in DEVELOPMENT_SETUP.md**
+
+**⚠️ JAVASCRIPT CONFLICTS DISCOVERED:**
+The frontend parameter detection must handle both engines separately:
+
+**v1.0 Parameters:**
+```javascript
+form_calculation: { strength: 0.5 }
+fixture_difficulty: { strength: 0.8 }
+```
+
+**v2.0 Parameters:**
+```javascript
+formula_optimization_v2: {
+  exponential_form: { alpha: 0.87 }
+}
+```
+
+**📋 TESTING REQUIREMENTS:**
+- Test parameter changes in both v1.0 Legacy and v2.0 Enhanced modes
+- Verify Apply Changes button works correctly for each engine
+- Confirm database updates go to correct columns (value_score vs true_value/roi)
+
 ## Tools and Automation
 
 ### Documentation Validation Commands
@@ -189,4 +282,43 @@ grep -r "Complete\|Pending\|Deferred" docs/
 
 **This maintenance guide ensures comprehensive, accurate, and up-to-date documentation throughout the Formula Optimization project lifecycle.**
 
-*Last updated: 2025-08-21 - Created after Sprint 1 completion*
+## 🎯 POST-DUAL ENGINE MANDATORY UPDATES
+
+### **Every Documentation Update Must Now Include:**
+
+1. **Engine Specification** - Which engine(s) the feature/change affects
+2. **Parameter Structure** - v1.0 vs v2.0 parameter format documentation
+3. **Database Columns** - Which columns are read/written by each engine
+4. **Gameweek Handling** - Verify proper database-driven gameweek detection
+5. **Historical Data** - Document any historical PPG calculation requirements
+
+### **Critical Files Requiring Dual Engine Documentation:**
+
+**High Priority:**
+- `DATABASE_SCHEMA.md` - Engine-specific column usage, gameweek detection patterns
+- `API_REFERENCE.md` - Separate v1.0/v2.0 endpoints, historical_ppg requirements  
+- `DEVELOPMENT_SETUP.md` - Dual engine testing procedures, parameter structure conflicts
+- `FEATURE_GUIDE.md` - UI toggle behavior, engine-specific features
+
+**Medium Priority:**
+- `FORMULA_REFERENCE.md` - v1.0 vs v2.0 calculation differences
+- `TESTING_METHODOLOGY.md` - Engine-specific validation procedures
+
+### **New Documentation Standards (Post-2025-08-22):**
+
+**Engine References:**
+- Always specify "v1.0 Legacy" or "v2.0 Enhanced" when discussing features
+- Never use ambiguous terms like "current system" without engine specification
+
+**Code Examples:**
+- Include both v1.0 and v2.0 examples where applicable
+- Show correct gameweek detection pattern in any time-based functionality
+- Include historical_ppg calculation in any player data queries
+
+**Cross-References:**
+- Link to CLAUDE.md dual engine warnings from technical documents
+- Reference `v2.0-dynamic-blending-stable` git tag for safe reversion points
+
+---
+
+*Last updated: 2025-08-22 - Major update: Added critical architectural discoveries and dual engine documentation requirements*

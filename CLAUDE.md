@@ -2,9 +2,32 @@
 
 ## Current System Status
 
-✅ **Production Ready Dashboard** with comprehensive parameter controls and player analytics
+✅ **v2.0 Enhanced Formula Complete** - Dynamic Blending with Historical Data Integration
 
-### Recent Major Features (2025-08-20)
+## ⚠️ CRITICAL: DUAL ENGINE SYSTEM
+
+**IMPORTANT FOR DEVELOPERS**: This system now runs TWO calculation engines in parallel:
+
+- **v1.0 Legacy Engine** (`src/app.py` calculations + static multipliers)
+- **v2.0 Enhanced Engine** (`calculation_engine_v2.py` + dynamic blending)
+
+**⚠️ ENGINE SEPARATION WARNINGS:**
+1. **Parameter Structure**: v1.0 uses `form_calculation`, v2.0 uses `formula_optimization_v2.exponential_form`
+2. **Database Columns**: v1.0 writes to `value_score`, v2.0 writes to `true_value` + `roi`  
+3. **API Endpoints**: `/api/players` (both), `/api/calculate-values-v2` (v2.0 only)
+4. **JavaScript**: Different parameter detection for v1.0 vs v2.0 modes
+5. **Calculation Logic**: v1.0 = `(PPG/Price) × multipliers`, v2.0 = `Blended_PPG × multipliers ÷ Price`
+
+**⚠️ WHEN MODIFYING CODE:**
+- **Check which engine** you're working on - don't mix v1.0 and v2.0 logic
+- **Test both modes** - Dashboard has toggle switch between Legacy/Enhanced
+- **Parameter changes** - Ensure correct structure for target engine
+- **Database updates** - v2.0 requires `historical_ppg`, `baseline_xgi`, etc.
+- **API changes** - Update both main and v2.0 endpoints if needed
+
+**✅ Safe Reversion Point**: `git reset --hard v2.0-dynamic-blending-stable`
+
+### Recent Major Features (2025-08-22)
 - **Blender Display Configuration**: Adjustable thresholds for blending historical/current season data
 - **Professional Tooltip System**: All 17 columns have detailed explanations
 - **Complete xGI Integration**: Understat data with name matching system (99% match rate)
@@ -302,3 +325,48 @@ Research revealed v2.0 is NOT a true replacement but a layer over v1.0:
 - All v2.0 enhanced features confirmed working
 - Database proven compatible with v2.0-only operation
 - User can safely experiment knowing rollback option exists
+
+---
+*Last Updated: 2025-08-22 - Focus: Dynamic Blending Complete + Critical Dual Engine Warnings*
+
+## Dynamic Blending Implementation Complete (2025-08-22)
+
+### ✅ MAJOR BREAKTHROUGH: Historical Data Integration
+
+**🎯 Core Fix**: v2.0 Dynamic Blending now properly uses real 2024-25 season data
+
+**Technical Achievements**:
+- **Historical PPG Calculation**: Added to both main API (`/api/players`) and v2.0 API (`/api/calculate-values-v2`)
+- **Current Gameweek Detection**: Fixed hardcoded GW1 → database `MAX(gameweek)` query 
+- **Database Integration**: `total_points_historical ÷ games_played_historical = historical_ppg`
+- **Enhanced Data Pipeline**: v2.0 engine now receives complete dataset (historical_ppg, baseline_xgi, games data)
+
+**Formula Impact**:
+```
+Current (GW2): w_current = min(1, (2-1)/(16-1)) = 0.067
+Blended PPG = (0.067 × Current_PPG) + (0.933 × Historical_PPG_2024_25)
+True Value = Blended_PPG × Form × Fixture × Starter × xGI
+```
+
+**Files Modified**:
+- `calculation_engine_v2.py` - Fixed `_get_current_gameweek()` with database query
+- `src/app.py` - Added `historical_ppg` calculation to both player APIs
+- Enhanced v2.0 calculation endpoint with complete dataset
+
+**🚨 CRITICAL ENGINE SEPARATION**:
+- v1.0 engine unaffected (still uses current PPG only)
+- v2.0 engine now properly blends historical + current data
+- Dashboard toggle switches between completely different calculation methods
+- Parameter structures remain separate (v1.0: `form_calculation`, v2.0: `formula_optimization_v2`)
+
+### Git Status
+- **Stable Commit**: `af620fb` - Complete Dynamic Blending implementation
+- **Safe Tag**: `v2.0-dynamic-blending-stable` - Reversion point
+- **Documentation**: README.md and CLAUDE.md updated with dual engine warnings
+
+### System State
+- ✅ **Working**: v2.0 Dynamic Blending with real historical data
+- ✅ **Working**: v1.0 Legacy system (unchanged)  
+- ✅ **Working**: Dual engine coexistence with proper separation
+- ✅ **Working**: Form multipliers correctly showing 1.0 (early season, insufficient data)
+- ✅ **Documentation**: Clear warnings about dual engine development requirements

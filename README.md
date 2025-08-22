@@ -1,27 +1,32 @@
 # Fantrax Value Hunter
 **Fantasy Football Analytics Platform - Production Ready**
 
-Advanced dashboard for finding undervalued Premier League players through configurable True Value calculations. Analyzes all 647+ players with real-time parameter adjustment, manual overrides, and comprehensive data integration.
+Advanced dashboard for finding undervalued Premier League players through **dual calculation engines** (v1.0 Legacy + v2.0 Enhanced). Features dynamic historical data blending, real-time parameter adjustment, manual overrides, and comprehensive data integration for all 647+ Premier League players.
 
 ---
 
-## 🎯 **Current Status: Production Ready**
+## 🎯 **Current Status: v2.0 Enhanced Formula Complete**
 
-✅ **Fully Operational Dashboard** with:
-- **Two-Panel Design**: Parameter controls + filterable player table
-- **True Value Calculator**: PPG × Form × Fixture × Starter × xGI multipliers
+✅ **Formula Optimization v2.0** - **Dynamic Blending System**:
+- **Historical Data Integration**: Real 2024-25 season performance blended with current 2025-26 data
+- **Dual Engine System**: v1.0 Legacy + v2.0 Enhanced running in parallel
+- **Smart Transition**: Early season uses 93.3% historical, 6.7% current data (GW2)
+- **Enhanced Calculations**: EWMA form, exponential fixture difficulty, normalized xGI
+- **True Value Separation**: Point prediction separate from ROI (value/price ratio)
+
+✅ **Production Dashboard** with:
+- **Two-Panel Design**: Parameter controls + filterable player table  
+- **Formula Toggle**: Switch between v1.0 Legacy and v2.0 Enhanced modes
+- **ROI Column**: Return on Investment calculations (v2.0 only)
 - **Manual Override System**: Real-time starter prediction controls (S/B/O/A)
 - **Advanced Filtering**: Position, price range, team, player search
-- **Comprehensive Pagination**: 50/100/200/All page sizes with numeric sorting
-- **xGI Integration**: Expected Goals Involvement data from Understat
 - **Professional UI**: Tooltips, color coding, responsive design
 
-**Recent Updates (2025-08-20)**:
-- Fixed Games column numeric sorting
-- Enhanced pagination with "All" option  
-- Updated UI terminology ("Blender Display", "Upload Weekly Game Data")
-- Comprehensive documentation overhaul
-- Critical data fixes (player corrections, name mappings)
+**Major Updates (2025-08-22)**:
+- **✅ COMPLETE**: Dynamic Blending with historical PPG integration from 2024-25 season
+- **✅ COMPLETE**: Current gameweek detection (no more hardcoded GW1)  
+- **✅ COMPLETE**: Enhanced API endpoints with complete dataset integration
+- **✅ STABLE**: Git checkpoint created (`v2.0-dynamic-blending-stable`)
 
 ---
 
@@ -93,9 +98,22 @@ See `docs/DEVELOPMENT_SETUP.md` for complete setup instructions including:
 
 ## 🎯 **Core Features**
 
-### **True Value Calculation**
+### **🎯 Dual Engine System**
+
+**⚠️ IMPORTANT: Two Calculation Engines**
+- **v1.0 Legacy**: Original system with static weights and linear calculations
+- **v2.0 Enhanced**: Research-based improvements with dynamic blending
+
+**v2.0 Enhanced Formula:**
 ```
-True Value = PPG × Form × Fixture × Starter × xGI Multipliers
+True Value = Blended PPG × Form × Fixture × Starter × xGI
+ROI = True Value ÷ Player Price
+```
+
+**Dynamic Blending (v2.0 only):**
+```
+Blended PPG = (w_current × Current PPG) + (w_historical × Historical PPG)
+w_current = min(1, (gameweek-1)/(16-1))  // 6.7% current, 93.3% historical at GW2
 ```
 
 ### **Parameter Control Systems**
@@ -166,7 +184,8 @@ True Value = PPG × Form × Fixture × Starter × xGI Multipliers
 
 ## 🔗 **API Endpoints**
 
-**Player Data**: `/api/players` (filtering, sorting, pagination)  
+**Player Data**: `/api/players` (filtering, sorting, pagination with historical_ppg)  
+**v2.0 Calculations**: `/api/calculate-values-v2` (enhanced formula with dynamic blending)  
 **Configuration**: `/api/config`, `/api/update-parameters`  
 **Data Import**: `/api/import-form-data`, `/api/import-lineups`, `/api/import-odds`  
 **Manual Overrides**: `/api/manual-override` (real-time starter adjustments)  
@@ -214,12 +233,12 @@ Complete documentation available in `docs/` folder:
 - **Match Accuracy**: 71.4% automatic for FFS imports, 85%+ confidence scoring
 - **UI Features**: Professional tooltips, numeric sorting, advanced pagination
 
-### **🔄 Recent Fixes (2025-08-20)**
-- Games column now sorts numerically using backend `games_total` field
-- Fixed pagination buttons to use correct filtered count
-- Updated 50+ players with incorrect games/minutes data
-- Enhanced name mapping for Rodrigo players (Wolves/Fulham team swap)
-- Comprehensive UI terminology updates for clarity
+### **🔄 Recent Major Updates (2025-08-22)**
+- **v2.0 Enhanced Formula**: Complete dynamic blending system with historical data integration
+- **Historical PPG Calculation**: Real 2024-25 season performance data properly integrated
+- **Current Gameweek Detection**: Fixed hardcoded GW1 to use database MAX(gameweek)
+- **Enhanced APIs**: Both main and v2.0 calculation endpoints include complete dataset
+- **Git Safety**: Stable checkpoint created (`v2.0-dynamic-blending-stable`) for safe reversion
 
 ---
 
