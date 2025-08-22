@@ -35,9 +35,9 @@ pytest-cov>=4.1.0
 black>=23.0.0  # Code formatting
 flake8>=6.0.0  # Linting
 
-# Optional: Database Support (Future)
-# sqlite3 (built-in)
-# sqlalchemy>=2.0.0
+# Database Support (Production)
+psycopg2-binary>=2.9.0  # PostgreSQL adapter for Railway deployment
+sqlalchemy>=2.0.0
 
 # Sprint 3: Validation Framework & Statistical Analysis
 scipy>=1.11.0

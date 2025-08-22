@@ -31,14 +31,28 @@ app = Flask(__name__,
             static_folder='../static')
 CORS(app)
 
-# Database configuration
+# Database configuration - supports both local and production environments
 DB_CONFIG = {
-    'host': 'localhost',
-    'port': 5433,
-    'user': 'fantrax_user',
-    'password': 'fantrax_password',
-    'database': 'fantrax_value_hunter'
+    'host': os.getenv('PGHOST', 'localhost'),
+    'port': int(os.getenv('PGPORT', 5433)),
+    'user': os.getenv('PGUSER', 'fantrax_user'),
+    'password': os.getenv('PGPASSWORD', 'fantrax_password'),
+    'database': os.getenv('PGDATABASE', 'fantrax_value_hunter')
 }
+
+# Alternative: use DATABASE_URL if provided (Railway format)
+DATABASE_URL = os.getenv('DATABASE_URL')
+if DATABASE_URL:
+    # Railway provides DATABASE_URL in format: postgresql://user:pass@host:port/db
+    import urllib.parse
+    result = urllib.parse.urlparse(DATABASE_URL)
+    DB_CONFIG = {
+        'host': result.hostname,
+        'port': result.port,
+        'user': result.username,
+        'password': result.password,
+        'database': result.path[1:]  # Remove leading slash
+    }
 
 def get_db_connection():
     """Get database connection with error handling"""
@@ -3447,4 +3461,7 @@ if __name__ == '__main__':
         print(f"Database connection failed: {e}")
         print("Starting app anyway...")
     
-    app.run(debug=True, host='0.0.0.0', port=5000)
+    # Production-ready configuration
+    port = int(os.getenv('PORT', 5000))
+    debug = os.getenv('FLASK_ENV') == 'development'
+    app.run(debug=debug, host='0.0.0.0', port=port)
