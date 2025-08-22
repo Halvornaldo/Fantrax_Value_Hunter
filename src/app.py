@@ -18,9 +18,15 @@ from datetime import datetime
 sys.path.append(os.path.dirname(__file__))
 from name_matching import UnifiedNameMatcher
 
-# Add integration package to path
-sys.path.append('C:/Users/halvo/.claude/Fantrax_Expected_Stats')
-from integration_package import IntegrationPipeline, UnderstatIntegrator, ValueHunterExtension
+# Add integration package to path (optional for production)
+try:
+    sys.path.append('C:/Users/halvo/.claude/Fantrax_Expected_Stats')
+    from integration_package import IntegrationPipeline, UnderstatIntegrator, ValueHunterExtension
+    INTEGRATION_AVAILABLE = True
+except ImportError:
+    # Integration package not available in production - disable related features
+    INTEGRATION_AVAILABLE = False
+    print("Integration package not available - running in production mode")
 
 # Add v2.0 calculation engine
 sys.path.append(os.path.join(os.path.dirname(__file__), '..'))
@@ -2257,6 +2263,13 @@ def get_monitoring_metrics():
 def sync_understat_data():
     """Sync Understat data with database using Global Name Matching System"""
     try:
+        # Check if integration package is available
+        if not INTEGRATION_AVAILABLE:
+            return jsonify({
+                'error': 'Integration package not available in production mode',
+                'message': 'This feature is only available in development environment'
+            }), 503
+            
         # Initialize integrator to get raw Understat data
         integrator = UnderstatIntegrator(DB_CONFIG)
         understat_df = integrator.extract_understat_per90_stats()
@@ -2555,6 +2568,14 @@ def get_understat_unmatched_data():
 def get_unmatched_understat():
     """Get list of unmatched Understat players for review (legacy endpoint)"""
     try:
+        # Check if integration package is available
+        if not INTEGRATION_AVAILABLE:
+            return jsonify({
+                'error': 'Integration package not available in production mode',
+                'message': 'This feature is only available in development environment',
+                'unmatched_players': []
+            }), 503
+            
         integrator = UnderstatIntegrator(DB_CONFIG)
         understat_df = integrator.extract_understat_per90_stats()
         
