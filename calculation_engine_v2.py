@@ -319,6 +319,11 @@ class FormulaEngineV2:
         """
         Calculate xGI multiplier using Sprint 2 normalized ratio calculation
         """
+        # Check if xGI integration is enabled
+        xgi_config = self.parameters.get('xgi_integration', {})
+        if not xgi_config.get('enabled', True):
+            return 1.0
+            
         return self._calculate_normalized_xgi_multiplier(player_data)
     
     def _calculate_normalized_xgi_multiplier(self, player_data: Dict[str, Any]) -> float:
