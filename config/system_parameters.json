@@ -1,0 +1,105 @@
+{
+  "form_calculation": {
+    "enabled": true,
+    "lookback_period": 5,
+    "minimum_games_for_form": 3,
+    "baseline_switchover_gameweek": 10,
+    "form_strength": 1.0,
+    "weight_recent": 0.6,
+    "weight_older": 0.4,
+    "cap_max_multiplier": 2.0,
+    "cap_min_multiplier": 0.5,
+    "description": "Weighted recent performance vs baseline"
+  },
+  "fixture_difficulty": {
+    "enabled": true,
+    "difficulty_strength": 1.0,
+    "home_advantage": 0.2,
+    "difficulty_cap": 1.8,
+    "description": "Odds-based fixture difficulty multiplier"
+  },
+  "starter_prediction": {
+    "enabled": true,
+    "auto_rotation_penalty": 0.65,
+    "force_bench_penalty": 0.6,
+    "description": "Rotation penalties based on predicted lineups"
+  },
+  "xgi_integration": {
+    "enabled": false,
+    "multiplier_mode": "adjusted",
+    "multiplier_strength": 1,
+    "data_source": "Understat via ScraperFC",
+    "display_stats": true,
+    "show_unmatched_badge": true,
+    "auto_sync_enabled": false,
+    "sync_frequency_hours": 168,
+    "description": "Expected Goals Involvement multiplier system",
+    "multiplier_modes": {
+      "direct": {
+        "description": "Use xGI90 directly as multiplier",
+        "formula": "true_value * xGI90 * strength"
+      },
+      "adjusted": {
+        "description": "Use 1 + (xGI90 * strength) as multiplier",
+        "formula": "true_value * (1 + xGI90 * strength)"
+      },
+      "capped": {
+        "description": "Cap multiplier range between min and max",
+        "formula": "true_value * clamp(xGI90, min, max)",
+        "min": 0.5,
+        "max": 1.5
+      }
+    },
+    "validation_ranges": {
+      "multiplier_strength": {
+        "min": 0.0,
+        "max": 2.0
+      }
+    }
+  },
+  "games_display": {
+    "baseline_switchover_gameweek": 10,
+    "transition_end_gameweek": 15,
+    "description": "Blender display configuration"
+  },
+  "formula_optimization_v2": {
+    "enabled": true,
+    "exponential_form": {
+      "enabled": true,
+      "alpha": 1
+    },
+    "dynamic_blending": {
+      "adaptation_gameweek": 12
+    },
+    "normalized_xgi": {
+      "normalization_strength": 1,
+      "position_adjustments": {
+        "defenders": true,
+        "midfielders": true,
+        "forwards": true
+      }
+    },
+    "multiplier_caps": {
+      "form": 2,
+      "fixture": 1.8,
+      "xgi": 2.5,
+      "global": 3
+    },
+    "ewma_form": {
+      "alpha": 0.87
+    }
+  },
+  "candidate_pools": {
+    "description": "Pool sizes and filters",
+    "pool_sizes": {
+      "G": 8,
+      "D": 20,
+      "M": 20,
+      "F": 20
+    }
+  },
+  "metadata": {
+    "version": "v2.0",
+    "last_updated": "2025-08-22"
+  }
+}
