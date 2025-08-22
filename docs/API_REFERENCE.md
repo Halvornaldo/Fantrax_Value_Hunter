@@ -381,6 +381,8 @@
   "xg90": "number",
   "xa90": "number", 
   "xgi90": "number",
+  "baseline_xgi": "number",
+  "historical_ppg": "number",
   "minutes": "number",
   "last_updated": "timestamp"
 }
@@ -446,4 +448,40 @@
 - **State Management**: Formula toggle affects visual styling but maintains functional consistency
 - **Performance**: New features add minimal overhead to existing API response times
 
-*Last updated: 2025-08-21 - Post Sprint 4 Phase 1 completion (Dashboard Integration)*
+## V2.0 Enhanced API Requirements (Added 2025-08-22)
+
+**⚠️ CRITICAL: baseline_xgi Column Required for V2.0 Mode**
+
+The `/api/players` endpoint MUST include `baseline_xgi` in SQL SELECT when v2.0 Enhanced mode is enabled:
+
+```sql
+-- REQUIRED SQL for v2.0 compatibility  
+SELECT p.id, p.name, p.team, p.position,
+       p.minutes, p.xg90, p.xa90, p.xgi90, p.baseline_xgi,  -- baseline_xgi REQUIRED
+       pm.price, pm.ppg, pm.value_score, pm.true_value, pm.roi,
+       -- Include historical_ppg calculation for Dynamic Blending
+       CASE 
+           WHEN COALESCE(pgd.games_played_historical, 0) > 0 
+           THEN COALESCE(pgd.total_points_historical, 0) / pgd.games_played_historical 
+           ELSE pm.ppg 
+       END as historical_ppg
+FROM players p
+LEFT JOIN player_metrics pm ON p.id = pm.player_id
+LEFT JOIN player_games_data pgd ON p.id = pgd.player_id
+WHERE pm.gameweek = ?
+```
+
+**New API Response Fields (v2.0):**
+- `baseline_xgi` - 2024-25 season xGI baseline for normalization calculations
+- `historical_ppg` - Essential for Dynamic Blending formula
+
+**xGI Toggle Implementation:**
+- Frontend: "Apply xGI to True Value Calculation" checkbox (default: unchecked)
+- Backend: When disabled, xGI multiplier = 1.0x (no effect on True Value)
+- Early season strategy: Recommended disabled until sufficient current season data
+
+**Engine Separation:**
+- v1.0 Legacy: Ignores `baseline_xgi`, uses capped xGI calculations
+- v2.0 Enhanced: REQUIRES `baseline_xgi` for normalized ratio calculations
+
+*Last updated: 2025-08-22 - Added v2.0 xGI implementation and baseline_xgi API requirements*

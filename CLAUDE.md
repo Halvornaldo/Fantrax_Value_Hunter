@@ -28,6 +28,9 @@
 **✅ Safe Reversion Point**: `git reset --hard v2.0-dynamic-blending-stable`
 
 ### Recent Major Features (2025-08-22)
+- **V2.0 xGI Enable/Disable Toggle**: Complete implementation of user-controllable xGI application to True Value calculations
+- **V2.0 Normalized xGI System**: Production-ready ratio-based xGI calculation with position-specific adjustments
+- **Critical Database Fix**: Added missing `baseline_xgi` column to `/api/players` endpoint enabling V2 calculations
 - **Blender Display Configuration**: Adjustable thresholds for blending historical/current season data
 - **Professional Tooltip System**: All 17 columns have detailed explanations
 - **Complete xGI Integration**: Understat data with name matching system (99% match rate)
@@ -370,3 +373,52 @@ True Value = Blended_PPG × Form × Fixture × Starter × xGI
 - ✅ **Working**: Dual engine coexistence with proper separation
 - ✅ **Working**: Form multipliers correctly showing 1.0 (early season, insufficient data)
 - ✅ **Documentation**: Clear warnings about dual engine development requirements
+
+## V2.0 xGI Implementation Complete (2025-08-22)
+
+### ✅ COMPLETE IMPLEMENTATION: User-Controllable xGI System
+
+**🎯 Major Achievement**: Full V2.0 normalized xGI system with user toggle control
+
+**Technical Implementation**:
+- **Dashboard Toggle**: Added enable/disable checkbox (defaults to disabled for early season)
+- **Backend Integration**: V2 engine properly calculates normalized xGI when enabled
+- **Database Fix**: Added missing `baseline_xgi` column to `/api/players` SQL query
+- **JavaScript Controls**: Complete parameter detection and state management
+- **Position Adjustments**: Defenders get 30% impact reduction (xGI less relevant for defensive play)
+
+**Formula Validation**:
+```
+Ben White Example:
+- baseline_xgi: 0.142 (2024-25 average) ✅ Correct
+- current xgi90: 0.099 (2025-26 limited data) ✅ Correct  
+- V2 calculation: 0.099/0.142 = 0.697 → 0.909x (defender adjustment) ✅ Working as designed
+
+Calafiori Example:
+- baseline_xgi: 0.108 (2024-25 average) ✅ Correct
+- current xgi90: 1.041 (excellent early form) ✅ Correct
+- V2 calculation: 1.041/0.108 = 9.64 → 2.500x (capped) ✅ Working as designed
+```
+
+**Key Findings**:
+- **"Normalized around 1.0"** means 1.0x = baseline performance (neutral)
+- **Early season ratios** are legitimate performance indicators, not data errors
+- **Position-specific adjustments** reduce xGI impact for defenders (30% vs 100% for forwards)
+- **Baseline data** uses 2024-25 season averages (correct for current 2025-26 season)
+
+**Files Modified**:
+- `src/app.py` - Added baseline_xgi to SQL query, V2 engine integration
+- `templates/dashboard.html` - Added enable/disable toggle (defaults unchecked)
+- `static/js/dashboard.js` - Added toggle event handlers and parameter detection
+
+**User Experience**:
+- **Disabled by default** - Appropriate for early season with limited sample sizes
+- **Easy toggle control** - Users can enable when confident in current season data
+- **Clear feedback** - 1.00x when disabled, calculated ratios when enabled
+- **Dashboard integration** - Works seamlessly with V2.0 Enhanced mode toggle
+
+### Early Season Strategy (GW2)
+- **Current setting**: xGI disabled by default (all players show 1.00x)
+- **Rationale**: Limited 2025-26 data creates volatile ratios vs 2024-25 baselines
+- **Future activation**: Users can enable after ~GW5 when current season data stabilizes
+- **Long-term value**: System ready for full deployment when data maturity improves

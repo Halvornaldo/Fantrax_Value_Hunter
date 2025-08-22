@@ -1519,6 +1519,8 @@ body.v1-enabled .true-value-enhanced {
     font-size: 0.85em;
     font-weight: bold;
     transition: width 0.3s ease;
+    min-width: 60px;
+    position: relative;
 }
 
 .current-weight {
@@ -1530,6 +1532,35 @@ body.v1-enabled .true-value-enhanced {
     font-size: 0.85em;
     font-weight: bold;
     transition: width 0.3s ease;
+    min-width: 60px;
+    position: relative;
+}
+
+/* Hide text when section is too narrow, show only percentage */
+.historical-weight[style*="width: 0%"],
+.current-weight[style*="width: 0%"] {
+    min-width: 0;
+}
+
+.historical-weight[style*="width: 1%"],
+.historical-weight[style*="width: 2%"],
+.historical-weight[style*="width: 3%"],
+.historical-weight[style*="width: 4%"],
+.historical-weight[style*="width: 5%"],
+.historical-weight[style*="width: 6%"],
+.historical-weight[style*="width: 7%"],
+.historical-weight[style*="width: 8%"],
+.historical-weight[style*="width: 9%"],
+.current-weight[style*="width: 1%"],
+.current-weight[style*="width: 2%"],
+.current-weight[style*="width: 3%"],
+.current-weight[style*="width: 4%"],
+.current-weight[style*="width: 5%"],
+.current-weight[style*="width: 6%"],
+.current-weight[style*="width: 7%"],
+.current-weight[style*="width: 8%"],
+.current-weight[style*="width: 9%"] {
+    min-width: 40px;
 }
 
 .weight-formula {
@@ -1641,4 +1672,31 @@ body.v2-enabled .v1-legacy-section {
 
 body.v1-enabled .v1-legacy-section {
     display: block !important;
+}
+
+/* Dark Theme Overrides for v2.0 Enhanced Sections */
+[data-theme="dark"] .v2-enhanced-section {
+    border-color: #4a5c3a;
+    background: rgba(74, 92, 58, 0.15);
+}
+
+[data-theme="dark"] .v2-enhanced-section h3 {
+    background: linear-gradient(135deg, #4a5c3a, #3d7c5a);
+    color: #e0e0e0;
+}
+
+[data-theme="dark"] .v2-help {
+    background: rgba(74, 92, 58, 0.2);
+    border-left-color: #4a5c3a;
+    color: var(--text-secondary);
+}
+
+[data-theme="dark"] .weight-formula {
+    color: #a0a0a0;
+    background: rgba(74, 92, 58, 0.2);
+}
+
+[data-theme="dark"] .info-display {
+    background: rgba(74, 92, 58, 0.15);
+    color: var(--text-primary);
 }

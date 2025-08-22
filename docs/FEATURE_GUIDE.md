@@ -115,14 +115,16 @@ All features can be configured through the Parameter Controls panel on the left 
 - **Multiplier Strength**: xGI impact factor (default: 1.0)
 - **Sync Button**: Manually sync with Understat data
 
-**Sprint 2 Enhancement (API Only)**:
+**Sprint 2 Enhancement (v2.0 Available)**:
 - **Normalized xGI**: Ratio-based calculation (current_xGI90 / baseline_xGI90)
 - **Historical Baselines**: Uses 2024/25 season data for proper comparison
 - **Position-Specific Logic**:
   - **Goalkeepers**: xGI disabled (not relevant)
-  - **Defenders**: 60% impact reduction (less xGI relevance)
+  - **Defenders**: 30% impact reduction when baseline < 0.2 (less xGI relevance)
   - **Midfielders/Forwards**: Full impact (100%)
-- **Enhanced Range**: [0.4, 2.5] multiplier caps
+- **Enhanced Range**: [0.4, 2.5] multiplier caps (configurable via panel)
+- **Enable/Disable Toggle**: "Apply xGI to True Value Calculation" checkbox (default: disabled)
+- **Early Season Strategy**: xGI disabled by default due to sample size volatility
 - **Data Integration**: 335 players with historical baselines from extract_baseline_xgi.py
 
 **How It Works**:
@@ -407,4 +409,53 @@ All parameter changes are tracked and require "Apply Changes" to take effect.
 
 ---
 
-*Last updated: 2025-08-21 - Post Sprint 4 Phase 1 completion (Dashboard Integration)*
+## V2.0 xGI Enhancement Implementation (Added 2025-08-22)
+
+### xGI Enable/Disable Toggle
+**Purpose**: Control whether xGI calculations affect True Value in early season when sample sizes are volatile
+
+**Frontend Controls** (v2.0 Enhanced mode only):
+- **Toggle Location**: Normalized xGI section of Parameter Controls panel
+- **Label**: "Apply xGI to True Value Calculation"
+- **Default State**: Unchecked (disabled) for early season stability
+- **Help Text**: "When unchecked, xGI multiplier = 1.0x (no effect on True Value)"
+
+**Technical Implementation**:
+- **Enabled**: Uses full normalized xGI calculation with position adjustments
+- **Disabled**: Forces xGI multiplier to 1.0x (neutral, no True Value impact)
+- **Real-time**: Changes apply immediately via "Apply Changes" button
+- **Validation**: Player table shows 1.000x in xGI column when disabled
+
+**Early Season Strategy**:
+- **Problem**: Low current season sample sizes create volatile ratios
+- **Example**: Ben White (0.909x), Calafiori (2.500x) with limited 2025-26 data
+- **Solution**: Default disabled until ~GW5-8 when sufficient current season data exists
+- **User Control**: Can be enabled anytime for users who want aggressive early-season xGI
+
+**Backend Logic**:
+```python
+# V2.0 engine checks enable state before calculating
+xgi_config = parameters.get('formula_optimization_v2', {}).get('normalized_xgi', {})
+xgi_enabled = xgi_config.get('enabled', True)
+
+if xgi_enabled:
+    # Full normalized calculation with position adjustments
+    v2_xgi_multiplier = v2_engine._calculate_normalized_xgi_multiplier(player_dict)
+    v2_xgi_capped = v2_engine._apply_multiplier_cap(v2_xgi_multiplier, 'xgi')
+else:
+    # Neutral multiplier - no effect on True Value
+    v2_xgi_capped = 1.0
+```
+
+### Baseline Data Validation
+**Database Requirements**:
+- `baseline_xgi` column REQUIRED in `/api/players` endpoint for v2.0 mode
+- 335 players with 2024-25 season baselines from Understat integration
+- Missing baselines handled gracefully (fallback to neutral 1.0x multiplier)
+
+**Position-Specific Adjustments** (when enabled):
+- **Goalkeepers**: xGI completely disabled (not relevant for GK performance)
+- **Defenders**: 30% impact reduction for low baseline players (< 0.2 baseline_xgi)
+- **Midfielders/Forwards**: Full normalized impact (100%)
+
+*Last updated: 2025-08-22 - Added v2.0 xGI toggle implementation and early season strategy documentation*

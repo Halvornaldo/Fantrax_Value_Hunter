@@ -449,7 +449,7 @@ def get_players():
         base_query = """
             SELECT 
                 p.id, p.name, p.team, p.position,
-                p.minutes, p.xg90, p.xa90, p.xgi90,
+                p.minutes, p.xg90, p.xa90, p.xgi90, p.baseline_xgi,
                 pm.price, pm.ppg, pm.value_score, pm.true_value,
                 p.roi,
                 pm.form_multiplier, pm.fixture_multiplier, pm.starter_multiplier, pm.xgi_multiplier,
@@ -562,6 +562,37 @@ def get_players():
             # Add numeric value for sorting (total games for reliable sorting)
             player_dict['games_total'] = games_historical + games_current
             players_list.append(player_dict)
+        
+        # Apply V2 calculations if V2 mode is enabled
+        v2_enabled = parameters.get('formula_optimization_v2', {}).get('enabled', False)
+        if v2_enabled:
+            try:
+                # Import V2 engine
+                from calculation_engine_v2 import FormulaEngineV2
+                
+                # Initialize V2 engine with current parameters
+                v2_engine = FormulaEngineV2(DB_CONFIG, parameters)
+                
+                # Calculate V2 xGI multipliers for each player
+                for player_dict in players_list:
+                    # Only calculate if player has baseline xGI data
+                    if player_dict.get('baseline_xgi') is not None:
+                        # Check if xGI is enabled in normalized_xgi config
+                        xgi_config = parameters.get('formula_optimization_v2', {}).get('normalized_xgi', {})
+                        xgi_enabled = xgi_config.get('enabled', True)
+                        
+                        if xgi_enabled:
+                            v2_xgi_multiplier = v2_engine._calculate_normalized_xgi_multiplier(player_dict)
+                            v2_xgi_capped = v2_engine._apply_multiplier_cap(v2_xgi_multiplier, 'xgi')
+                        else:
+                            v2_xgi_capped = 1.0  # Disabled, use neutral multiplier
+                        
+                        # Override the V1 xgi_multiplier with V2 calculated value
+                        player_dict['xgi_multiplier'] = v2_xgi_capped
+                        
+            except Exception as e:
+                # Log error but don't break the API - fall back to V1 values
+                print(f"Warning: V2 xGI calculation failed: {e}")
         
         elapsed_time = time.time() - start_time
         

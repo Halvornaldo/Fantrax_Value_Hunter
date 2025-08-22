@@ -866,18 +866,21 @@ function buildParameterChanges() {
         }
         
         // Check Normalized xGI parameters
+        const xgiEnabled = document.getElementById('xgi-enabled')?.checked !== false;
         const xgiStrength = parseFloat(document.getElementById('xgi-normalization-strength')?.value || 1.0);
         const xgiDefenders = document.getElementById('xgi-defenders')?.checked;
         const xgiMidfielders = document.getElementById('xgi-midfielders')?.checked;
         const xgiForwards = document.getElementById('xgi-forwards')?.checked;
         
         const currentXgi = currentV2Config.normalized_xgi || {};
-        if (Math.abs(xgiStrength - (currentXgi.normalization_strength || 1.0)) > 0.01 ||
+        if (xgiEnabled !== (currentXgi.enabled !== false) ||
+            Math.abs(xgiStrength - (currentXgi.normalization_strength || 1.0)) > 0.01 ||
             xgiDefenders !== (currentXgi.position_adjustments?.defenders !== false) ||
             xgiMidfielders !== (currentXgi.position_adjustments?.midfielders !== false) ||
             xgiForwards !== (currentXgi.position_adjustments?.forwards !== false)) {
             if (!changes.formula_optimization_v2) changes.formula_optimization_v2 = {};
             changes.formula_optimization_v2.normalized_xgi = {
+                enabled: xgiEnabled,
                 normalization_strength: xgiStrength,
                 position_adjustments: {
                     defenders: xgiDefenders,
@@ -2326,7 +2329,7 @@ function updateBlendingVisualization() {
         historicalBar.querySelector('span').textContent = `Historical: ${historicalPercent}%`;
         
         currentBar.style.width = `${currentPercent}%`;
-        currentBar.querySelector('span').textContent = `Current: ${currentPercent}%`;
+        currentBar.querySelector('span').textContent = `${currentPercent}%`;
     }
 }
 
@@ -2338,6 +2341,9 @@ function setupXGIControls() {
     const defenderToggle = document.getElementById('xgi-defenders');
     const midfielderToggle = document.getElementById('xgi-midfielders');
     const forwardToggle = document.getElementById('xgi-forwards');
+    
+    // xGI enabled toggle
+    const xgiEnabledToggle = document.getElementById('xgi-enabled');
     
     if (normalizationSlider) {
         normalizationSlider.addEventListener('input', function() {
@@ -2354,6 +2360,13 @@ function setupXGIControls() {
             });
         }
     });
+    
+    // xGI enabled toggle handler
+    if (xgiEnabledToggle) {
+        xgiEnabledToggle.addEventListener('change', function() {
+            markParameterChanged();
+        });
+    }
 }
 
 function setupCapControls() {

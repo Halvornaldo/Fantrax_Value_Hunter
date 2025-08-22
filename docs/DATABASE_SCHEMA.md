@@ -19,7 +19,7 @@ Primary player data table
   - `roi` (DECIMAL 8,3) - Return on investment (true_value/price)
   - `formula_version` (VARCHAR 10, DEFAULT 'v2.0') - Formula version used
   - `exponential_form_score` (DECIMAL 5,3) - EWMA form calculation
-  - `baseline_xgi` (DECIMAL 5,3) - **Sprint 2: Historical 2024/25 xGI baseline for normalization**
+  - `baseline_xgi` (DECIMAL 5,3) - **Sprint 2: Historical 2024/25 xGI baseline for normalization** ⚠️ REQUIRED for v2.0 engine
   - `blended_ppg` (DECIMAL 5,2) - **Sprint 2: Dynamic blend of historical/current PPG**
   - `current_season_weight` (DECIMAL 4,3) - **Sprint 2: Current season data weight for blending**
 - **Description**: Contains basic player information, xG statistics, and v2.0 Sprint 2 enhancements
@@ -292,4 +292,29 @@ All tables include appropriate indexes for:
 
 **Maintenance Note**: This document must be updated after each Formula Optimization sprint with new columns, tables, and migration status. See `docs/DOCUMENTATION_MAINTENANCE.md` for complete update requirements.
 
-*Last updated: 2025-08-21 - Post Formula Optimization v2.0 Sprint 1 completion*
+## V2.0 Engine Column Dependencies (Added 2025-08-22)
+
+**⚠️ CRITICAL: baseline_xgi Column Required for V2.0 API Endpoints**
+
+The v2.0 Enhanced formula engine requires the `baseline_xgi` column to be included in ALL player API queries:
+
+```sql
+-- REQUIRED for v2.0 engine functionality
+SELECT p.baseline_xgi FROM players p WHERE ...
+```
+
+**Engine-Specific Column Usage:**
+- **v1.0 Legacy Engine**: Uses `value_score` column, ignores v2.0 columns
+- **v2.0 Enhanced Engine**: Writes to `true_value` + `roi`, REQUIRES `baseline_xgi` for normalized xGI calculations
+
+**xGI Toggle Implementation (2025-08-22):**
+- Frontend toggle: "Apply xGI to True Value Calculation" (default: disabled)
+- When disabled: xGI multiplier = 1.0x (no effect on True Value)
+- When enabled: Uses normalized xGI calculation with position-specific adjustments
+- Early season strategy: Recommended disabled due to sample size volatility
+
+**API Endpoint Dependencies:**
+- `/api/players` - MUST include `p.baseline_xgi` in SELECT for v2.0 mode
+- `/api/calculate-values-v2` - Requires baseline_xgi for normalized calculations
+
+*Last updated: 2025-08-22 - Added v2.0 xGI implementation and column dependency documentation*

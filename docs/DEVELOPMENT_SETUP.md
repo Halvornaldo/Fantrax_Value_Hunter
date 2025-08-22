@@ -460,4 +460,157 @@ After completing each Formula Optimization sprint, the following documents MUST 
 - Formula toggle is intended for testing/development - not critical for production
 - Backend transaction errors may occur if database connections aren't properly closed
 
-*Last updated: 2025-08-21 - Post Sprint 4 Phase 1 completion (Dashboard Integration)*
+## V2.0 xGI Testing Procedures (Added 2025-08-22)
+
+### xGI Toggle Testing
+**Purpose**: Validate the v2.0 xGI enable/disable functionality works correctly
+
+**Testing Steps**:
+```bash
+# 1. Test v2.0 xGI disabled (default state)
+curl -X POST http://localhost:5000/api/calculate-values-v2 \
+  -H "Content-Type: application/json" \
+  -d '{"formula_version": "v2.0", "gameweek": 2}'
+
+# Expected: All players show xGI multiplier = 1.000x in response
+```
+
+**Frontend Testing**:
+1. Load dashboard in v2.0 Enhanced mode
+2. Navigate to Normalized xGI section
+3. Verify "Apply xGI to True Value Calculation" checkbox is UNCHECKED by default
+4. Check help text displays: "When unchecked, xGI multiplier = 1.0x (no effect on True Value)"
+5. Player table should show 1.000x in xGI column for all players
+
+**Toggle Enable Testing**:
+```bash
+# 2. Test xGI enabled state
+# Check the checkbox in dashboard, click "Apply Changes"
+# Verify player table shows calculated xGI values (not all 1.000x)
+# Expected examples:
+# - Ben White: ~0.909x
+# - Calafiori: ~2.500x (capped by system limits)
+```
+
+**Backend Parameter Testing**:
+```bash
+# 3. Verify parameter structure
+python -c "
+import json
+with open('config/system_parameters.json') as f:
+    params = json.load(f)
+    xgi_config = params.get('formula_optimization_v2', {}).get('normalized_xgi', {})
+    print(f'xGI enabled: {xgi_config.get(\"enabled\", \"NOT FOUND\")}')
+    print(f'xGI cap: {xgi_config.get(\"cap\", \"NOT FOUND\")}')
+"
+```
+
+### Baseline Data Validation Testing
+**Purpose**: Ensure baseline_xgi column is properly required and handled
+
+**Database Testing**:
+```bash
+# 4. Test baseline_xgi column presence
+python -c "
+import psycopg2
+conn = psycopg2.connect(host='localhost', port=5433, 
+    user='fantrax_user', password='fantrax_password', 
+    database='fantrax_value_hunter')
+cur = conn.cursor()
+
+# Check baseline_xgi in /api/players query
+cur.execute('''SELECT COUNT(*) FROM players p 
+               WHERE p.baseline_xgi IS NOT NULL''')
+count = cur.fetchone()[0]
+print(f'Players with baseline_xgi: {count}/633')
+
+# Test specific players mentioned in conversation
+cur.execute('''SELECT name, baseline_xgi, xgi90 
+               FROM players 
+               WHERE name IN (\'Ben White\', \'Riccardo Calafiori\')''')
+for row in cur.fetchall():
+    print(f'{row[0]}: baseline={row[1]}, current={row[2]}')
+    
+conn.close()
+"
+```
+
+**API Response Testing**:
+```bash
+# 5. Test baseline_xgi appears in API response
+curl "http://localhost:5000/api/players?limit=5" | python -m json.tool | grep baseline_xgi
+
+# Expected: baseline_xgi field should appear in player objects
+# If missing, v2.0 xGI calculations will fail
+```
+
+### Early Season Strategy Validation
+**Purpose**: Document expected behavior for low sample size scenarios
+
+**Expected Behaviors**:
+- **GW1-4**: xGI disabled by default (insufficient current season data)
+- **GW5-8**: User choice - can enable for aggressive early xGI or keep disabled for stability
+- **GW9+**: Safe to enable - sufficient current season sample size
+
+**Testing Low Sample Size**:
+```bash
+# 6. Test volatile ratio detection
+python -c "
+# Simulate early season scenario
+current_xgi = 0.45  # Low current season sample
+baseline_xgi = 2.06  # Historical 2024-25 baseline
+ratio = current_xgi / baseline_xgi if baseline_xgi > 0 else 1.0
+print(f'Early season ratio: {ratio:.3f}x')
+print(f'Volatility concern: {\"HIGH\" if ratio < 0.5 or ratio > 2.0 else \"NORMAL\"}')
+"
+```
+
+### Engine Separation Testing
+**Purpose**: Validate v1.0 and v2.0 engines handle xGI independently
+
+**v1.0 vs v2.0 Testing**:
+```bash
+# 7. Compare xGI calculations between engines
+# In dashboard:
+# a) Switch to v1.0 Legacy mode - xGI should use capped calculations (0.5-1.5x)
+# b) Switch to v2.0 Enhanced mode - xGI should use normalized ratios (baseline-relative)
+# c) Verify same player shows different xGI values in different modes
+```
+
+**Parameter Structure Testing**:
+```bash
+# 8. Verify parameter structures don't conflict
+python -c "
+import json
+with open('config/system_parameters.json') as f:
+    params = json.load(f)
+    
+    # v1.0 parameters
+    v1_xgi = params.get('xgi_integration', {})
+    print(f'v1.0 xGI structure: {list(v1_xgi.keys())}')
+    
+    # v2.0 parameters  
+    v2_xgi = params.get('formula_optimization_v2', {}).get('normalized_xgi', {})
+    print(f'v2.0 xGI structure: {list(v2_xgi.keys())}')
+    
+    # Should be completely separate parameter structures
+"
+```
+
+### Critical Requirement Validation
+
+**⚠️ MUST VERIFY** during testing:
+1. `/api/players` endpoint includes `p.baseline_xgi` in SQL SELECT statement
+2. v2.0 xGI toggle defaults to UNCHECKED (disabled)
+3. When disabled, ALL players show xGI multiplier = 1.000x
+4. When enabled, players show calculated ratios (current_xgi90 / baseline_xgi)
+5. Position adjustments apply correctly (defenders get 30% reduction when baseline < 0.2)
+
+**Testing Checklist**:
+- [ ] xGI toggle shows unchecked by default
+- [ ] baseline_xgi column present in API responses
+- [ ] Toggle enable/disable changes xGI calculations
+- [ ] v1.0 and v2.0 modes show different xGI values
+- [ ] Parameter changes persist after "Apply Changes"
+
+*Last updated: 2025-08-22 - Added comprehensive v2.0 xGI testing procedures and validation requirements*
