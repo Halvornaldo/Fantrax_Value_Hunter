@@ -480,15 +480,18 @@ def get_players():
                 CASE 
                     WHEN COALESCE(pgd.games_played_historical, 0) > 0 
                     THEN COALESCE(pgd.total_points_historical, 0) / pgd.games_played_historical 
-                    ELSE pm.ppg 
-                END as historical_ppg
+                    ELSE NULL 
+                END as historical_ppg,
+                p.id as player_id,
+                COALESCE(tf.difficulty_score, 0) as fixture_difficulty
             FROM players p
             JOIN player_metrics pm ON p.id = pm.player_id
             LEFT JOIN player_games_data pgd ON p.id = pgd.player_id AND pm.gameweek = pgd.gameweek
+            LEFT JOIN team_fixtures tf ON p.team = tf.team_code AND tf.gameweek = %s
             WHERE pm.gameweek = %s
         """
         
-        params = [gameweek]
+        params = [gameweek, gameweek]
         conditions = []
         
         # Add filters
@@ -593,22 +596,30 @@ def get_players():
                 # Initialize V2 engine with current parameters
                 v2_engine = FormulaEngineV2(DB_CONFIG, parameters)
                 
-                # Calculate V2 xGI multipliers for each player
+                # Calculate complete V2 values for each player (not just xGI)
                 for player_dict in players_list:
-                    # Only calculate if player has baseline xGI data
-                    if player_dict.get('baseline_xgi') is not None:
-                        # Check if xGI is enabled in normalized_xgi config
-                        xgi_config = parameters.get('formula_optimization_v2', {}).get('normalized_xgi', {})
-                        xgi_enabled = xgi_config.get('enabled', True)
+                    try:
+                        # Calculate full V2 player value using independent calculations
+                        v2_calculation = v2_engine.calculate_player_value(player_dict)
                         
-                        if xgi_enabled:
-                            v2_xgi_multiplier = v2_engine._calculate_normalized_xgi_multiplier(player_dict)
-                            v2_xgi_capped = v2_engine._apply_multiplier_cap(v2_xgi_multiplier, 'xgi')
-                        else:
-                            v2_xgi_capped = 1.0  # Disabled, use neutral multiplier
+                        # Override ALL multipliers with V2 independent calculations
+                        v2_multipliers = v2_calculation.get('multipliers', {})
+                        player_dict['form_multiplier'] = v2_multipliers.get('form', player_dict.get('form_multiplier', 1.0))
+                        player_dict['fixture_multiplier'] = v2_multipliers.get('fixture', player_dict.get('fixture_multiplier', 1.0))
+                        player_dict['starter_multiplier'] = v2_multipliers.get('starter', player_dict.get('starter_multiplier', 1.0))
+                        player_dict['xgi_multiplier'] = v2_multipliers.get('xgi', player_dict.get('xgi_multiplier', 1.0))
                         
-                        # Override the V1 xgi_multiplier with V2 calculated value
-                        player_dict['xgi_multiplier'] = v2_xgi_capped
+                        # Override True Value with V2 calculation (this is what shows in the True Value column)
+                        player_dict['true_value'] = v2_calculation.get('true_value', player_dict.get('value_score', 0) * player_dict.get('price', 1))
+                        
+                        # Add V2 metadata for debugging
+                        player_dict['v2_calculation'] = True
+                        player_dict['blended_ppg'] = v2_calculation.get('base_ppg', player_dict.get('ppg', 0))
+                        
+                    except Exception as player_error:
+                        # If V2 calculation fails for this player, keep V1 values
+                        print(f"Warning: V2 calculation failed for {player_dict.get('name', 'unknown')}: {player_error}")
+                        player_dict['v2_calculation'] = False
                         
             except Exception as e:
                 # Log error but don't break the API - fall back to V1 values
@@ -3080,7 +3091,7 @@ def calculate_values_v2():
                 CASE 
                     WHEN COALESCE(pgd.games_played_historical, 0) > 0 
                     THEN COALESCE(pgd.total_points_historical, 0) / pgd.games_played_historical 
-                    ELSE pm.ppg 
+                    ELSE NULL 
                 END as historical_ppg
             FROM players p
             JOIN player_metrics pm ON p.id = pm.player_id

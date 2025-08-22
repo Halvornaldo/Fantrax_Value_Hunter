@@ -319,9 +319,9 @@ class FormulaEngineV2:
         """
         Calculate xGI multiplier using Sprint 2 normalized ratio calculation
         """
-        # Check if xGI integration is enabled
-        xgi_config = self.parameters.get('xgi_integration', {})
-        if not xgi_config.get('enabled', True):
+        # Check if xGI integration is enabled (use main xgi_integration config)
+        xgi_config = self.params.get('xgi_integration', {})
+        if not xgi_config.get('enabled', False):
             return 1.0
             
         return self._calculate_normalized_xgi_multiplier(player_data)
@@ -398,28 +398,34 @@ class FormulaEngineV2:
         Returns (blended_ppg, current_weight)
         """
         current_ppg = player_data.get('ppg', 0.0)
-        historical_ppg = player_data.get('historical_ppg', current_ppg)
+        historical_ppg = player_data.get('historical_ppg', None)
         
         # Handle Decimal conversion
         if hasattr(current_ppg, 'quantize'):
             current_ppg = float(current_ppg)
-        if hasattr(historical_ppg, 'quantize'):
+        if historical_ppg is not None and hasattr(historical_ppg, 'quantize'):
             historical_ppg = float(historical_ppg)
         
-        # Get dynamic blending parameters
-        K = self.v2_config.get('dynamic_blending', {}).get('full_adaptation_gw', 16)
-        
-        # Calculate current weight using smooth transition formula
-        if self.current_gameweek <= 1:
-            w_current = 0.0
-            w_historical = 1.0
+        # Handle NULL historical PPG for new players
+        if historical_ppg is None:
+            # For new players without historical data, use current PPG only
+            blended_ppg = current_ppg
+            w_current = 1.0
         else:
-            # Smooth transition: w_current = min(1, (N-1)/(K-1))
-            w_current = min(1.0, (self.current_gameweek - 1) / (K - 1))
-            w_historical = 1.0 - w_current
-        
-        # Blend the PPG values
-        blended_ppg = (w_current * current_ppg) + (w_historical * historical_ppg)
+            # Get dynamic blending parameters
+            K = self.v2_config.get('dynamic_blending', {}).get('full_adaptation_gw', 16)
+            
+            # Calculate current weight using smooth transition formula
+            if self.current_gameweek <= 1:
+                w_current = 0.0
+                w_historical = 1.0
+            else:
+                # Smooth transition: w_current = min(1, (N-1)/(K-1))
+                w_current = min(1.0, (self.current_gameweek - 1) / (K - 1))
+                w_historical = 1.0 - w_current
+            
+            # Blend the PPG values
+            blended_ppg = (w_current * current_ppg) + (w_historical * historical_ppg)
         
         return max(0.1, blended_ppg), w_current
     
