@@ -1073,10 +1073,13 @@ function sortPlayersData() {
         let aVal = a[currentSort.field];
         let bVal = b[currentSort.field];
         
-        // Special handling for Games column - always treat as numeric
+        // Special handling for numeric columns - always treat as numeric
         if (currentSort.field === 'games_played_historical') {
             aVal = parseInt(aVal) || 0;
             bVal = parseInt(bVal) || 0;
+        } else if (currentSort.field === 'true_value') {
+            aVal = parseFloat(aVal) || 0;
+            bVal = parseFloat(bVal) || 0;
         }
         // Handle different data types
         else if (typeof aVal === 'string') {
