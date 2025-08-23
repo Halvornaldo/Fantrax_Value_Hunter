@@ -4,16 +4,30 @@
     "transition_end_gameweek": 15,
     "description": "Blender display configuration"
   },
+  "xgi_integration": {
+    "enabled": true,
+    "last_sync": 1755945608.5077126,
+    "matched_players": 298,
+    "unmatched_players": 6,
+    "description": "xGI integration toggle and statistics"
+  },
+  "starter_prediction": {
+    "enabled": true,
+    "manual_overrides": {},
+    "description": "Starter prediction system with manual overrides"
+  },
   "formula_optimization_v2": {
     "enabled": true,
     "exponential_form": {
       "enabled": true,
-      "alpha": 1
+      "alpha": 0.87
     },
     "dynamic_blending": {
-      "adaptation_gameweek": 12
+      "enabled": true,
+      "full_adaptation_gw": 16
     },
     "normalized_xgi": {
+      "enabled": true,
       "normalization_strength": 1,
       "position_adjustments": {
         "defenders": true,
@@ -21,11 +35,22 @@
         "forwards": true
       }
     },
+    "exponential_fixture": {
+      "enabled": true,
+      "base": 1.05,
+      "position_weights": {
+        "G": 1.1,
+        "D": 1.2,
+        "M": 1.0,
+        "F": 1.05
+      }
+    },
     "multiplier_caps": {
-      "form": 2,
+      "enabled": true,
+      "form": 2.0,
       "fixture": 1.8,
       "xgi": 2.5,
-      "global": 3
+      "global": 3.0
     },
     "ewma_form": {
       "alpha": 0.87
@@ -42,6 +67,6 @@
   },
   "metadata": {
     "version": "v2.0",
-    "last_updated": "2025-08-22"
+    "last_updated": "2025-08-23"
   }
 }

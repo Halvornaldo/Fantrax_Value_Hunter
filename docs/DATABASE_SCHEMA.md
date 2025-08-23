@@ -15,6 +15,174 @@ This document describes the complete database schema for the V2.0 Enhanced Formu
 
 ---
 
+## **Raw Data Snapshot System**
+
+### **Overview: Retrospective Trend Analysis Architecture**
+The V2.0 Enhanced system includes a raw data snapshot system that captures weekly imported data without calculations. This enables "apples-to-apples" trend analysis by applying the same formula parameters retroactively to different gameweeks.
+
+**Key Benefits:**
+- Compare player performance across weeks using consistent V2.0 Enhanced parameters
+- Analyze formula effectiveness over time
+- Test different parameter sets against historical raw data
+- Track weekly changes in prices, form, fixtures, and performance
+
+### **`raw_player_snapshots`** - Weekly Player Performance Data
+**Purpose**: Capture raw imported data (prices, FPts, xG stats) without any calculations for retrospective analysis
+
+**Primary Key**: `(player_id, gameweek)`
+**Owner**: `fantrax_user`
+
+**Core Player Data**:
+- `player_id` (VARCHAR(10) NOT NULL) - Player identifier
+- `gameweek` (INTEGER NOT NULL) - Gameweek number
+- `name` (VARCHAR(255)) - Player name at time of capture
+- `team` (VARCHAR(3)) - Team code at time of capture
+- `position` (VARCHAR(10)) - Playing position
+- `price` (DECIMAL(5,2)) - Fantrax price for that gameweek
+- `fpts` (DECIMAL(6,2)) - Fantrax points scored that gameweek
+- `minutes_played` (INTEGER DEFAULT 0) - Minutes played that gameweek
+
+**Expected Goals Data** (Understat raw weekly stats):
+- `xg90` (DECIMAL(5,3)) - Expected goals per 90 minutes (cumulative)
+- `xa90` (DECIMAL(5,3)) - Expected assists per 90 minutes (cumulative)  
+- `xgi90` (DECIMAL(5,3)) - Expected goals involvement per 90 minutes (cumulative)
+- `baseline_xgi` (DECIMAL(5,3)) - Historical 2024-25 baseline for normalization
+
+**Fixture Context**:
+- `opponent` (VARCHAR(3)) - Opponent team code
+- `is_home` (BOOLEAN) - Home/away indicator
+- `fixture_difficulty` (DECIMAL(5,2)) - Calculated difficulty score
+
+**Starting Status** (FFS prediction data):
+- `is_predicted_starter` (BOOLEAN) - Starting prediction
+- `rotation_risk` (VARCHAR(10)) - Risk level ('low', 'medium', 'high', 'benched')
+
+**Metadata**:
+- `created_at` (TIMESTAMP DEFAULT CURRENT_TIMESTAMP) - Capture timestamp
+- `fantrax_import` (BOOLEAN DEFAULT FALSE) - Data source flags
+- `understat_import` (BOOLEAN DEFAULT FALSE)
+- `ffs_import` (BOOLEAN DEFAULT FALSE)
+- `odds_import` (BOOLEAN DEFAULT FALSE)
+
+**Constraints**:
+- `UNIQUE(player_id, gameweek)` - One record per player per gameweek
+- `CHECK (gameweek > 0)` - Valid gameweek numbers
+
+### **`raw_fixture_snapshots`** - Weekly Fixture and Odds Data
+**Purpose**: Capture fixture difficulty and betting odds data for each gameweek
+
+**Primary Key**: `(team_code, gameweek)`
+**Owner**: `fantrax_user`
+
+**Fixture Data**:
+- `team_code` (VARCHAR(3) NOT NULL) - Team identifier
+- `gameweek` (INTEGER NOT NULL) - Gameweek number
+- `opponent_code` (VARCHAR(3) NOT NULL) - Opponent team code
+- `is_home` (BOOLEAN NOT NULL) - Home/away indicator
+- `difficulty_score` (DECIMAL(5,2)) - Calculated difficulty score
+
+**Betting Odds** (raw odds for difficulty calculation):
+- `home_odds` (DECIMAL(6,2)) - Home win odds
+- `draw_odds` (DECIMAL(6,2)) - Draw odds
+- `away_odds` (DECIMAL(6,2)) - Away win odds
+- `implied_prob_home` (DECIMAL(5,4)) - Calculated home win probability
+- `implied_prob_away` (DECIMAL(5,4)) - Calculated away win probability
+
+**Metadata**:
+- `created_at` (TIMESTAMP DEFAULT CURRENT_TIMESTAMP) - Capture timestamp
+- `odds_source` (VARCHAR(50)) - Odds data source
+
+**Constraints**:
+- `UNIQUE(team_code, gameweek)` - One record per team per gameweek
+- `CHECK (gameweek > 0)` - Valid gameweek numbers
+
+### **`raw_form_snapshots`** - Weekly Form Tracking Data  
+**Purpose**: Capture weekly form progression for EWMA calculations
+
+**Primary Key**: `(player_id, gameweek)`
+**Owner**: `fantrax_user`
+
+**Form Tracking**:
+- `player_id` (VARCHAR(10) NOT NULL) - Player identifier
+- `gameweek` (INTEGER NOT NULL) - Gameweek number
+- `points_scored` (DECIMAL(5,2) NOT NULL) - Points scored that gameweek
+- `games_played` (INTEGER NOT NULL) - Games played that gameweek (0 or 1)
+
+**Running Totals** (for season calculations):
+- `total_points_season` (DECIMAL(8,2)) - Running season total
+- `total_games_season` (INTEGER) - Running season games count
+- `ppg_season` (DECIMAL(5,2)) - Running season PPG
+
+**Metadata**:
+- `created_at` (TIMESTAMP DEFAULT CURRENT_TIMESTAMP) - Capture timestamp
+
+**Constraints**:
+- `UNIQUE(player_id, gameweek)` - One record per player per gameweek
+- `CHECK (gameweek > 0)` - Valid gameweek numbers
+- `CHECK (games_played IN (0, 1))` - Valid games played values
+
+### **Database Views for Raw Data Access**
+
+#### **`raw_data_complete`** - Comprehensive Raw Data View
+Complete view combining all raw snapshot data for trend analysis:
+```sql
+SELECT 
+    rps.player_id, rps.gameweek, rps.name, rps.team, rps.position,
+    rps.price, rps.fpts, rps.minutes_played,
+    rps.xg90, rps.xa90, rps.xgi90, rps.baseline_xgi,
+    rps.opponent, rps.is_home, rps.fixture_difficulty,
+    rps.is_predicted_starter, rps.rotation_risk,
+    rfs.points_scored, rfs.games_played,
+    rfs.total_points_season, rfs.total_games_season, rfs.ppg_season
+FROM raw_player_snapshots rps
+LEFT JOIN raw_form_snapshots rfs 
+    ON rps.player_id = rfs.player_id AND rps.gameweek = rfs.gameweek
+ORDER BY rps.player_id, rps.gameweek
+```
+
+#### **`raw_form_history`** - Form Analysis View
+Form progression view for EWMA calculations:
+```sql
+SELECT 
+    player_id, gameweek, points_scored, games_played,
+    ppg_season,
+    LAG(points_scored, 1) OVER (PARTITION BY player_id ORDER BY gameweek) as prev_points,
+    LAG(points_scored, 2) OVER (PARTITION BY player_id ORDER BY gameweek) as prev_2_points,
+    AVG(points_scored) OVER (PARTITION BY player_id ORDER BY gameweek ROWS BETWEEN 7 PRECEDING AND CURRENT ROW) as form_8gw
+FROM raw_form_snapshots
+ORDER BY player_id, gameweek
+```
+
+### **Gameweek Detection Pattern**
+**🎯 CRITICAL**: All functions accessing raw data MUST use database-driven gameweek detection
+
+**✅ CORRECT PATTERN:**
+```sql
+SELECT MAX(gameweek) FROM raw_player_snapshots WHERE gameweek IS NOT NULL
+```
+
+**❌ INCORRECT PATTERNS TO AVOID:**
+- `gameweek = 1` (hardcoded values)
+- Parameter-based gameweek without database validation
+- Assumptions about current gameweek
+
+### **Raw Data Import Integration**
+**Data Flow**: Raw snapshots are populated during standard import processes:
+
+1. **Fantrax Upload**: Captures player prices, FPts, team data → `raw_player_snapshots`
+2. **Understat Sync**: Captures xG stats, minutes → `raw_player_snapshots` 
+3. **FFS Lineup Upload**: Captures starting predictions → `raw_player_snapshots`
+4. **Odds CSV Import**: Captures fixture difficulty → `raw_fixture_snapshots`
+5. **Form Calculation**: Aggregates weekly points → `raw_form_snapshots`
+
+**Testing Requirements:**
+- Verify raw data capture during weekly imports (Fantrax, Understat, odds)
+- Test trend analysis endpoints with historical gameweek data  
+- Confirm V2.0 parameter consistency across trend calculations
+- Validate gameweek detection in all time-based functionality
+
+---
+
 ## **Core Data Tables**
 
 ### **`players`** - Primary Player Data
@@ -46,6 +214,12 @@ This document describes the complete database schema for the V2.0 Enhanced Formu
 - `xgi90` (DECIMAL 5,3) - Expected goals involvement per 90 minutes
 
 **Description**: Contains all player data for V2.0 Enhanced Formula calculations with separated True Value and ROI metrics.
+
+**⚠️ Name Matching Integration**: 
+- All player imports utilize the UnifiedNameMatcher system
+- Players with <85% confidence are flagged for manual verification
+- Recent testing: 98.0% match rate (298/304 players matched automatically)
+- Unmatched players stored in `/temp/understat_unmatched.json` for validation UI
 
 ### **`player_metrics`** - Weekly Performance Data
 **Purpose**: Gameweek-by-gameweek player performance tracking with V2.0 multipliers
@@ -445,6 +619,6 @@ WHERE gameweek = (SELECT MAX(gameweek) FROM player_metrics);
 
 ---
 
-**Last Updated**: 2025-08-22 - V2.0 Enhanced Formula Database Schema Complete
+**Last Updated**: 2025-08-23 - V2.0 Enhanced Formula Database Schema with Raw Data Snapshot System
 
-*This document reflects the current V2.0-only database structure with all legacy components removed. The database serves 647 Premier League players with optimized V2.0 Enhanced Formula calculations including True Value predictions, ROI analysis, dynamic blending, EWMA form calculations, and normalized xGI integration.*
+*This document reflects the current V2.0-only database structure with all legacy components removed. The database serves 647 Premier League players with optimized V2.0 Enhanced Formula calculations including True Value predictions, ROI analysis, dynamic blending, EWMA form calculations, and normalized xGI integration. The raw data snapshot system enables retrospective trend analysis by capturing weekly imported data without calculations.*

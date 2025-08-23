@@ -31,10 +31,214 @@ This document describes the complete API for the V2.0 Enhanced Formula system. T
 #### `GET /import-validation`
 **Description**: Data import validation interface  
 **Returns**: HTML validation page with 99% match rate system
+**Testing Status**: ✅ Verified working - file upload, validation, and unmatched player workflow functional
 
 #### `GET /monitoring`
 **Description**: V2.0 system monitoring interface  
 **Returns**: HTML monitoring page with performance metrics
+
+---
+
+## **Trend Analysis API - Raw Data Snapshot System**
+
+### **`GET /api/trends/calculate`** - Apply V2.0 Formula to Historical Raw Data
+**Description**: Retroactively apply V2.0 Enhanced Formula to raw data snapshots for trend analysis
+
+**Purpose**: Enable "apples-to-apples" analysis by applying consistent formula parameters to different gameweeks using captured raw data without calculations.
+
+**Parameters**:
+- `gameweek_start` (int, required): Starting gameweek for analysis (inclusive)
+- `gameweek_end` (int, required): Ending gameweek for analysis (inclusive)
+- `player_ids` (string, optional): Comma-separated player IDs to analyze
+- `parameters` (JSON, optional): V2.0 Enhanced Formula parameters to apply
+
+**Default Parameters Applied**:
+```json
+{
+  "formula_optimization_v2": {
+    "exponential_form": {
+      "enabled": true,
+      "lookback_games": 8,
+      "ewma_alpha": 0.87,
+      "min_multiplier": 0.5,
+      "max_multiplier": 2.0
+    },
+    "exponential_fixture": {
+      "enabled": true,
+      "exponential_base": 1.05,
+      "position_weights": {"G": 1.10, "D": 1.20, "M": 1.00, "F": 1.05},
+      "min_multiplier": 0.5,
+      "max_multiplier": 1.8
+    },
+    "normalized_xgi": {
+      "enabled": true,
+      "position_adjustments": {"G": 0.5, "D": 0.8, "M": 1.0, "F": 1.2},
+      "min_multiplier": 0.5,
+      "max_multiplier": 2.5
+    },
+    "multiplier_caps": {
+      "form": 2.0,
+      "fixture": 1.8,
+      "xgi": 2.5,
+      "global": 3.0
+    }
+  }
+}
+```
+
+**Response Format**:
+```json
+{
+  "trend_analysis": [
+    {
+      "player_id": "ABC123",
+      "name": "Mo Salah",
+      "team": "LIV",
+      "position": "M",
+      "gameweek": 1,
+      "price": 12.50,
+      "fpts": 18.0,
+      "season_ppg": 6.0,
+      "current_season_weight": 1.0,
+      "form_multiplier": 1.0,
+      "fixture_multiplier": 1.05,
+      "starter_multiplier": 1.0,
+      "xgi_multiplier": 1.2,
+      "true_value": 7.56,
+      "roi": 0.605,
+      "value_score": 0.605,
+      "calculation_timestamp": "2025-08-23T14:30:00Z",
+      "parameters_used": "current_season_only"
+    }
+  ],
+  "metadata": {
+    "gameweeks_analyzed": [1, 2],
+    "total_data_points": 1244,
+    "calculation_method": "current_season_baselines",
+    "parameters_applied": "v2.0_enhanced_default",
+    "analysis_timestamp": "2025-08-23T14:30:00Z"
+  }
+}
+```
+
+### **`GET /api/trends/raw-data`** - Access Raw Snapshot Data
+**Description**: Retrieve raw weekly data without any calculations applied
+
+**Parameters**:
+- `gameweek` (int, optional): Specific gameweek to retrieve
+- `gameweek_start` (int, optional): Starting gameweek range
+- `gameweek_end` (int, optional): Ending gameweek range  
+- `player_ids` (string, optional): Comma-separated player IDs
+- `data_types` (string, optional): Comma-separated data types ('player', 'fixture', 'form')
+
+**Response Format**:
+```json
+{
+  "raw_data": {
+    "player_snapshots": [
+      {
+        "player_id": "ABC123",
+        "gameweek": 1,
+        "name": "Mo Salah",
+        "team": "LIV",
+        "position": "M",
+        "price": 12.50,
+        "fpts": 18.0,
+        "minutes_played": 90,
+        "xg90": 0.45,
+        "xa90": 0.12,
+        "xgi90": 0.57,
+        "baseline_xgi": 0.52,
+        "opponent": "IPO",
+        "is_home": true,
+        "fixture_difficulty": -2.1,
+        "is_predicted_starter": true,
+        "rotation_risk": "low",
+        "created_at": "2025-08-17T12:00:00Z"
+      }
+    ],
+    "fixture_snapshots": [
+      {
+        "team_code": "LIV",
+        "gameweek": 1,
+        "opponent_code": "IPO",
+        "is_home": true,
+        "difficulty_score": -2.1,
+        "home_odds": 1.35,
+        "draw_odds": 5.20,
+        "away_odds": 8.50,
+        "created_at": "2025-08-17T10:00:00Z"
+      }
+    ],
+    "form_snapshots": [
+      {
+        "player_id": "ABC123",
+        "gameweek": 1,
+        "points_scored": 18.0,
+        "games_played": 1,
+        "total_points_season": 18.0,
+        "total_games_season": 1,
+        "ppg_season": 18.0,
+        "created_at": "2025-08-17T18:00:00Z"
+      }
+    ]
+  },
+  "metadata": {
+    "gameweeks_included": [1],
+    "players_included": 622,
+    "data_capture_complete": true,
+    "last_updated": "2025-08-17T18:00:00Z"
+  }
+}
+```
+
+**Usage Examples**:
+```bash
+# Get raw data for GW1
+curl "http://localhost:5001/api/trends/raw-data?gameweek=1"
+
+# Get Salah's raw data across multiple gameweeks
+curl "http://localhost:5001/api/trends/raw-data?gameweek_start=1&gameweek_end=3&player_ids=ABC123"
+
+# Get only fixture data for analysis
+curl "http://localhost:5001/api/trends/raw-data?gameweek=1&data_types=fixture"
+```
+
+### **Historical Data Integration Requirements**
+**🎯 CRITICAL**: All trend analysis endpoints MUST include historical_ppg calculation for dynamic blending
+
+**Required SQL Pattern for Player Queries**:
+```sql
+SELECT 
+    p.id, p.name, p.team, p.position, p.price,
+    -- Historical PPG calculation for dynamic blending
+    CASE 
+        WHEN COALESCE(pgd.games_played_historical, 0) > 0 
+        THEN COALESCE(pgd.total_points_historical, 0) / pgd.games_played_historical 
+        ELSE pm.ppg 
+    END as historical_ppg,
+    -- Other V2.0 calculations...
+FROM players p
+LEFT JOIN player_metrics pm ON p.id = pm.player_id AND pm.gameweek = %s
+LEFT JOIN player_games_data pgd ON p.id = pgd.player_id AND pgd.gameweek = %s
+WHERE ...
+```
+
+### **Gameweek Detection Integration**
+All trend analysis endpoints use database-driven gameweek detection:
+
+**Current Gameweek Detection**:
+```sql
+SELECT MAX(gameweek) FROM raw_player_snapshots WHERE gameweek IS NOT NULL
+```
+
+**Available Gameweeks Query**:
+```sql
+SELECT DISTINCT gameweek 
+FROM raw_player_snapshots 
+WHERE gameweek IS NOT NULL 
+ORDER BY gameweek
+```
 
 ---
 
@@ -375,21 +579,69 @@ WHERE ...
 
 ### **`POST /api/understat/sync`**
 **Description**: Sync xGI data for V2.0 normalized calculations
+**Testing Status**: ✅ Verified working - 98.0% match rate (298/304 players), unmatched players properly flagged
 
 **V2.0 Enhanced Response**:
 ```json
 {
   "success": true,
   "sync_results": {
-    "players_updated": 299,
-    "baseline_xgi_updated": 299,
-    "match_rate": "99%",
-    "failed_matches": ["Player Name 1", "Player Name 2"]
+    "players_updated": 298,
+    "baseline_xgi_updated": 298,
+    "match_rate": 98.02631578947368,
+    "unmatched_players": 6,
+    "total_understat_players": 304
+  },
+  "name_matching": {
+    "exact_matches": 250,
+    "fuzzy_matches": 48,
+    "needs_manual_review": 6,
+    "unmatched_saved_to": "/temp/understat_unmatched.json"
   },
   "v2_integration": {
     "normalized_calculations_ready": true,
     "baseline_data_quality": "excellent",
     "position_adjustments_applied": true
+  }
+}
+```
+
+### **`GET /api/understat/get-unmatched-data`**
+**Description**: Retrieve unmatched players for manual verification UI
+**Testing Status**: ✅ Verified working - returns structured validation data with original names, suggestions
+
+**Response**:
+```json
+{
+  "status": "success",
+  "data": {
+    "total_players": 6,
+    "unmatched_count": 6,
+    "unmatched_details": [
+      {
+        "original_name": "Tosin Adarabioyo",
+        "original_team": "CHE",
+        "original_position": "Unknown",
+        "needs_review": true,
+        "match_result": {
+          "confidence": 0,
+          "fantrax_name": null,
+          "suggested_matches": []
+        },
+        "original_data": {
+          "player_name": "Tosin Adarabioyo",
+          "team": "Chelsea",
+          "xG90": 0.0,
+          "xA90": 0.0
+        }
+      }
+    ],
+    "summary": {
+      "total": 6,
+      "matched": 0,
+      "needs_review": 6,
+      "match_rate": 0.0
+    }
   }
 }
 ```
@@ -664,6 +916,6 @@ ROI = True Value ÷ Price
 
 ---
 
-**Last Updated**: 2025-08-22 - V2.0 Enhanced Formula API Complete
+**Last Updated**: 2025-08-23 - V2.0 Enhanced Formula API with Trend Analysis System
 
-*This document reflects the current V2.0-only API structure with all legacy endpoints removed. The API serves 647 Premier League players with optimized V2.0 Enhanced Formula calculations including True Value predictions, ROI analysis, dynamic blending, EWMA form calculations, and normalized xGI integration.*
+*This document reflects the current V2.0-only API structure with all legacy endpoints removed. The API serves 647 Premier League players with optimized V2.0 Enhanced Formula calculations including True Value predictions, ROI analysis, dynamic blending, EWMA form calculations, and normalized xGI integration. The trend analysis system enables retrospective analysis using captured raw data snapshots.*

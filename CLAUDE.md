@@ -28,6 +28,12 @@
 
 **✅ Safe Production System**: Complete V2.0 consolidation with comprehensive documentation
 
+### Recent Major Features (2025-08-23)
+- **Raw Data Snapshot System**: Complete trend analysis architecture for retrospective "apples-to-apples" analysis
+- **Current Season Analytics**: Simplified trend engine using current-season-only baselines for immediate Week 1 capture
+- **Week 1 Data Capture**: Successfully captured all 622 players with comprehensive fixture, performance, and context data
+- **Documentation Updates**: All core documentation updated to reflect trend analysis system and V2.0-only architecture
+
 ### Recent Major Features (2025-08-22)
 - **Complete Documentation Overhaul**: All 7 core documentation files updated to V2.0-only
 - **V2.0 xGI Enable/Disable Toggle**: Complete implementation of user-controllable xGI application to True Value calculations
@@ -61,10 +67,16 @@
 - `name_mappings` - Cross-source player name resolution (99% match rate)
 - `team_fixtures` - Odds-based fixture difficulty scores for exponential calculation
 
+**Raw Data Snapshot Tables** (New 2025-08-23):
+- `raw_player_snapshots` - Weekly captured player data without calculations
+- `raw_fixture_snapshots` - Weekly fixture difficulty and betting odds  
+- `raw_form_snapshots` - Weekly form progression for EWMA calculations
+
 ### Application Stack
-- **Backend**: Flask app (`src/app.py`) with V2.0 Enhanced API endpoints
+- **Backend**: Flask app (`src/app.py`) with V2.0 Enhanced API endpoints + trend analysis
 - **Frontend**: V2.0 Enhanced dashboard (Parameter Controls + Enhanced Player Table)
 - **Configuration**: `config/system_parameters.json` with V2.0 parameter structure
+- **Trend Analysis**: `trend_analysis_engine_simple.py` for current-season retrospective analysis
 
 ## V2.0 Enhanced Feature Systems
 
@@ -236,30 +248,37 @@ The V2.0 Enhanced dashboard successfully processes all 647 Premier League player
 
 **🎯 Major Achievement**: All documentation updated to reflect V2.0-only system
 
-**Documentation Files Updated** (7 of 7 complete):
+**Documentation Files Updated** (5 of 5 core docs updated for trend analysis system):
+1. **DATABASE_SCHEMA.md** - V2.0 database + raw snapshot system (620+ lines)
+2. **API_REFERENCE.md** - V2.0 endpoints + trend analysis API (920+ lines)  
+3. **FEATURE_GUIDE.md** - V2.0 dashboard + trend analysis features (468+ lines)
+4. **DOCUMENTATION_MAINTENANCE.md** - V2.0-only maintenance guide (319+ lines)
+5. **CLAUDE.md** - V2.0-only development context (this document)
+
+**Previous Documentation Suite** (2025-08-22 - All 7 docs updated to V2.0-only):
 1. **FORMULA_MIGRATION_GUIDE.md** - V2.0 Enhanced system guide (382 lines)
-2. **DATABASE_SCHEMA.md** - V2.0-only database structure (450 lines)
+2. **DATABASE_SCHEMA.md** - V2.0-only database structure (450 lines) 
 3. **API_REFERENCE.md** - V2.0-only endpoint documentation (669 lines)
 4. **FEATURE_GUIDE.md** - V2.0 Enhanced dashboard features (410 lines)
 5. **DEVELOPMENT_SETUP.md** - V2.0-only development procedures (543 lines)
 6. **FORMULA_REFERENCE.md** - Complete V2.0 mathematical documentation (560 lines)
-7. **CLAUDE.md** - V2.0-only development context (this document)
+7. **CLAUDE.md** - V2.0-only development context
 
-**Key Documentation Features**:
-- **V2.0-Only Focus**: All legacy references removed completely
-- **Enhanced Technical Detail**: Complete mathematical formulas and implementation examples
-- **Production System Documentation**: Real-world usage with 647 Premier League players
-- **Comprehensive Coverage**: API endpoints, database schema, dashboard features, development setup
-- **Professional Quality**: Detailed examples, code snippets, and troubleshooting guides
+**Trend Analysis System Documentation Features**:
+- **Raw Data Snapshot Tables**: Complete schema for `raw_player_snapshots`, `raw_fixture_snapshots`, `raw_form_snapshots`
+- **API Endpoints**: `/api/trends/calculate` and `/api/trends/raw-data` with full parameter documentation
+- **Current Season Focus**: Simplified analysis using current-season-only baselines for immediate Week 1 capture
+- **Gameweek Detection**: Proper database-driven gameweek detection patterns
+- **Data Capture Integration**: Automatic raw data capture during standard import workflows
 
-**Documentation Impact**:
-- **Developer Onboarding**: Clear V2.0-only system understanding
-- **System Maintenance**: Complete technical reference for all components
-- **Feature Development**: Detailed specifications for V2.0 Enhanced Formula system
-- **Quality Assurance**: Comprehensive testing and validation procedures
+**System Integration Benefits**:
+- **Retrospective Analysis**: Apply current V2.0 parameters to past gameweeks for trend comparison
+- **Formula Testing**: Test different parameter sets against historical raw data for validation
+- **Season-Long Tracking**: Monitor player performance trends using consistent calculation methods
+- **Data Quality Assurance**: Raw data capture without calculations ensures unbiased analysis
 
 ---
 
-*Last Updated: 2025-08-22 - V2.0 Enhanced Formula System Complete with Full Documentation Suite*
+*Last Updated: 2025-08-23 - V2.0 Enhanced Formula System with Raw Data Snapshot System for Trend Analysis*
 
-*This document reflects the consolidated V2.0-only system with all legacy components removed. The system serves 647 Premier League players with optimized V2.0 Enhanced Formula calculations including True Value predictions, ROI analysis, dynamic blending, EWMA form calculations, and normalized xGI integration. Complete documentation suite provides comprehensive technical reference for development and production use.*
+*This document reflects the consolidated V2.0-only system with all legacy components removed. The system serves 647 Premier League players with optimized V2.0 Enhanced Formula calculations including True Value predictions, ROI analysis, dynamic blending, EWMA form calculations, and normalized xGI integration. The new raw data snapshot system enables retrospective trend analysis by capturing weekly imported data without calculations, allowing for "apples-to-apples" parameter testing and season-long performance tracking.*

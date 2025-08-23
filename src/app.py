@@ -32,6 +32,9 @@ except ImportError:
 sys.path.append(os.path.join(os.path.dirname(__file__), '..'))
 from calculation_engine_v2 import FormulaEngineV2
 
+# Add trend analysis engine
+from trend_analysis_engine import TrendAnalysisEngine
+
 app = Flask(__name__, 
             template_folder='../templates',
             static_folder='../static')
@@ -1756,6 +1759,35 @@ def import_form_data():
                     DO UPDATE SET games_played = EXCLUDED.games_played, last_updated = NOW()
                 """, [player_id, gameweek, games_played])
                 
+                # NEW: Capture raw data snapshot for trend analysis
+                cursor.execute("""
+                    INSERT INTO raw_player_snapshots 
+                    (player_id, gameweek, name, team, position, price, fpts, 
+                     minutes_played, fantrax_import, import_timestamp)
+                    VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s, NOW())
+                    ON CONFLICT (player_id, gameweek) 
+                    DO UPDATE SET 
+                        price = EXCLUDED.price,
+                        fpts = EXCLUDED.fpts,
+                        name = EXCLUDED.name,
+                        team = EXCLUDED.team,
+                        position = EXCLUDED.position,
+                        fantrax_import = TRUE,
+                        import_timestamp = NOW()
+                """, [player_id, gameweek, player_name, team, position, salary, fpts, 0, True])
+                
+                # Also capture in raw form snapshots for EWMA calculations
+                cursor.execute("""
+                    INSERT INTO raw_form_snapshots 
+                    (player_id, gameweek, points_scored, minutes_played, games_played, import_timestamp)
+                    VALUES (%s, %s, %s, %s, %s, NOW())
+                    ON CONFLICT (player_id, gameweek)
+                    DO UPDATE SET 
+                        points_scored = EXCLUDED.points_scored,
+                        games_played = EXCLUDED.games_played,
+                        import_timestamp = NOW()
+                """, [player_id, gameweek, fpts, 0, games_played])
+                
                 imported_count += 1
                 
             except Exception as e:
@@ -1832,16 +1864,16 @@ def import_odds():
         # Team name mapping dictionary
         ODDS_TO_FANTRAX = {
             "Arsenal": "ARS", "Aston Villa": "AVL", "Bournemouth": "BOU",
-            "Brentford": "BRE", "Brighton": "BHA", "Burnley": "BUR", 
+            "Brentford": "BRF", "Brighton": "BHA", "Burnley": "BUR", 
             "Chelsea": "CHE", "Crystal Palace": "CRY", "Everton": "EVE",
             "Fulham": "FUL", "Leeds": "LEE", "Liverpool": "LIV",
             "Manchester City": "MCI", "Manchester Utd": "MUN", "Newcastle": "NEW",
-            "Nottingham": "NFO", "Sunderland": "SUN", "Tottenham": "TOT",
+            "Nottingham": "NOT", "Sunderland": "SUN", "Tottenham": "TOT",
             "West Ham": "WHU", "Wolves": "WOL",
             # OddsPortal variations for missing teams
             "Man City": "MCI", "Man United": "MUN", "Tottenham Hotspur": "TOT",
             "West Ham United": "WHU", "Wolverhampton": "WOL", "Brighton & Hove Albion": "BHA",
-            "Nottm Forest": "NFO", "Nottingham Forest": "NFO", "Leeds United": "LEE"
+            "Nottm Forest": "NOT", "Nottingham Forest": "NOT", "Leeds United": "LEE"
         }
         
         # Parse CSV content
@@ -1868,25 +1900,45 @@ def import_odds():
         
         # First pass: collect all valid matches with dates
         all_matches = []
-        teams_seen = set()
+        teams_seen_this_gw = set()  # Track teams for current gameweek only
         
         for row in csv_reader:
             if len(row) < 7:
                 continue
                 
-            # Parse row data
+            # Auto-detect CSV format
             date_str = row[0].strip().strip('"')
-            time_str = row[1].strip().strip('"') 
-            home_team = row[2].strip().strip('"')
-            away_team = row[3].strip().strip('"')
             
+            # Check if row[2] is a separator (new format) or team name (old format)
+            potential_separator = row[2].strip().strip('"')
+            is_new_format = potential_separator in [':', '–', '-', 'vs']
+            
+            if is_new_format:
+                # New format: Date, Home, Separator, Away, Odds...
+                home_team = row[1].strip().strip('"')
+                away_team = row[3].strip().strip('"')
+                odds_start_index = 4
+            else:
+                # Old format: Date, Time, Home, Away, Odds...
+                home_team = row[2].strip().strip('"')
+                away_team = row[3].strip().strip('"')
+                odds_start_index = 4
+            
+            # Skip if we've already seen both teams for current gameweek
+            team_pair = tuple(sorted([home_team, away_team]))
+            if team_pair in teams_seen_this_gw:
+                continue
+                
             try:
-                home_odds = float(row[4].strip().strip('"'))
-                draw_odds = float(row[5].strip().strip('"'))
-                away_odds = float(row[6].strip().strip('"'))
+                home_odds = float(row[odds_start_index].strip().strip('"'))
+                draw_odds = float(row[odds_start_index + 1].strip().strip('"'))
+                away_odds = float(row[odds_start_index + 2].strip().strip('"'))
             except (ValueError, IndexError):
                 skipped_matches += 1
                 continue
+                
+            # Mark this team pair as seen for current gameweek
+            teams_seen_this_gw.add(team_pair)
                 
             # Handle date continuation (empty date means same as previous)
             if date_str:
@@ -2006,6 +2058,52 @@ def import_odds():
                         is_home = EXCLUDED.is_home,
                         difficulty_score = EXCLUDED.difficulty_score
                 """, [gameweek, match['away_code'], match['home_code'], False, away_difficulty])
+                
+                # NEW: Capture raw fixture snapshots for trend analysis
+                cursor.execute("""
+                    INSERT INTO raw_fixture_snapshots 
+                    (gameweek, team, opponent, is_home, home_odds, draw_odds, away_odds, 
+                     difficulty_score, odds_source, import_timestamp)
+                    VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s, NOW())
+                    ON CONFLICT (gameweek, team)
+                    DO UPDATE SET 
+                        opponent = EXCLUDED.opponent,
+                        is_home = EXCLUDED.is_home,
+                        home_odds = EXCLUDED.home_odds,
+                        draw_odds = EXCLUDED.draw_odds,
+                        away_odds = EXCLUDED.away_odds,
+                        difficulty_score = EXCLUDED.difficulty_score,
+                        import_timestamp = NOW()
+                """, [gameweek, match['home_code'], match['away_code'], True, match['home_odds'], match['draw_odds'], match['away_odds'], home_difficulty, 'oddsportal'])
+                
+                cursor.execute("""
+                    INSERT INTO raw_fixture_snapshots 
+                    (gameweek, team, opponent, is_home, home_odds, draw_odds, away_odds, 
+                     difficulty_score, odds_source, import_timestamp)
+                    VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s, NOW())
+                    ON CONFLICT (gameweek, team)
+                    DO UPDATE SET 
+                        opponent = EXCLUDED.opponent,
+                        is_home = EXCLUDED.is_home,
+                        home_odds = EXCLUDED.home_odds,
+                        draw_odds = EXCLUDED.draw_odds,
+                        away_odds = EXCLUDED.away_odds,
+                        difficulty_score = EXCLUDED.difficulty_score,
+                        import_timestamp = NOW()
+                """, [gameweek, match['away_code'], match['home_code'], False, match['home_odds'], match['draw_odds'], match['away_odds'], away_difficulty, 'oddsportal'])
+                
+                # Update player snapshots with home/away status, opponent, and fixture difficulty
+                cursor.execute("""
+                    UPDATE raw_player_snapshots 
+                    SET opponent = %s, is_home = %s, fixture_difficulty = %s, odds_import = TRUE
+                    WHERE gameweek = %s AND team = %s
+                """, [match['away_code'], True, home_difficulty, gameweek, match['home_code']])
+                
+                cursor.execute("""
+                    UPDATE raw_player_snapshots 
+                    SET opponent = %s, is_home = %s, fixture_difficulty = %s, odds_import = TRUE
+                    WHERE gameweek = %s AND team = %s
+                """, [match['home_code'], False, away_difficulty, gameweek, match['away_code']])
                 
                 processed_matches += 1
                 
@@ -2296,6 +2394,21 @@ def sync_understat_data():
                 round(player['xGI90'], 3),
                 player['fantrax_id']
             ])
+            
+            # NEW: Update raw snapshots with xG data and minutes for all existing gameweeks
+            cursor.execute("""
+                UPDATE raw_player_snapshots 
+                SET minutes_played = %s, xg90 = %s, xa90 = %s, xgi90 = %s, 
+                    understat_import = TRUE, import_timestamp = NOW()
+                WHERE player_id = %s
+            """, [
+                player['minutes'],
+                round(player['xG90'], 3),
+                round(player['xA90'], 3),
+                round(player['xGI90'], 3),
+                player['fantrax_id']
+            ])
+            
             updated_count += 1
         
         conn.commit()

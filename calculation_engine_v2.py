@@ -461,64 +461,6 @@ class FormulaEngineV2:
         }
 
 
-class LegacyFormulaEngine:
-    """
-    Wrapper for v1.0 formula - maintains backward compatibility
-    Used for A/B testing and gradual migration
-    """
-    
-    def __init__(self, db_config: Dict[str, Any], parameters: Dict[str, Any]):
-        self.db_config = db_config
-        self.params = parameters
-        
-    def calculate_player_value(self, player_data: Dict[str, Any]) -> Dict[str, Any]:
-        """Calculate using v1.0 formula for comparison"""
-        try:
-            player_id = player_data.get('player_id', 'unknown')
-            ppg = player_data.get('ppg', 0.0)
-            price = player_data.get('price', 1.0)
-            
-            # Original v1.0 calculation (price mixed with prediction)
-            base_value = ppg / price if price > 0 else 0
-            
-            # Apply existing multipliers
-            form_mult = player_data.get('form_multiplier', 1.0)
-            fixture_mult = player_data.get('fixture_multiplier', 1.0)
-            starter_mult = player_data.get('starter_multiplier', 1.0)
-            xgi_mult = player_data.get('xgi_multiplier', 1.0)
-            
-            # v1.0 final calculation
-            value_score = base_value * form_mult * fixture_mult * starter_mult * xgi_mult
-            
-            return {
-                'player_id': player_id,
-                'true_value': round(value_score, 2),  # In v1.0, true_value = value_score
-                'roi': round(value_score, 3),  # In v1.0, ROI = value_score
-                'value_score': round(value_score, 3),
-                'base_ppg': round(ppg, 2),
-                'multipliers': {
-                    'form': round(form_mult, 3),
-                    'fixture': round(fixture_mult, 3),
-                    'starter': round(starter_mult, 3),
-                    'xgi': round(xgi_mult, 3)
-                },
-                'metadata': {
-                    'formula_version': '1.0',
-                    'calculation_time': datetime.now().isoformat()
-                }
-            }
-            
-        except Exception as e:
-            logger.error(f"Error in legacy calculation: {e}")
-            return {
-                'player_id': player_data.get('player_id', 'unknown'),
-                'true_value': 0.0,
-                'roi': 0.0,
-                'value_score': 0.0,
-                'base_ppg': 0.0,
-                'multipliers': {'form': 1.0, 'fixture': 1.0, 'starter': 1.0, 'xgi': 1.0},
-                'metadata': {'formula_version': '1.0', 'error': str(e)}
-            }
 
 
 def load_system_parameters(config_path: str = 'config/system_parameters.json') -> Dict[str, Any]:
@@ -550,9 +492,8 @@ if __name__ == "__main__":
     # Load parameters
     parameters = load_system_parameters()
     
-    # Create engines
+    # Create V2.0 engine
     v2_engine = FormulaEngineV2(db_config, parameters)
-    v1_engine = LegacyFormulaEngine(db_config, parameters)
     
     # Test data
     test_player = {
@@ -561,23 +502,26 @@ if __name__ == "__main__":
         'position': 'M',
         'price': 8.5,
         'ppg': 6.2,
-        'form_multiplier': 1.15,
-        'fixture_multiplier': 1.1,
-        'starter_multiplier': 1.0,
-        'xgi_multiplier': 1.2,
-        'fixture_difficulty': -3  # Easy fixture
+        'historical_ppg': 5.8,
+        'baseline_xgi': 0.4,
+        'xgi90': 0.6,
+        'fixture_difficulty': -3,  # Easy fixture
+        'starter_multiplier': 1.0
     }
     
-    # Calculate with both engines
+    # Calculate with V2.0 engine
     v2_result = v2_engine.calculate_player_value(test_player)
-    v1_result = v1_engine.calculate_player_value(test_player)
     
-    # Compare results
-    print("=== FORMULA OPTIMIZATION v2.0 TEST ===")
-    print(f"v1.0 Value Score: {v1_result['value_score']:.3f}")
-    print(f"v2.0 True Value:  {v2_result['true_value']:.2f}")
-    print(f"v2.0 ROI:         {v2_result['roi']:.3f}")
-    print(f"v2.0 Fixture Mult: {v2_result['multipliers']['fixture']:.3f} (exponential)")
-    print(f"v1.0 Fixture Mult: {v1_result['multipliers']['fixture']:.3f} (linear)")
+    # Display results
+    print("=== V2.0 ENHANCED FORMULA TEST ===")
+    print(f"True Value:    {v2_result['true_value']:.2f}")
+    print(f"ROI:           {v2_result['roi']:.3f}")
+    print(f"Base PPG:      {v2_result['base_ppg']:.2f}")
+    print(f"Blended PPG:   {v2_result['blended_ppg']:.2f}")
+    print(f"Form Mult:     {v2_result['multipliers']['form']:.3f}")
+    print(f"Fixture Mult:  {v2_result['multipliers']['fixture']:.3f} (exponential)")
+    print(f"Starter Mult:  {v2_result['multipliers']['starter']:.3f}")
+    print(f"xGI Mult:      {v2_result['multipliers']['xgi']:.3f} (normalized)")
+    print(f"Current Weight: {v2_result['current_season_weight']:.3f}")
     
-    logger.info("v2.0 calculation engine test completed")
+    logger.info("V2.0 Enhanced Formula test completed")

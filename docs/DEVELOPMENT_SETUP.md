@@ -348,6 +348,28 @@ config/
 
 ## **V2.0 Enhanced Testing Procedures**
 
+### **Name Matching System Testing** ✅ VERIFIED (2025-08-23)
+**Complete Name Matching Workflow Test**:
+```bash
+# 1. Start server
+python src/app.py
+
+# 2. Test Understat sync with name matching
+curl -X POST http://localhost:5001/api/understat/sync
+# Expected: 98%+ match rate, unmatched players flagged
+
+# 3. Verify unmatched data for manual review
+curl -X GET http://localhost:5001/api/understat/get-unmatched-data
+# Expected: Structured validation data with original names
+```
+
+**Frontend Upload Testing** ✅ VERIFIED (2025-08-23):
+- Form upload page navigation: ✅ Working
+- File upload mechanism: ✅ Working  
+- CSV validation and processing: ✅ Working
+- Error handling (missing columns): ✅ Working
+- Success confirmation display: ✅ Working
+
 ### **V2.0 Formula Validation Testing**
 
 **Complete V2.0 System Test**:

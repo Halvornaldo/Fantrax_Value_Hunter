@@ -56,9 +56,10 @@ This document defines the mandatory documentation updates required after complet
 ## Additional Documentation (Update As Relevant)
 
 ### Formula-Related Documents
-- **`docs/FORMULA_OPTIMIZATION_SPRINTS.md`** - Mark sprints complete, update implementation results
-- **`docs/FORMULA_REFERENCE.md`** - Update calculation formulas and mathematical examples
-- **`docs/FORMULA_MIGRATION_GUIDE.md`** - Add new migration steps and rollback procedures
+- **`docs/V2_ENHANCED_FORMULA_GUIDE.md`** - Complete V2.0 formula documentation with calculations, examples, and API integration
+- **`docs/FORMULA_OPTIMIZATION_SPRINTS.md`** - Mark sprints complete, update implementation results (DEPRECATED - moved to V2_ENHANCED_FORMULA_GUIDE.md)
+- **`docs/FORMULA_REFERENCE.md`** - DEPRECATED - consolidated into V2_ENHANCED_FORMULA_GUIDE.md
+- **`docs/FORMULA_MIGRATION_GUIDE.md`** - DEPRECATED - consolidated into V2_ENHANCED_FORMULA_GUIDE.md
 
 ### Project Management Documents
 - **`CLAUDE.md`** - Update system status, recent features, and sprint progress
@@ -173,30 +174,24 @@ This document defines the mandatory documentation updates required after complet
 - Broken cross-references between documents
 - Unclear distinction between v1.0 and v2.0 features
 
-## 🚨 CRITICAL ARCHITECTURAL DISCOVERIES (2025-08-22)
+## 🚨 SYSTEM ARCHITECTURE (2025-08-23)
 
-### **Dual Engine System - MUST Document in All Relevant Files**
+### **Consolidated V2.0 Enhanced Engine**
 
-**⚠️ CRITICAL FOR LONG-TERM MAINTENANCE:**
-The system now runs two completely separate calculation engines that developers MUST NOT mix:
+**✅ SYSTEM ARCHITECTURE UPDATE:**
+The system has been consolidated to a single V2.0 Enhanced Formula engine:
 
-**v1.0 Legacy Engine:**
-- Location: `src/app.py` (main calculation logic)
-- Parameters: `form_calculation.strength`, `fixture_difficulty.strength`
-- Database: Writes to `value_score` column
-- Formula: `(PPG ÷ Price) × multipliers`
-
-**v2.0 Enhanced Engine:**
-- Location: `calculation_engine_v2.py` (separate module)
-- Parameters: `formula_optimization_v2.exponential_form.alpha`
-- Database: Writes to `true_value` and `roi` columns
-- Formula: `Blended_PPG × multipliers ÷ Price`
+**V2.0 Enhanced Engine:**
+- Location: `calculation_engine_v2.py` (single engine)
+- Parameters: `formula_optimization_v2` structure with enhanced controls
+- Database: Uses `true_value` and `roi` columns (V2.0 calculations only)
+- Formula: `True Value = Blended_PPG × multipliers`, `ROI = True Value ÷ Price`
 
 **📋 DOCUMENTATION REQUIREMENTS:**
-- `API_REFERENCE.md` - Both engines must be clearly separated in endpoint documentation
-- `DEVELOPMENT_SETUP.md` - Testing procedures must cover both engines
-- `FEATURE_GUIDE.md` - UI toggle between engines must be explained
-- `DATABASE_SCHEMA.md` - Column usage by engine must be documented
+- `API_REFERENCE.md` - V2.0 Enhanced endpoints and calculations
+- `DEVELOPMENT_SETUP.md` - V2.0 testing procedures and validation
+- `FEATURE_GUIDE.md` - V2.0 Enhanced dashboard features and controls
+- `DATABASE_SCHEMA.md` - V2.0 column usage and raw data snapshot system
 
 ### **Gameweek Detection Logic - Document in DATABASE_SCHEMA.md**
 
@@ -221,7 +216,7 @@ SELECT MAX(gameweek) FROM player_metrics WHERE gameweek IS NOT NULL
 ### **Historical Data Integration - Document in API_REFERENCE.md**
 
 **🎯 ESSENTIAL DATA PIPELINE:**
-v2.0 Dynamic Blending requires historical PPG calculation in ALL player queries:
+V2.0 Dynamic Blending requires historical PPG calculation in ALL player queries:
 
 ```sql
 CASE 
@@ -233,31 +228,30 @@ END as historical_ppg
 
 **📋 AFFECTED ENDPOINTS:**
 - `/api/players` - Main dashboard data
-- `/api/calculate-values-v2` - v2.0 calculations
+- `/api/trends/calculate` - Raw data trend analysis
 - Any new player data endpoints
 
-### **Parameter Structure Conflicts - Document in DEVELOPMENT_SETUP.md**
+### **Raw Data Snapshot System - Document in DATABASE_SCHEMA.md**
 
-**⚠️ JAVASCRIPT CONFLICTS DISCOVERED:**
-The frontend parameter detection must handle both engines separately:
+**🎯 NEW TREND ANALYSIS ARCHITECTURE (2025-08-23):**
+The system now captures weekly raw data snapshots for retrospective trend analysis:
 
-**v1.0 Parameters:**
-```javascript
-form_calculation: { strength: 0.5 }
-fixture_difficulty: { strength: 0.8 }
+**Raw Snapshot Tables:**
+```sql
+raw_player_snapshots   -- Weekly player performance and context data
+raw_fixture_snapshots  -- Weekly fixture difficulty and odds data  
+raw_form_snapshots     -- Weekly form tracking for EWMA calculations
 ```
 
-**v2.0 Parameters:**
-```javascript
-formula_optimization_v2: {
-  exponential_form: { alpha: 0.87 }
-}
-```
+**Key Features:**
+- Captures raw imported data (prices, FPts, xG stats, odds) without calculations
+- Enables "apples-to-apples" analysis by applying formulas retroactively
+- Supports home/away context and opponent data for comprehensive trend analysis
 
 **📋 TESTING REQUIREMENTS:**
-- Test parameter changes in both v1.0 Legacy and v2.0 Enhanced modes
-- Verify Apply Changes button works correctly for each engine
-- Confirm database updates go to correct columns (value_score vs true_value/roi)
+- Test trend analysis endpoints with historical gameweek data
+- Verify raw data capture during weekly imports (Fantrax, Understat, odds)
+- Confirm V2.0 parameter consistency across trend calculations
 
 ## Tools and Automation
 
@@ -282,43 +276,44 @@ grep -r "Complete\|Pending\|Deferred" docs/
 
 **This maintenance guide ensures comprehensive, accurate, and up-to-date documentation throughout the Formula Optimization project lifecycle.**
 
-## 🎯 POST-DUAL ENGINE MANDATORY UPDATES
+## 🎯 POST-V2.0 CONSOLIDATION MANDATORY UPDATES (2025-08-23)
 
 ### **Every Documentation Update Must Now Include:**
 
-1. **Engine Specification** - Which engine(s) the feature/change affects
-2. **Parameter Structure** - v1.0 vs v2.0 parameter format documentation
-3. **Database Columns** - Which columns are read/written by each engine
+1. **V2.0 Enhanced System** - All features are V2.0 Enhanced Formula only
+2. **Parameter Structure** - `formula_optimization_v2` parameter format documentation
+3. **Database Columns** - V2.0 columns (`true_value`, `roi`) and raw snapshot tables
 4. **Gameweek Handling** - Verify proper database-driven gameweek detection
-5. **Historical Data** - Document any historical PPG calculation requirements
+5. **Historical Data** - Document historical PPG calculation and raw data capture
 
-### **Critical Files Requiring Dual Engine Documentation:**
+### **Critical Files Requiring V2.0 Enhanced Documentation:**
 
 **High Priority:**
-- `DATABASE_SCHEMA.md` - Engine-specific column usage, gameweek detection patterns
-- `API_REFERENCE.md` - Separate v1.0/v2.0 endpoints, historical_ppg requirements  
-- `DEVELOPMENT_SETUP.md` - Dual engine testing procedures, parameter structure conflicts
-- `FEATURE_GUIDE.md` - UI toggle behavior, engine-specific features
+- `DATABASE_SCHEMA.md` - V2.0 column usage, raw snapshot system, gameweek detection patterns
+- `API_REFERENCE.md` - V2.0 Enhanced endpoints, trend analysis endpoints, historical_ppg requirements  
+- `DEVELOPMENT_SETUP.md` - V2.0 testing procedures, raw data snapshot validation
+- `FEATURE_GUIDE.md` - V2.0 Enhanced dashboard features, trend analysis system
 
 **Medium Priority:**
-- `FORMULA_REFERENCE.md` - v1.0 vs v2.0 calculation differences
-- `TESTING_METHODOLOGY.md` - Engine-specific validation procedures
+- `FORMULA_REFERENCE.md` - V2.0 Enhanced Formula calculations only
+- `TESTING_METHODOLOGY.md` - V2.0 Enhanced validation procedures, trend analysis testing
 
-### **New Documentation Standards (Post-2025-08-22):**
+### **New Documentation Standards (Post-2025-08-23):**
 
-**Engine References:**
-- Always specify "v1.0 Legacy" or "v2.0 Enhanced" when discussing features
-- Never use ambiguous terms like "current system" without engine specification
+**System References:**
+- Always specify "V2.0 Enhanced" when discussing the calculation system
+- Reference "raw data snapshot system" for trend analysis features
 
 **Code Examples:**
-- Include both v1.0 and v2.0 examples where applicable
+- Include V2.0 Enhanced Formula examples only
 - Show correct gameweek detection pattern in any time-based functionality
-- Include historical_ppg calculation in any player data queries
+- Include historical_ppg calculation in player data queries
+- Document raw data capture patterns for new import functionality
 
 **Cross-References:**
-- Link to CLAUDE.md dual engine warnings from technical documents
-- Reference `v2.0-dynamic-blending-stable` git tag for safe reversion points
+- Link to CLAUDE.md V2.0-only architecture from technical documents
+- Reference raw snapshot table structures for trend analysis features
 
 ---
 
-*Last updated: 2025-08-22 - Major update: Added critical architectural discoveries and dual engine documentation requirements*
+*Last updated: 2025-08-23 - Major update: Consolidated to V2.0-only system, added raw data snapshot system for trend analysis*
