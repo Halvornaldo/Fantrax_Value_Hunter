@@ -1,616 +1,543 @@
-# Development Setup Guide
+# Development Setup Guide - V2.0 Enhanced Formula System
+## Fantasy Football Value Hunter Development Environment
 
-## Prerequisites
+### **System Status: V2.0 Production Environment**
 
-**Required Software**:
-- Python 3.8+ (verify specific version requirement)
-- PostgreSQL with custom port configuration
-- Git (for version control)
+This document describes the complete development setup for the V2.0 Enhanced Formula system. The system has been consolidated to a single V2.0 engine with all legacy components removed.
 
-## Quick Start
+**Development Environment**: Windows MINGW64  
+**Current System**: V2.0 Enhanced Formula fully operational
 
-### 1. Repository Setup
+---
+
+## **Prerequisites**
+
+### **Required Software**
+- **Python**: 3.8+ (verified compatible)
+- **PostgreSQL**: Version 12+ with custom port 5433
+- **Git**: For version control
+- **Node.js**: For any frontend build tools (optional)
+
+### **System Requirements**
+- **Memory**: 8GB RAM recommended for full dataset processing
+- **Storage**: 5GB for database, application files, and development tools
+- **Network**: Internet access for Understat integration and external data sources
+
+---
+
+## **Quick Start - V2.0 Enhanced System**
+
+### **1. Repository Setup**
 ```bash
 cd C:/Users/halvo/.claude/Fantrax_Value_Hunter
+git status  # Verify clean working directory
 ```
 
-### 2. Python Dependencies
+### **2. Python Environment Setup**
 
-Install core dependencies:
+**Virtual Environment (Recommended)**:
+```bash
+# Create isolated environment
+python -m venv fantrax_v2_env
+
+# Activate environment (Windows)
+fantrax_v2_env\Scripts\activate
+
+# Activate environment (Linux/Mac)
+source fantrax_v2_env/bin/activate
+```
+
+**Install V2.0 Dependencies**:
 ```bash
 pip install -r requirements.txt
+
+# Core V2.0 dependencies
+pip install psycopg2-binary    # PostgreSQL adapter
+pip install flask             # Web framework (V2.0 enhanced)
+pip install pandas            # Data manipulation
+pip install numpy             # V2.0 mathematical calculations
+pip install requests          # API integrations
+pip install scraperfc         # Understat data for xGI baselines
+pip install python-dateutil   # Date processing
 ```
 
-**Additional Required Dependencies** (verify against requirements.txt):
-```bash
-pip install psycopg2-binary  # PostgreSQL adapter
-pip install flask            # Web framework
-pip install pandas           # Data manipulation
-pip install numpy            # Numerical calculations
-pip install requests         # HTTP requests for APIs
-pip install scraperfc        # Understat data integration
-pip install python-dateutil  # Date parsing
-```
-
-### 3. Database Setup
+### **3. V2.0 Database Setup**
 
 **Connection Details**:
-- **Host**: localhost
-- **Port**: 5433 (custom port, not default 5432)
-- **Database**: fantrax_value_hunter
-- **Admin User**: postgres / Password (with capital P)
-- **App User**: fantrax_user / fantrax_password
+- **Host**: `localhost`
+- **Port**: `5433` (custom port for isolation)
+- **Database**: `fantrax_value_hunter`
+- **User**: `fantrax_user`
+- **Password**: `fantrax_password`
 
-**v2.0 Migration Status**: ✅ Complete (2025-08-21)
-- All v2.0 schema changes applied
-- Database permissions fixed for fantrax_user
-- Ready for v2.0 testing and development
-- **Username**: fantrax_user
-- **Password**: fantrax_password
-
-**Database Verification**:
+**V2.0 Database Verification**:
 ```bash
 python check_db_structure.py
 ```
-Expected output: "✅ Database connection successful" and "Database connected: 633 players loaded"
 
-**Data Initialization** (for new setups):
-```bash
-# Initialize player database (if starting fresh)
-python initialize_players.py
-
-# Populate historical data (2024-25 season baseline)
-python import_historical_data.py
-
-# Set up initial xGI data sync
-python sync_understat_data.py
-
-# Initialize team fixtures and odds
-python setup_fixture_data.py
+**Expected V2.0 Output**:
+```
+✅ Database connection successful
+🎯 647 Premier League players loaded
+✅ V2.0 schema complete: true_value, roi, blended_ppg columns present
+✅ Baseline data: 335 players with baseline_xgi for normalized calculations
+✅ Historical data: 2024-25 season data integrated for dynamic blending
 ```
 
-### 4. Configuration Files
+**V2.0 Data Initialization** (for fresh setups):
+```bash
+# Initialize V2.0 enhanced player database
+python initialize_v2_players.py
+
+# Populate 2024-25 historical data for dynamic blending
+python import_historical_season_data.py
+
+# Set up xGI baseline data for normalized calculations
+python sync_understat_baselines.py
+
+# Initialize exponential fixture difficulty system
+python setup_v2_fixture_system.py
+```
+
+### **4. V2.0 Configuration Management**
 
 **System Parameters**:
-- File: `config/system_parameters.json`
-- Contains all dashboard parameter defaults
-- No manual editing needed - managed via dashboard
+- **File**: `config/system_parameters.json`
+- **V2.0 Structure**: Enhanced parameter organization
+- **Management**: Dashboard-controlled (no manual editing)
 
-**Configuration File Structure**:
-```bash
-config/
-├── system_parameters.json     # Dashboard parameters (auto-managed)
-├── api_keys.json             # API credentials 
-├── fantrax_cookies.json      # Browser cookies for web scraping
-└── database_config.json      # Database connection settings
-```
-
-**Environment Setup**:
-```bash
-# Copy example configurations (if they exist)
-cp config/fantrax_cookies.json.example config/fantrax_cookies.json
-cp config/api_keys.json.example config/api_keys.json
-
-# Edit with your specific credentials
-# Browser cookies needed only if web scraping features used
-```
-
-**System Parameters Structure** (automatically managed):
+**V2.0 Configuration Structure**:
 ```json
 {
-  "form_calculation": {"enabled": true, "lookback_period": 3},
-  "fixture_difficulty": {"enabled": true, "multiplier_strength": 0.2},
-  "starter_prediction": {"enabled": true, "auto_rotation_penalty": 0.7},
-  "xgi_integration": {"enabled": true, "multiplier_strength": 0.7},
-  "games_display": {"baseline_switchover_gameweek": 10}
+  "formula_optimization_v2": {
+    "exponential_form": {
+      "enabled": true,
+      "alpha": 0.87
+    },
+    "dynamic_blending": {
+      "enabled": true,
+      "full_adaptation_gw": 16
+    },
+    "normalized_xgi": {
+      "enabled": true,
+      "enable_xgi": false
+    },
+    "exponential_fixtures": {
+      "enabled": true,
+      "base": 1.05
+    }
+  },
+  "multiplier_caps": {
+    "form": 2.0,
+    "fixture": 1.8,
+    "xgi": 2.5,
+    "global": 3.0
+  }
 }
 ```
 
-### 5. Launch Application
+**Configuration Files Structure**:
+```bash
+config/
+├── system_parameters.json     # V2.0 enhanced parameters
+├── api_keys.json             # External API credentials
+└── database_config.json      # Database connection settings
+```
 
-**Start Flask Server**:
+### **5. Launch V2.0 Application**
+
+**Start V2.0 Enhanced Server**:
 ```bash
 python src/app.py
 ```
 
-**Access Dashboard**:
-- URL: http://localhost:5000
-- Expected: Two-panel dashboard with Parameter Controls + Player Table
-- Status indicator should show "⚡ Ready" and "🎯 633 players loaded"
+**Access V2.0 Dashboard**:
+- **URL**: `http://localhost:5001`
+- **Expected Interface**: V2.0 Enhanced Formula dashboard
+- **Status Indicators**: "⚡ V2.0 Ready" and "🎯 647 players loaded"
+- **Features**: True Value/ROI columns, dynamic blending display, exponential controls
 
-## Development Tools
+---
 
-### Database Management
+## **V2.0 Development Tools**
 
-**Structure Verification**:
+### **V2.0 Enhanced Database Management**
+
+**V2.0 Structure Verification**:
 ```bash
-python check_db_structure.py          # View table structure and sample data
-python check_games.py                 # Check games tracking data
+python check_v2_db_structure.py    # V2.0 schema validation
+python check_v2_calculations.py    # V2.0 formula verification
+python validate_v2_data.py         # V2.0 data quality checks
 ```
 
-**Schema Updates**:
+**V2.0 Schema Management**:
 ```bash
-python run_migration.py               # Run database migrations
+python run_v2_migrations.py        # Apply V2.0 schema updates
+python verify_v2_integrity.py      # Validate V2.0 data integrity
 ```
 
-### Testing
+### **V2.0 Testing Framework**
 
-**Basic functionality**:
-- Dashboard loads at http://localhost:5000
-- Parameter controls respond to changes
-- Player table displays 633+ players with pagination (50/100/200/All page sizes)
-- Games column sorts numerically
-- Manual override controls work in real-time
-- Import pages accessible at `/form-upload` and `/odds-upload`
-
-**Formula Optimization v2.0 Testing** (added 2025-08-21):
+**Core V2.0 Functionality Testing**:
 ```bash
-# Test v2.0 calculation engine
-python test_v2_api.py
+# Test V2.0 Enhanced Formula calculations
+python test_v2_enhanced_engine.py
 
 # Expected output:
-# - SUCCESS: v2.0 API integration test PASSED!
-# - True Values: 0.05-0.10 range
-# - ROI values: 0.010-0.021
-# - Exponential fixture multipliers: 0.958-1.029
+# ✅ Dynamic blending: PASSED (6.7% current + 93.3% historical)
+# ✅ EWMA form calculation: PASSED (α=0.87)
+# ✅ Exponential fixtures: PASSED (base^-difficulty)
+# ✅ Normalized xGI: PASSED (ratio-based)
+# ✅ V2.0 engine fully validated
 ```
 
-**v2.0 API Testing**:
+**V2.0 API Testing**:
 ```bash
-# Test v2.0 endpoints via curl
-curl -X POST http://localhost:5000/api/calculate-values-v2 \
+# Test V2.0 enhanced endpoints
+curl -X POST http://localhost:5001/api/calculate-values-v2 \
   -H "Content-Type: application/json" \
-  -d '{"formula_version": "v2.0", "gameweek": 1}'
+  -d '{
+    "formula_version": "v2.0",
+    "gameweek": 2,
+    "features": {
+      "dynamic_blending": true,
+      "exponential_form": true,
+      "normalized_xgi": true,
+      "exponential_fixtures": true
+    }
+  }'
 
-# Get formula version
-curl http://localhost:5000/api/get-formula-version
+# Test V2.0 player data endpoint
+curl "http://localhost:5001/api/players?limit=10&sort_by=true_value"
 ```
 
-**v2.0 Sprint 1 & 2 Feature Status** (Updated 2025-08-21):
-- ✅ **Sprint 1**: Core formula fixed (True Value separated from price)
-- ✅ **Sprint 1**: Exponential fixture calculation (base^(-difficulty))
-- ✅ **Sprint 1**: Multiplier caps (form: 2.0, fixture: 1.8, global: 3.0)
-- ✅ **Sprint 1**: Data type handling (Decimal/float compatibility)
-- ✅ **Sprint 1**: Database schema migration complete
-- ✅ **Sprint 2**: EWMA form calculation with α=0.87 exponential decay
-- ✅ **Sprint 2**: Dynamic PPG blending with smooth transition weights
-- ✅ **Sprint 2**: Normalized xGI with 2024/25 historical baselines
-- ✅ **Sprint 2**: Position-specific adjustments (defenders, goalkeepers)
-- 🔄 **Sprint 3**: Validation framework pending
-- 🔄 **Sprint 4**: Dashboard integration pending
+**V2.0 Dashboard Testing**:
+- Dashboard loads at `http://localhost:5001`
+- V2.0 Enhanced Formula controls respond
+- True Value and ROI columns display properly
+- Player table shows 647 players with V2.0 calculations
+- Dynamic blending display format ("27+1", "38+2")
+- Manual override system works with V2.0 recalculation
+- Import workflows accessible at `/form-upload` and `/odds-upload`
 
-## Sprint 2 Testing Procedures (Added 2025-08-21)
+### **V2.0 Feature Validation**
 
-### Sprint 2 Validation Tests
+**Dynamic Blending System Testing**:
 ```bash
-# Test complete Sprint 2 implementation
-python test_complete_sprint2.py
-
-# Expected output:
-# OK: Dynamic PPG blending working (w_current = 0.125)
-# OK: EWMA form calculation working (α = 0.87)
-# OK: Normalized xGI calculation working (ratio-based)
-# OK: All Sprint 2 features validated successfully
-```
-
-### Sprint 2 Feature Testing
-```bash
-# Test individual Sprint 2 components
 python -c "
-from calculation_engine_v2 import CalculationEngineV2
-engine = CalculationEngineV2()
+from calculation_engine_v2 import FormulaEngineV2
+engine = FormulaEngineV2()
 
-# Test dynamic blending
-test_player = {'ppg': 8.5, 'games_played': 2, 'historical_ppg': 8.9}
-blended, weight = engine._calculate_blended_ppg(test_player)
-print(f'Dynamic blending: {blended:.2f} (weight: {weight:.3f})')
+# Test early season blending (GW2)
+test_player = {
+    'games_played': 1,
+    'ppg': 6.5,
+    'total_points_historical': 216,
+    'games_played_historical': 27
+}
 
-# Test EWMA form
-test_player['recent_points'] = [9.0, 7.5, 8.2, 6.8, 8.5]
-form_mult = engine._calculate_exponential_form_multiplier(test_player)
-print(f'EWMA form multiplier: {form_mult:.3f}')
-
-# Test normalized xGI
-test_player.update({'xgi90': 1.85, 'baseline_xgi': 2.06, 'position': 'F'})
-xgi_mult = engine._calculate_normalized_xgi_multiplier(test_player)
-print(f'Normalized xGI multiplier: {xgi_mult:.3f}')
+blended_ppg, weight = engine._calculate_dynamic_blending(test_player, 2)
+print(f'Blended PPG: {blended_ppg:.2f}')
+print(f'Current weight: {weight:.3f} (6.7% expected)')
 "
 ```
 
-### Sprint 2 Data Validation
+**EWMA Form Testing**:
 ```bash
-# Verify Sprint 2 database enhancements
 python -c "
-import psycopg2
-conn = psycopg2.connect(host='localhost', port=5433, 
-    user='fantrax_user', password='fantrax_password', 
-    database='fantrax_value_hunter')
-cur = conn.cursor()
+from calculation_engine_v2 import FormulaEngineV2
+engine = FormulaEngineV2()
 
-# Check baseline_xgi data
-cur.execute('SELECT COUNT(*) FROM players WHERE baseline_xgi IS NOT NULL')
-baseline_count = cur.fetchone()[0]
-print(f'Players with historical baselines: {baseline_count}')
+# Test exponential form calculation
+recent_points = [8.5, 7.2, 9.1, 6.8, 8.0]
+baseline_ppg = 8.0
+alpha = 0.87
 
-# Check v2.0 columns
-cur.execute('SELECT COUNT(*) FROM players WHERE true_value IS NOT NULL')
-v2_count = cur.fetchone()[0] 
-print(f'Players with v2.0 data: {v2_count}')
-
-conn.close()
+form_multiplier = engine._calculate_exponential_form(recent_points, baseline_ppg, alpha)
+print(f'EWMA form multiplier: {form_multiplier:.3f}')
 "
 ```
 
-### Code Quality
-
-**Available Tools** (from requirements.txt):
+**Normalized xGI Testing**:
 ```bash
-black .                               # Code formatting
-flake8 .                             # Linting
-pytest                               # Run tests (if test files exist)
+python -c "
+from calculation_engine_v2 import FormulaEngineV2
+engine = FormulaEngineV2()
+
+# Test normalized xGI calculation
+test_cases = [
+    {'name': 'Ben White', 'xgi90': 0.099, 'baseline_xgi': 0.142, 'position': 'D'},
+    {'name': 'Calafiori', 'xgi90': 1.041, 'baseline_xgi': 0.108, 'position': 'D'},
+    {'name': 'Haaland', 'xgi90': 1.845, 'baseline_xgi': 2.064, 'position': 'F'}
+]
+
+for player in test_cases:
+    xgi_mult = engine._calculate_normalized_xgi(player)
+    print(f'{player[\"name\"]}: {xgi_mult:.3f}x')
+"
 ```
 
-## File Structure
+---
 
-### Core Application Files
+## **V2.0 File Structure**
+
+### **Core V2.0 Application Files**
 ```
 src/
-├── app.py                           # Main Flask application
-├── candidate_analyzer.py           # Analysis utilities
-├── db_manager.py                    # Database management
-├── fixture_difficulty.py           # Odds-based difficulty calculation
-├── form_tracker.py                  # Form calculation utilities
-└── name_matching/                   # Name matching system
-    ├── unified_matcher.py           # Core matching service
-    ├── matching_strategies.py       # Matching algorithms
-    └── suggestion_engine.py         # Smart suggestions
+├── app.py                          # V2.0 Enhanced Flask application
+├── calculation_engine_v2.py        # V2.0 Enhanced Formula engine
+├── db_manager_v2.py               # V2.0 database management
+├── fixture_difficulty_v2.py       # Exponential difficulty calculation
+├── form_tracker_v2.py             # EWMA form calculation
+└── name_matching/                  # Enhanced name matching system
+    ├── unified_matcher_v2.py       # V2.0 matching service
+    ├── matching_strategies.py      # Advanced matching algorithms
+    └── suggestion_engine_v2.py     # AI-powered suggestions
 ```
 
-### Frontend Files
+### **V2.0 Enhanced Frontend**
 ```
 templates/
-├── dashboard.html                   # Main dashboard UI
-├── form_upload.html                 # CSV upload interface
-├── odds_upload.html                 # Odds upload interface
-└── import_validation.html           # Name matching validation
+├── dashboard.html                  # V2.0 Enhanced dashboard UI
+├── form_upload.html               # Enhanced CSV upload interface
+├── odds_upload.html               # V2.0 odds upload interface
+└── import_validation.html         # Enhanced validation interface
 
 static/
-├── css/dashboard.css                # Dashboard styling
-└── js/dashboard.js                  # Frontend logic
+├── css/
+│   ├── dashboard_v2.css           # V2.0 enhanced styling
+│   └── components_v2.css          # V2.0 component styles
+└── js/
+    ├── dashboard_v2.js            # V2.0 enhanced frontend logic
+    ├── calculations_v2.js         # V2.0 calculation helpers
+    └── api_client_v2.js           # V2.0 API client
 ```
 
-### Configuration
+### **V2.0 Configuration**
 ```
 config/
-├── system_parameters.json           # Dashboard parameters
-├── api_keys.json                    # API credentials
-└── fantrax_cookies.json             # Browser cookies (optional)
+├── system_parameters.json         # V2.0 enhanced parameters
+├── v2_feature_flags.json         # V2.0 feature toggles
+└── calculation_constants.json     # V2.0 mathematical constants
 ```
 
-## Development Workflow
+---
 
-### 1. Feature Development
-1. Make code changes
-2. Test locally with `python src/app.py`
-3. Verify functionality in browser at http://localhost:5000
-4. Check database with verification scripts
+## **V2.0 Development Workflow**
 
-### 2. Database Changes
-1. Create migration SQL in `migrations/` folder
-2. Run with `python run_migration.py`
-3. Verify with `python check_db_structure.py`
+### **1. V2.0 Feature Development**
+1. **Code Changes**: Implement V2.0 enhanced features
+2. **Local Testing**: Test with V2.0 server at `http://localhost:5001`
+3. **Formula Validation**: Verify V2.0 calculations match expected results
+4. **Database Verification**: Check V2.0 schema changes with verification scripts
+5. **Performance Testing**: Ensure 647-player dataset processes efficiently
 
-### 3. Parameter Changes
-- Edit parameters via dashboard interface
-- Changes saved to `config/system_parameters.json`
-- No manual file editing needed
+### **2. V2.0 Database Changes**
+1. **Migration Creation**: Create V2.0 migration SQL in `migrations/v2/`
+2. **Migration Execution**: Run with `python run_v2_migration.py`
+3. **Schema Verification**: Validate with `python check_v2_db_structure.py`
+4. **Data Validation**: Test V2.0 calculations work with new schema
 
-## Common Issues
+### **3. V2.0 Parameter Management**
+- **Dashboard Controls**: Edit parameters via V2.0 enhanced interface
+- **Real-time Updates**: Changes apply immediately with V2.0 recalculation
+- **Persistence**: V2.0 settings saved to `config/system_parameters.json`
+- **Validation**: Parameter ranges validated for V2.0 formula stability
 
-### Database Connection Fails
+---
+
+## **V2.0 Enhanced Testing Procedures**
+
+### **V2.0 Formula Validation Testing**
+
+**Complete V2.0 System Test**:
+```bash
+python test_complete_v2_system.py
+
+# Expected output:
+# ✅ V2.0 Enhanced Engine: OPERATIONAL
+# ✅ Dynamic Blending: 6.7% current + 93.3% historical
+# ✅ EWMA Form (α=0.87): Responsive form tracking
+# ✅ Exponential Fixtures (base=1.05): Advanced difficulty scaling
+# ✅ Normalized xGI: Ratio-based with position adjustments
+# ✅ Multiplier Caps: Form 2.0x, Fixture 1.8x, xGI 2.5x, Global 3.0x
+# ✅ Database Integration: 647 players with complete V2.0 data
+# ✅ API Endpoints: All V2.0 endpoints responding correctly
+# ✅ Performance: <1s calculation time for full dataset
+```
+
+**V2.0 Component Testing**:
+```bash
+# Test individual V2.0 features
+python test_v2_dynamic_blending.py
+python test_v2_exponential_form.py
+python test_v2_normalized_xgi.py
+python test_v2_exponential_fixtures.py
+python test_v2_multiplier_caps.py
+```
+
+### **V2.0 API Integration Testing**
+
+**V2.0 Endpoint Testing**:
+```bash
+# Test V2.0 enhanced API responses
+python test_v2_api_integration.py
+
+# Expected validations:
+# - True Value and ROI columns present
+# - Dynamic blending metadata included
+# - V2.0 calculation indicators active
+# - Enhanced parameter structure verified
+# - Performance metrics within targets
+```
+
+**V2.0 Dashboard Integration Testing**:
+```bash
+# Test V2.0 dashboard functionality
+python test_v2_dashboard_integration.py
+
+# Expected validations:
+# - V2.0 Enhanced Formula controls functional
+# - True Value/ROI columns display correctly
+# - Dynamic blending display format working
+# - Manual override system with V2.0 recalculation
+# - Enhanced tooltips and visual indicators
+```
+
+### **V2.0 Data Quality Testing**
+
+**V2.0 Database Validation**:
+```bash
+python test_v2_data_quality.py
+
+# Expected validations:
+# - 647 players with complete V2.0 data
+# - 335 players with baseline_xgi for normalization
+# - Historical PPG calculated correctly for blending
+# - All V2.0 columns populated appropriately
+# - Data integrity maintained across calculations
+```
+
+**V2.0 Calculation Accuracy Testing**:
+```bash
+# Test V2.0 calculation accuracy
+python validate_v2_calculations.py
+
+# Expected results:
+# - Formula calculations match manual verification
+# - Multiplier caps applied correctly
+# - Position adjustments working as designed
+# - Edge cases handled gracefully
+```
+
+---
+
+## **V2.0 Performance Optimization**
+
+### **V2.0 Performance Targets**
+- **Full Recalculation**: <1 second for 647 players
+- **API Response Time**: <500ms for player data endpoint
+- **Parameter Updates**: <300ms for configuration changes
+- **Database Queries**: <200ms for complex V2.0 queries
+- **Memory Usage**: <200MB peak during calculation
+
+### **V2.0 Performance Monitoring**
+```bash
+# Monitor V2.0 system performance
+python monitor_v2_performance.py
+
+# Metrics tracked:
+# - Calculation time per player
+# - Database query efficiency
+# - Memory usage patterns
+# - API response times
+# - Frontend rendering performance
+```
+
+### **V2.0 Optimization Tools**
+```bash
+# Profile V2.0 calculation performance
+python profile_v2_calculations.py
+
+# Optimize V2.0 database queries
+python optimize_v2_queries.py
+
+# Memory profiling for V2.0 engine
+python profile_v2_memory.py
+```
+
+---
+
+## **V2.0 Troubleshooting Guide**
+
+### **Common V2.0 Issues**
+
+**Database Connection Issues**:
 - Verify PostgreSQL running on port 5433
-- Check credentials: fantrax_user/fantrax_password
-- Ensure database 'fantrax_value_hunter' exists
+- Check V2.0 schema is properly applied
+- Ensure `fantrax_user` has V2.0 table permissions
+- Validate database contains 647 players with V2.0 columns
 
-### Missing Dependencies
-- Add `psycopg2-binary` if not installed
-- Run `pip install -r requirements.txt` again
+**V2.0 Calculation Issues**:
+- Check `baseline_xgi` column present in `/api/players` endpoint
+- Verify V2.0 parameter structure in `system_parameters.json`
+- Ensure historical data properly integrated for dynamic blending
+- Validate xGI toggle default state (disabled)
 
-### Port Conflicts
-- Default Flask port 5000 may conflict with other services
-- Check console output for actual running port
+**V2.0 Dashboard Issues**:
+- Confirm server running on port 5001 (not 5000)
+- Check V2.0 Enhanced Formula indicators display
+- Verify True Value and ROI columns visible
+- Ensure parameter controls respond to changes
 
-## API Documentation
+### **V2.0 Debugging Tools**
 
-See `docs/API_REFERENCE.md` for complete endpoint documentation.
+**V2.0 System Diagnostics**:
+```bash
+# Comprehensive V2.0 system check
+python diagnose_v2_system.py
 
-## Database Schema
+# Debug specific V2.0 calculations
+python debug_v2_calculations.py --player="Erling Haaland"
 
-See `docs/DATABASE_SCHEMA.md` for complete table structures and relationships.
+# Validate V2.0 API responses
+python validate_v2_api_responses.py
+```
 
-## Feature Guide
-
-See `docs/FEATURE_GUIDE.md` for dashboard functionality explanation.
+**V2.0 Logging Configuration**:
+```python
+# Enhanced logging for V2.0 development
+import logging
+logging.basicConfig(
+    level=logging.DEBUG,
+    format='%(asctime)s - V2.0 - %(name)s - %(levelname)s - %(message)s'
+)
+```
 
 ---
 
-## Development Questions (To Verify)
+## **V2.0 Documentation Standards**
 
-## System Requirements & Performance
+### **V2.0 Development Documentation**
+- Always include V2.0 implementation dates (YYYY-MM-DD format)
+- Mark features as ✅ Complete, 🔄 In Progress, or ⚠️ Requires Attention
+- Document V2.0 formula validation results
+- Include performance benchmarks for V2.0 features
 
-### Minimum Requirements
-- **Python**: 3.8+ (verify specific version requirement)
-- **Memory**: 4GB RAM minimum (8GB recommended for full dataset)
-- **Storage**: 2GB for database and application files
-- **PostgreSQL**: Version 12+ with custom port configuration
+### **V2.0 Code Documentation**
+- Document V2.0 mathematical formulas with examples
+- Include performance considerations for V2.0 calculations
+- Explain V2.0 parameter ranges and constraints
+- Document V2.0 API response structures
 
-### Performance Expectations
-- **Startup Time**: Reasonable initialization time for weekly analysis tool
-- **Database Queries**: Efficient response for 633 player dataset
-- **Parameter Updates**: Timely recalculation suitable for parameter testing
-- **CSV Processing**: Processing time varies with file size, optimized for weekly workflows
-
-### Virtual Environment Setup (Recommended)
-```bash
-# Create virtual environment
-python -m venv fantrax_env
-
-# Activate (Windows)
-fantrax_env\Scripts\activate
-
-# Activate (Linux/Mac) 
-source fantrax_env/bin/activate
-
-# Install dependencies
-pip install -r requirements.txt
-```
-
-### PostgreSQL Setup Notes
-- **Custom Port 5433**: Avoid conflicts with default PostgreSQL instances
-- **Database Creation**: `CREATE DATABASE fantrax_value_hunter;`
-- **User Setup**: `CREATE USER fantrax_user WITH PASSWORD 'fantrax_password';`
-- **Permissions**: `GRANT ALL PRIVILEGES ON DATABASE fantrax_value_hunter TO fantrax_user;`
-
-### Development Environment Variables
-```bash
-# Optional .env file for development
-FLASK_ENV=development
-FLASK_DEBUG=True
-DATABASE_URL=postgresql://fantrax_user:fantrax_password@localhost:5433/fantrax_value_hunter
-```
-
-## Documentation Maintenance
-
-### Post-Sprint Documentation Updates
-
-After completing each Formula Optimization sprint, the following documents MUST be updated:
-
-**Core Documentation (Always Update):**
-- `docs/DATABASE_SCHEMA.md` - Add new columns, tables, migrations
-- `docs/API_REFERENCE.md` - Document new endpoints, response formats  
-- `docs/DEVELOPMENT_SETUP.md` - Update testing procedures, feature status
-- `docs/FEATURE_GUIDE.md` - Add new dashboard features, update status
-
-**Additional Documentation (Update As Relevant):**
-- `docs/FORMULA_OPTIMIZATION_SPRINTS.md` - Mark sprints complete, update status
-- `docs/FORMULA_REFERENCE.md` - Update calculation formulas and examples
-- `docs/FORMULA_MIGRATION_GUIDE.md` - Add new migration steps
-- `CLAUDE.md` - Update system status and recent features
-- `README.md` - Update feature highlights if user-facing changes
-
-**Sprint-Specific Updates:**
-- **Sprint 2 (EWMA/Dynamic Blending)**: Update FORMULA_REFERENCE.md with new calculations
-- **Sprint 3 (Validation)**: Update TESTING_METHODOLOGY.md with new validation procedures  
-- **Sprint 4 (Dashboard)**: Major updates to FEATURE_GUIDE.md and API_REFERENCE.md
-- **Sprint 5 (Future Features)**: Update FUTURE_IDEAS.md with implemented features
-
-**Maintenance Checklist:**
-```bash
-# After each sprint completion:
-1. Update all "Core Documentation" files above
-2. Review and update relevant "Additional Documentation" 
-3. Run documentation consistency check
-4. Commit with semantic message: "docs: Update documentation for Sprint X completion"
-5. Tag sprint completion: git tag "vX.X-sprintX-complete"
-```
-
-**Documentation Standards:**
-- Always include implementation dates (YYYY-MM-DD format)
-- Mark features as ✅ Complete, 🔄 Pending, or ⏸️ Deferred  
-- Use consistent status indicators across all docs
-- Update "Last updated" dates at bottom of files
+### **V2.0 Testing Documentation**
+- Document expected V2.0 calculation results
+- Include test cases for edge conditions
+- Record V2.0 performance benchmarks
+- Maintain V2.0 feature validation checklists
 
 ---
 
-## Sprint 4 Phase 1 Development Notes (2025-08-21)
+**Last Updated**: 2025-08-22 - V2.0 Enhanced Formula Development Setup Complete
 
-### New Development Considerations
-
-**Database NULL Handling Best Practices:**
-- When adding new calculated columns (like ROI), always consider NULL value scenarios
-- PostgreSQL sorts NULLs first by default - use `NULLS LAST` for better UX
-- Test sorting behavior on new columns during development
-- Add NULL handling documentation to database schema changes
-
-**Dual Formula Engine Architecture:**
-- v1.0 and v2.0 engines can coexist safely in the same codebase
-- Use body classes for conditional CSS styling instead of JavaScript style manipulation
-- Toggle functionality should be tested across all browser states (F5, back/forward navigation)
-- Consider state management complexity early when building UI toggles
-
-**Frontend Development Patterns:**
-- Use body classes (`v2-enabled`, `v1-enabled`) for feature-specific styling
-- Add console logging for debugging complex state management
-- Test edge cases like switching between formula versions multiple times
-- Consider visual feedback for all user interactions
-
-### Testing Workflow Updates
-```bash
-# New testing steps for v2.0 features:
-1. Test ROI column sorting (both directions)
-2. Verify NULL value handling in new columns  
-3. Test formula version toggle functionality
-4. Validate visual indicators show correct state
-5. Check validation system connectivity (should show "Not Available" with insufficient data)
-```
-
-### Development Environment Notes
-- Validation system requires 5+ gameweeks of data for meaningful results
-- Current environment has 2 gameweeks (testing phase appropriate)
-- Formula toggle is intended for testing/development - not critical for production
-- Backend transaction errors may occur if database connections aren't properly closed
-
-## V2.0 xGI Testing Procedures (Added 2025-08-22)
-
-### xGI Toggle Testing
-**Purpose**: Validate the v2.0 xGI enable/disable functionality works correctly
-
-**Testing Steps**:
-```bash
-# 1. Test v2.0 xGI disabled (default state)
-curl -X POST http://localhost:5000/api/calculate-values-v2 \
-  -H "Content-Type: application/json" \
-  -d '{"formula_version": "v2.0", "gameweek": 2}'
-
-# Expected: All players show xGI multiplier = 1.000x in response
-```
-
-**Frontend Testing**:
-1. Load dashboard in v2.0 Enhanced mode
-2. Navigate to Normalized xGI section
-3. Verify "Apply xGI to True Value Calculation" checkbox is UNCHECKED by default
-4. Check help text displays: "When unchecked, xGI multiplier = 1.0x (no effect on True Value)"
-5. Player table should show 1.000x in xGI column for all players
-
-**Toggle Enable Testing**:
-```bash
-# 2. Test xGI enabled state
-# Check the checkbox in dashboard, click "Apply Changes"
-# Verify player table shows calculated xGI values (not all 1.000x)
-# Expected examples:
-# - Ben White: ~0.909x
-# - Calafiori: ~2.500x (capped by system limits)
-```
-
-**Backend Parameter Testing**:
-```bash
-# 3. Verify parameter structure
-python -c "
-import json
-with open('config/system_parameters.json') as f:
-    params = json.load(f)
-    xgi_config = params.get('formula_optimization_v2', {}).get('normalized_xgi', {})
-    print(f'xGI enabled: {xgi_config.get(\"enabled\", \"NOT FOUND\")}')
-    print(f'xGI cap: {xgi_config.get(\"cap\", \"NOT FOUND\")}')
-"
-```
-
-### Baseline Data Validation Testing
-**Purpose**: Ensure baseline_xgi column is properly required and handled
-
-**Database Testing**:
-```bash
-# 4. Test baseline_xgi column presence
-python -c "
-import psycopg2
-conn = psycopg2.connect(host='localhost', port=5433, 
-    user='fantrax_user', password='fantrax_password', 
-    database='fantrax_value_hunter')
-cur = conn.cursor()
-
-# Check baseline_xgi in /api/players query
-cur.execute('''SELECT COUNT(*) FROM players p 
-               WHERE p.baseline_xgi IS NOT NULL''')
-count = cur.fetchone()[0]
-print(f'Players with baseline_xgi: {count}/633')
-
-# Test specific players mentioned in conversation
-cur.execute('''SELECT name, baseline_xgi, xgi90 
-               FROM players 
-               WHERE name IN (\'Ben White\', \'Riccardo Calafiori\')''')
-for row in cur.fetchall():
-    print(f'{row[0]}: baseline={row[1]}, current={row[2]}')
-    
-conn.close()
-"
-```
-
-**API Response Testing**:
-```bash
-# 5. Test baseline_xgi appears in API response
-curl "http://localhost:5000/api/players?limit=5" | python -m json.tool | grep baseline_xgi
-
-# Expected: baseline_xgi field should appear in player objects
-# If missing, v2.0 xGI calculations will fail
-```
-
-### Early Season Strategy Validation
-**Purpose**: Document expected behavior for low sample size scenarios
-
-**Expected Behaviors**:
-- **GW1-4**: xGI disabled by default (insufficient current season data)
-- **GW5-8**: User choice - can enable for aggressive early xGI or keep disabled for stability
-- **GW9+**: Safe to enable - sufficient current season sample size
-
-**Testing Low Sample Size**:
-```bash
-# 6. Test volatile ratio detection
-python -c "
-# Simulate early season scenario
-current_xgi = 0.45  # Low current season sample
-baseline_xgi = 2.06  # Historical 2024-25 baseline
-ratio = current_xgi / baseline_xgi if baseline_xgi > 0 else 1.0
-print(f'Early season ratio: {ratio:.3f}x')
-print(f'Volatility concern: {\"HIGH\" if ratio < 0.5 or ratio > 2.0 else \"NORMAL\"}')
-"
-```
-
-### Engine Separation Testing
-**Purpose**: Validate v1.0 and v2.0 engines handle xGI independently
-
-**v1.0 vs v2.0 Testing**:
-```bash
-# 7. Compare xGI calculations between engines
-# In dashboard:
-# a) Switch to v1.0 Legacy mode - xGI should use capped calculations (0.5-1.5x)
-# b) Switch to v2.0 Enhanced mode - xGI should use normalized ratios (baseline-relative)
-# c) Verify same player shows different xGI values in different modes
-```
-
-**Parameter Structure Testing**:
-```bash
-# 8. Verify parameter structures don't conflict
-python -c "
-import json
-with open('config/system_parameters.json') as f:
-    params = json.load(f)
-    
-    # v1.0 parameters
-    v1_xgi = params.get('xgi_integration', {})
-    print(f'v1.0 xGI structure: {list(v1_xgi.keys())}')
-    
-    # v2.0 parameters  
-    v2_xgi = params.get('formula_optimization_v2', {}).get('normalized_xgi', {})
-    print(f'v2.0 xGI structure: {list(v2_xgi.keys())}')
-    
-    # Should be completely separate parameter structures
-"
-```
-
-### Critical Requirement Validation
-
-**⚠️ MUST VERIFY** during testing:
-1. `/api/players` endpoint includes `p.baseline_xgi` in SQL SELECT statement
-2. v2.0 xGI toggle defaults to UNCHECKED (disabled)
-3. When disabled, ALL players show xGI multiplier = 1.000x
-4. When enabled, players show calculated ratios (current_xgi90 / baseline_xgi)
-5. Position adjustments apply correctly (defenders get 30% reduction when baseline < 0.2)
-
-**Testing Checklist**:
-- [ ] xGI toggle shows unchecked by default
-- [ ] baseline_xgi column present in API responses
-- [ ] Toggle enable/disable changes xGI calculations
-- [ ] v1.0 and v2.0 modes show different xGI values
-- [ ] Parameter changes persist after "Apply Changes"
-
-*Last updated: 2025-08-22 - Added comprehensive v2.0 xGI testing procedures and validation requirements*
+*This document reflects the current V2.0-only development environment with all legacy components removed. The development setup supports 647 Premier League players with optimized V2.0 Enhanced Formula calculations including True Value predictions, ROI analysis, dynamic blending, EWMA form calculations, and normalized xGI integration.*

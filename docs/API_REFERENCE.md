@@ -1,487 +1,669 @@
-# API Reference
+# API Reference - V2.0 Enhanced Formula System
+## Fantasy Football Value Hunter API Documentation
 
-## Base URL
-`http://localhost:5000`
+### **System Status: V2.0 Production API**
 
-## Endpoints
+This document describes the complete API for the V2.0 Enhanced Formula system. The system has been consolidated to a single V2.0 engine with all legacy components removed.
 
-### Dashboard & UI Routes
+**Base URL**: `http://localhost:5001`  
+**Server Status**: V2.0 Enhanced Formula fully operational
+
+---
+
+## **Core API Endpoints**
+
+### **Dashboard & UI Routes**
 
 #### `GET /`
-**Description**: Main dashboard page  
-**Returns**: HTML dashboard interface
+**Description**: V2.0 Enhanced dashboard interface  
+**Returns**: HTML dashboard with V2.0 Enhanced Formula controls
+**Features**: True Value/ROI columns, dynamic blending display, exponential controls
 
 #### `GET /form-upload`
-**Description**: Form upload page for CSV data  
-**Returns**: HTML form interface
+**Description**: Weekly game data upload interface  
+**Returns**: HTML form for CSV uploads with name validation
+**Button Label**: "Upload Weekly Game Data"
 
 #### `GET /odds-upload`
-**Description**: Odds upload page for fixture data  
-**Returns**: HTML form interface
+**Description**: Fixture odds upload interface  
+**Returns**: HTML form for betting odds CSV imports
 
 #### `GET /import-validation`
-**Description**: Import validation page  
-**Returns**: HTML validation interface
+**Description**: Data import validation interface  
+**Returns**: HTML validation page with 99% match rate system
 
 #### `GET /monitoring`
-**Description**: System monitoring page  
-**Returns**: HTML monitoring interface
+**Description**: V2.0 system monitoring interface  
+**Returns**: HTML monitoring page with performance metrics
 
-### Player Data API
+---
 
-#### `GET /api/players`
-**Description**: Get all players with filtering and sorting  
+## **Player Data API - V2.0 Enhanced**
+
+### **`GET /api/players`** - Primary Player Data Endpoint
+**Description**: Get all players with V2.0 Enhanced Formula calculations
+
 **Parameters**:
 - `position` (string, optional): Filter by position (G, D, M, F)
 - `min_price` (float, optional): Minimum price filter
 - `max_price` (float, optional): Maximum price filter
 - `team` (string, optional): Filter by team code
 - `search` (string, optional): Search player names
-- `gameweek` (int, optional, default=1): Gameweek data to retrieve
+- `gameweek` (int, optional, default=current): Gameweek data to retrieve
 - `limit` (int, optional, default=100): Results per page (50, 100, 200, 1000)
 - `offset` (int, optional, default=0): Pagination offset
-- `sort_by` (string, optional, default='true_value'): Sort field (games_total supported for numeric Games sorting, roi supported with NULLS LAST handling)
+- `sort_by` (string, optional, default='true_value'): Sort field
+  - `true_value` - V2.0 point predictions
+  - `roi` - Return on investment (with NULLS LAST)
+  - `games_total` - Total games (current + historical)
 - `sort_direction` (string, optional, default='desc'): Sort direction (asc/desc)
 
-**Returns**: JSON object with pagination info and player array
-
-**Response Format**:
+**V2.0 Response Format**:
 ```json
 {
-  "players": [...],
-  "total_count": 647,
-  "filtered_count": 50,
-  "filters_applied": {...},
-  "pagination": {
-    "limit": 50,
-    "offset": 0,
-    "has_more": true
-  }
-}
-```
-
-#### `GET /api/players-by-team`
-**Description**: Get players for a specific team  
-**Parameters**:
-- `team` (string, required): Team code
-
-**Returns**: JSON array of player objects for team
-
-#### `GET /api/teams`
-**Description**: Get list of all teams  
-**Returns**: JSON array of team objects
-
-### Configuration API
-
-#### `GET /api/config`
-**Description**: Get current system configuration  
-**Returns**: JSON configuration object
-
-#### `POST /api/update-parameters`
-**Description**: Update system parameters  
-**Body**: JSON configuration object  
-**Returns**: Success/error response
-
-### Formula Optimization v2.0 API
-
-#### `POST /api/calculate-values-v2`
-**Description**: Calculate player values using Formula Optimization v2.0 (Sprint 1 & 2 features)  
-**Sprint 2 Features**: EWMA form calculation, dynamic PPG blending, normalized xGI
-
-**Body**: 
-```json
-{
-  "formula_version": "v2.0|v1.0",
-  "gameweek": "number",
-  "player_ids": ["array", "optional"]
-}
-```
-
-**Returns**: 
-```json
-{
-  "success": true,
-  "version": "v2.0",
-  "players_calculated": 647,
-  "sprint_features": {
-    "ewma_form": true,
-    "dynamic_blending": true,
-    "normalized_xgi": true,
-    "exponential_fixture": true
-  },
-  "sample_results": [
+  "players": [
     {
-      "player_id": "string",
+      "id": "string",
       "name": "Erling Haaland",
-      "true_value": 8.68,
-      "roi": 1.021,
-      "value_score": 1.021,
+      "team": "MCI",
+      "position": "F",
+      "price": 15.00,
+      "true_value": 28.45,
+      "roi": 1.896,
+      "blended_ppg": 8.45,
+      "historical_ppg": 8.0,
+      "current_season_weight": 0.067,
+      "exponential_form_score": 0.952,
+      "baseline_xgi": 2.064,
+      "xgi90": 1.845,
       "multipliers": {
         "form": 0.952,
         "fixture": 1.006,
         "starter": 1.000,
         "xgi": 0.895
       },
-      "sprint2_data": {
-        "blended_ppg": 8.45,
-        "current_season_weight": 0.125,
-        "exponential_form_score": 0.952,
-        "normalized_xgi_ratio": 0.895,
-        "baseline_xgi": 2.064
-      },
-      "metadata": {
-        "formula_version": "v2.0",
-        "caps_applied": {
-          "form": false,
-          "fixture": false,
-          "xgi": false,
-          "global": false
-        },
-        "blending_info": {
-          "weight_current": 0.125,
-          "weight_historical": 0.875,
-          "adaptation_gameweek": 16
-        }
-      }
+      "games_played": 1,
+      "games_played_historical": 27,
+      "games_total": 28,
+      "games_display": "27+1",
+      "v2_calculation": true,
+      "formula_version": "v2.0",
+      "last_updated": "2025-08-22T10:30:00Z"
     }
-  ]
-}
-```
-
-#### `POST /api/toggle-formula-version`
-**Description**: Toggle between v1.0 and v2.0 formulas (admin only)  
-**Body**: 
-```json
-{
-  "version": "v2.0|v1.0"
-}
-```
-**Returns**: 
-```json
-{
-  "success": true,
-  "new_version": "v2.0",
-  "message": "Formula switched to v2.0"
-}
-```
-
-#### `GET /api/get-formula-version`
-**Description**: Get current formula version  
-**Returns**: 
-```json
-{
-  "current_version": "v2.0",
-  "v2_enabled": true,
-  "legacy_support": true
-}
-```
-
-### Data Import API
-
-#### `POST /api/import-form-data`
-**Description**: Import weekly form data from CSV  
-**Parameters**:
-- `gameweek` (string, required): Gameweek number
-- `file` (file, required): CSV file upload
-
-**Returns**: Success/error response with import statistics
-
-#### `POST /api/import-lineups`
-**Description**: Import lineup predictions from CSV  
-**Body**: JSON with lineup data  
-**Returns**: Success/error response
-
-#### `POST /api/import-odds`
-**Description**: Import fixture odds data from CSV  
-**Parameters**:
-- `file` (file, required): CSV file upload
-
-**Returns**: Success/error response
-
-### Data Validation API
-
-#### `POST /api/validate-import`
-**Description**: Validate CSV data before import  
-**Body**: JSON with CSV data  
-**Returns**: Validation results
-
-#### `POST /api/apply-import`
-**Description**: Apply validated import data  
-**Body**: JSON with validated data  
-**Returns**: Import results
-
-### Player Management API
-
-#### `POST /api/manual-override`
-**Description**: Set manual starter override for individual players (applies immediately)
-**Body**: 
-```json
-{
-  "player_id": "string", 
-  "override_type": "starter|bench|out|auto",
-  "gameweek": "number"
-}
-```
-**Returns**: 
-```json
-{
-  "success": true,
-  "player_name": "string",
-  "new_multiplier": "number", 
-  "new_true_value": "number"
-}
-```
-
-#### `POST /api/get-player-suggestions`
-**Description**: Get player name suggestions for mapping  
-**Body**: JSON with search criteria  
-**Returns**: Player suggestions
-
-#### `POST /api/confirm-mapping`
-**Description**: Confirm player name mapping  
-**Body**: JSON with mapping confirmations  
-**Returns**: Success/error response
-
-### Understat Integration API
-
-#### `POST /api/understat/sync`
-**Description**: Sync data with Understat  
-**Returns**: Sync results
-
-#### `GET /api/understat/unmatched`
-**Description**: Get unmatched Understat players  
-**Returns**: List of unmatched players
-
-#### `GET /api/understat/stats`
-**Description**: Get Understat integration statistics  
-**Returns**: Statistics object
-
-#### `POST /api/understat/apply-mappings`
-**Description**: Apply Understat player mappings  
-**Body**: JSON with mapping data  
-**Returns**: Success/error response
-
-### Validation Framework API (Sprint 3)
-
-#### `POST /api/run-validation`
-**Description**: Execute validation backtesting against actual fantasy performance  
-**Body**: 
-```json
-{
-  "gameweeks": [1, 2, 3],
-  "min_minutes": 90,
-  "formula_version": "v2.0",
-  "validation_type": "temporal|cross_validation"
-}
-```
-**Returns**: 
-```json
-{
-  "success": true,
-  "validation_id": "string",
-  "metrics": {
-    "rmse": 0.305,
-    "mae": 0.234,
-    "correlation": 0.87,
-    "r_squared": 0.76,
-    "players_tested": 33
+  ],
+  "total_count": 647,
+  "filtered_count": 100,
+  "filters_applied": {
+    "position": null,
+    "team": null,
+    "price_range": null
   },
-  "limitations": [
-    "Single gameweek testing",
-    "Potential data leakage risk",
-    "Small sample size (33 players)"
-  ]
-}
-```
-
-#### `POST /api/optimize-parameters`
-**Description**: Run parameter optimization for multipliers  
-**Body**: 
-```json
-{
-  "parameters_to_optimize": ["form_strength", "fixture_strength"],
-  "gameweeks": [1, 2, 3],
-  "objective": "minimize_rmse"
-}
-```
-**Returns**: Parameter optimization results
-
-#### `POST /api/benchmark-versions`
-**Description**: Compare v1.0 vs v2.0 formula performance  
-**Body**: 
-```json
-{
-  "gameweeks": [1],
-  "min_minutes": 90
-}
-```
-**Returns**: 
-```json
-{
-  "v1_metrics": {
-    "rmse": 2.277,
-    "players_tested": 74,
-    "bias": 1.7
+  "pagination": {
+    "limit": 100,
+    "offset": 0,
+    "has_more": true
   },
-  "v2_metrics": {
-    "rmse": 0.305,
-    "players_tested": 33,
-    "bias": 0.1
-  },
-  "improvement": "87% RMSE reduction"
-}
-```
-
-#### `GET /api/validation-history`
-**Description**: Get historical validation results  
-**Returns**: Array of previous validation runs
-
-#### `GET /api/validation-dashboard`
-**Description**: Validation dashboard page  
-**Returns**: HTML validation dashboard interface
-
-### Utility API
-
-#### `GET /api/export`
-**Description**: Export player data as CSV  
-**Parameters**: Same as `/api/players` endpoint  
-**Returns**: CSV file download
-
-#### `GET /api/health`
-**Description**: Health check endpoint  
-**Returns**: System status
-
-#### `GET /api/monitoring/metrics`
-**Description**: Get system monitoring metrics  
-**Returns**: Metrics data
-
-## Response Formats
-
-### Player Object
-```json
-{
-  "id": "string",
-  "name": "string", 
-  "team": "string",
-  "position": "string",
-  "price": "number",
-  "ppg": "number",
-  "value_score": "number",
-  "true_value": "number",
-  "roi": "number",
-  "form_multiplier": "number",
-  "fixture_multiplier": "number", 
-  "starter_multiplier": "number",
-  "xgi_multiplier": "number",
-  "games_played": "number",
-  "games_played_historical": "number",
-  "games_total": "number",
-  "games_display": "string",
-  "data_source": "string",
-  "xg90": "number",
-  "xa90": "number", 
-  "xgi90": "number",
-  "baseline_xgi": "number",
-  "historical_ppg": "number",
-  "minutes": "number",
-  "last_updated": "timestamp"
-}
-```
-
-### Configuration Object
-```json
-{
-  "form_calculation": {
-    "enabled": "boolean",
-    "lookback_period": "number",
-    "minimum_games": "number",
-    "baseline_switchover_gameweek": "number",
-    "form_strength": "number"
-  },
-  "fixture_difficulty": {
-    "enabled": "boolean",
-    "multiplier_strength": "number",
-    "position_weights": {
-      "goalkeeper": "number",
-      "defender": "number", 
-      "midfielder": "number",
-      "forward": "number"
+  "metadata": {
+    "formula_version": "v2.0",
+    "calculation_engine": "enhanced",
+    "features_active": {
+      "dynamic_blending": true,
+      "exponential_form": true,
+      "normalized_xgi": true,
+      "exponential_fixtures": true
     }
-  },
-  "starter_prediction": {
-    "enabled": "boolean",
-    "auto_rotation_penalty": "number",
-    "force_bench_penalty": "number"
-  },
-  "xgi_integration": {
-    "enabled": "boolean",
-    "multiplier_mode": "string",
-    "multiplier_strength": "number"
-  },
-  "games_display": {
-    "baseline_switchover_gameweek": "number",
-    "transition_period_end": "number",
-    "show_historical_data": "boolean"
   }
 }
 ```
 
----
-
-**Maintenance Note**: This document must be updated after each Formula Optimization sprint with new endpoints, response formats, and API changes. See `docs/DOCUMENTATION_MAINTENANCE.md` for complete update requirements.
-
-## Sprint 4 Phase 1 Updates (2025-08-21)
-
-### New UI Features
-- **ROI Column**: Added to player table with proper NULL handling via `NULLS LAST` sorting
-- **Formula Toggle**: Dashboard includes v1.0/v2.0 formula version switching  
-- **Validation Status**: Indicators show validation system connectivity (awaiting sufficient data)
-- **Visual Indicators**: v2.0 features marked with version badges and conditional CSS styling
-
-### Database Considerations
-- **NULL Handling**: ROI column may contain NULL values - API automatically applies `NULLS LAST` clause when sorting by ROI
-- **Dual Engine**: v1.0 and v2.0 formulas run in parallel, switchable via toggle without data conflicts
-- **Data Requirements**: Validation system requires 5+ gameweeks for meaningful backtesting (currently 2 GWs available)
-
-### Frontend Integration
-- **CSS Classes**: Body classes (`v2-enabled`, `v1-enabled`) control conditional styling for formula versions
-- **State Management**: Formula toggle affects visual styling but maintains functional consistency
-- **Performance**: New features add minimal overhead to existing API response times
-
-## V2.0 Enhanced API Requirements (Added 2025-08-22)
-
-**⚠️ CRITICAL: baseline_xgi Column Required for V2.0 Mode**
-
-The `/api/players` endpoint MUST include `baseline_xgi` in SQL SELECT when v2.0 Enhanced mode is enabled:
-
+**⚠️ CRITICAL SQL Requirements for V2.0**:
 ```sql
--- REQUIRED SQL for v2.0 compatibility  
-SELECT p.id, p.name, p.team, p.position,
-       p.minutes, p.xg90, p.xa90, p.xgi90, p.baseline_xgi,  -- baseline_xgi REQUIRED
-       pm.price, pm.ppg, pm.value_score, pm.true_value, pm.roi,
-       -- Include historical_ppg calculation for Dynamic Blending
+-- REQUIRED columns for V2.0 functionality
+SELECT p.baseline_xgi, p.true_value, p.roi, p.blended_ppg,
+       p.current_season_weight, p.exponential_form_score,
+       -- Historical PPG calculation for Dynamic Blending
        CASE 
            WHEN COALESCE(pgd.games_played_historical, 0) > 0 
            THEN COALESCE(pgd.total_points_historical, 0) / pgd.games_played_historical 
            ELSE pm.ppg 
        END as historical_ppg
 FROM players p
-LEFT JOIN player_metrics pm ON p.id = pm.player_id
-LEFT JOIN player_games_data pgd ON p.id = pgd.player_id
-WHERE pm.gameweek = ?
+WHERE ...
 ```
 
-**New API Response Fields (v2.0):**
-- `baseline_xgi` - 2024-25 season xGI baseline for normalization calculations
-- `historical_ppg` - Essential for Dynamic Blending formula
+### **`GET /api/players-by-team`**
+**Description**: Get V2.0 calculated players for specific team  
+**Parameters**:
+- `team` (string, required): Team code
 
-**xGI Toggle Implementation:**
-- Frontend: "Apply xGI to True Value Calculation" checkbox (default: unchecked)
-- Backend: When disabled, xGI multiplier = 1.0x (no effect on True Value)
-- Early season strategy: Recommended disabled until sufficient current season data
+**Returns**: JSON array of player objects with V2.0 calculations
 
-**Engine Separation:**
-- v1.0 Legacy: Ignores `baseline_xgi`, uses capped xGI calculations
-- v2.0 Enhanced: REQUIRES `baseline_xgi` for normalized ratio calculations
+### **`GET /api/teams`**
+**Description**: Get list of all Premier League teams  
+**Returns**: JSON array of 20 team objects
 
-*Last updated: 2025-08-22 - Added v2.0 xGI implementation and baseline_xgi API requirements*
+---
+
+## **V2.0 Formula Calculation API**
+
+### **`POST /api/calculate-values-v2`** - V2.0 Enhanced Calculation Engine
+**Description**: Execute V2.0 Enhanced Formula calculations with all advanced features
+
+**Request Body**:
+```json
+{
+  "formula_version": "v2.0",
+  "gameweek": 2,
+  "player_ids": ["optional", "array"],
+  "parameters": {
+    "dynamic_blending": {
+      "enabled": true,
+      "full_adaptation_gw": 16
+    },
+    "exponential_form": {
+      "enabled": true,
+      "alpha": 0.87
+    },
+    "normalized_xgi": {
+      "enabled": true,
+      "enable_xgi": false
+    },
+    "exponential_fixtures": {
+      "enabled": true,
+      "base": 1.05
+    }
+  }
+}
+```
+
+**V2.0 Response**:
+```json
+{
+  "success": true,
+  "formula_version": "v2.0",
+  "calculation_engine": "enhanced",
+  "players_calculated": 647,
+  "features_active": {
+    "dynamic_blending": true,
+    "exponential_form": true,
+    "normalized_xgi": true,
+    "exponential_fixtures": true
+  },
+  "performance_metrics": {
+    "calculation_time_ms": 450,
+    "database_queries": 8,
+    "memory_usage_mb": 125
+  },
+  "sample_calculations": [
+    {
+      "player_id": "haaland_e",
+      "name": "Erling Haaland",
+      "true_value": 28.45,
+      "roi": 1.896,
+      "blended_ppg": 8.45,
+      "multipliers": {
+        "form": 0.952,
+        "fixture": 1.006,
+        "starter": 1.000,
+        "xgi": 0.895
+      },
+      "v2_enhancements": {
+        "dynamic_blending": {
+          "current_weight": 0.067,
+          "historical_weight": 0.933,
+          "transition_status": "early_season"
+        },
+        "exponential_form": {
+          "ewma_score": 0.952,
+          "alpha_parameter": 0.87,
+          "baseline_comparison": 8.45
+        },
+        "normalized_xgi": {
+          "current_ratio": 0.895,
+          "baseline_xgi": 2.064,
+          "position_adjustment": "none"
+        },
+        "caps_applied": {
+          "form": false,
+          "fixture": false,
+          "xgi": false,
+          "global": false
+        }
+      }
+    }
+  ],
+  "validation_status": {
+    "data_quality": "excellent",
+    "missing_baselines": 0,
+    "calculation_warnings": []
+  }
+}
+```
+
+### **`POST /api/recalculate`** - Parameter Updates
+**Description**: Update V2.0 system parameters and recalculate  
+**Body**: JSON configuration with V2.0 parameter structure  
+**Returns**: Updated calculations with performance metrics
+
+---
+
+## **Configuration API - V2.0 Enhanced**
+
+### **`GET /api/config`**
+**Description**: Get V2.0 Enhanced system configuration
+
+**V2.0 Configuration Response**:
+```json
+{
+  "formula_optimization_v2": {
+    "exponential_form": {
+      "enabled": true,
+      "alpha": 0.87
+    },
+    "dynamic_blending": {
+      "enabled": true,
+      "full_adaptation_gw": 16
+    },
+    "normalized_xgi": {
+      "enabled": true,
+      "enable_xgi": false
+    },
+    "exponential_fixtures": {
+      "enabled": true,
+      "base": 1.05
+    }
+  },
+  "multiplier_caps": {
+    "form": 2.0,
+    "fixture": 1.8,
+    "xgi": 2.5,
+    "global": 3.0
+  },
+  "system_metadata": {
+    "formula_version": "v2.0",
+    "total_players": 647,
+    "current_gameweek": 2,
+    "calculation_engine": "enhanced"
+  }
+}
+```
+
+### **`POST /api/update-parameters`**
+**Description**: Update V2.0 Enhanced system parameters  
+**Body**: V2.0 configuration object with enhanced parameters  
+**Returns**: Success confirmation with updated parameter values
+
+---
+
+## **Data Import API - V2.0 Enhanced**
+
+### **`POST /api/import-form-data`**
+**Description**: Import weekly game data with V2.0 name matching system
+
+**Parameters**:
+- `gameweek` (string, required): Gameweek number
+- `file` (file, required): CSV file upload
+
+**V2.0 Enhanced Response**:
+```json
+{
+  "success": true,
+  "import_statistics": {
+    "total_rows": 300,
+    "successful_matches": 297,
+    "failed_matches": 3,
+    "match_rate": "99%"
+  },
+  "name_matching": {
+    "exact_matches": 250,
+    "fuzzy_matches": 47,
+    "manual_review_required": 3
+  },
+  "data_integration": {
+    "historical_data_updated": true,
+    "blending_weights_recalculated": true,
+    "form_scores_updated": true
+  }
+}
+```
+
+### **`POST /api/import-odds`**
+**Description**: Import fixture odds for V2.0 exponential difficulty calculation  
+**Returns**: Import results with exponential multiplier updates
+
+### **`POST /api/import-lineups`**
+**Description**: Import lineup predictions for starter multipliers  
+**Returns**: Lineup processing results with starter penalty applications
+
+---
+
+## **Player Management API - V2.0 Enhanced**
+
+### **`POST /api/manual-override`**
+**Description**: Real-time manual overrides with V2.0 instant recalculation
+
+**Request Body**:
+```json
+{
+  "player_id": "haaland_e", 
+  "override_type": "starter|bench|out|auto",
+  "gameweek": 2
+}
+```
+
+**V2.0 Response**:
+```json
+{
+  "success": true,
+  "player_name": "Erling Haaland",
+  "override_applied": "starter",
+  "updated_calculations": {
+    "old_starter_multiplier": 0.8,
+    "new_starter_multiplier": 1.0,
+    "old_true_value": 22.76,
+    "new_true_value": 28.45,
+    "impact": "+25% True Value increase"
+  },
+  "v2_recalculation": true,
+  "calculation_time_ms": 45
+}
+```
+
+---
+
+## **Understat Integration API - V2.0 Enhanced**
+
+### **`POST /api/understat/sync`**
+**Description**: Sync xGI data for V2.0 normalized calculations
+
+**V2.0 Enhanced Response**:
+```json
+{
+  "success": true,
+  "sync_results": {
+    "players_updated": 299,
+    "baseline_xgi_updated": 299,
+    "match_rate": "99%",
+    "failed_matches": ["Player Name 1", "Player Name 2"]
+  },
+  "v2_integration": {
+    "normalized_calculations_ready": true,
+    "baseline_data_quality": "excellent",
+    "position_adjustments_applied": true
+  }
+}
+```
+
+### **`GET /api/understat/stats`**
+**Description**: V2.0 xGI integration statistics
+
+**Returns**: Enhanced statistics with baseline quality metrics
+
+---
+
+## **V2.0 Validation Framework API**
+
+### **`POST /api/run-validation`**
+**Description**: Execute V2.0 formula validation and backtesting
+
+**Request Body**:
+```json
+{
+  "gameweeks": [1, 2],
+  "min_minutes": 90,
+  "formula_version": "v2.0",
+  "validation_type": "temporal",
+  "features_to_test": [
+    "dynamic_blending",
+    "exponential_form", 
+    "normalized_xgi",
+    "exponential_fixtures"
+  ]
+}
+```
+
+**V2.0 Validation Response**:
+```json
+{
+  "success": true,
+  "validation_id": "v2_validation_20250822_001",
+  "formula_version": "v2.0",
+  "features_tested": {
+    "dynamic_blending": true,
+    "exponential_form": true,
+    "normalized_xgi": true,
+    "exponential_fixtures": true
+  },
+  "performance_metrics": {
+    "rmse": 0.305,
+    "mae": 0.234,
+    "spearman_correlation": 0.87,
+    "r_squared": 0.76,
+    "precision_at_20": 0.85
+  },
+  "test_details": {
+    "players_tested": 33,
+    "gameweeks_tested": 2,
+    "predictions_made": 66,
+    "data_completeness": "excellent"
+  },
+  "v2_specific_metrics": {
+    "blending_accuracy": 0.92,
+    "form_prediction_accuracy": 0.89,
+    "xgi_normalization_quality": 0.94
+  }
+}
+```
+
+### **`GET /api/validation-history`**
+**Description**: Historical V2.0 validation results  
+**Returns**: Array of V2.0 validation runs with trend analysis
+
+---
+
+## **Utility API - V2.0 Enhanced**
+
+### **`GET /api/export`**
+**Description**: Export V2.0 player data as CSV with all enhanced columns
+
+**Enhanced Export Columns**:
+- All standard player data
+- `true_value` - V2.0 point predictions
+- `roi` - Return on investment ratios
+- `blended_ppg` - Dynamic blending results
+- `exponential_form_score` - EWMA form scores
+- `baseline_xgi` - Historical xGI baselines
+- V2.0 multiplier breakdown
+
+### **`GET /api/health`**
+**Description**: V2.0 Enhanced system health check
+
+**V2.0 Health Response**:
+```json
+{
+  "status": "healthy",
+  "formula_version": "v2.0",
+  "system_info": {
+    "total_players": 647,
+    "database_status": "connected",
+    "calculation_engine": "enhanced",
+    "last_calculation": "2025-08-22T10:30:00Z"
+  },
+  "v2_features_status": {
+    "dynamic_blending": "operational",
+    "exponential_form": "operational", 
+    "normalized_xgi": "operational",
+    "exponential_fixtures": "operational"
+  },
+  "performance_metrics": {
+    "avg_response_time_ms": 250,
+    "calculation_success_rate": "100%",
+    "memory_usage": "normal"
+  }
+}
+```
+
+---
+
+## **V2.0 Data Structures**
+
+### **Enhanced Player Object - V2.0**
+```json
+{
+  "id": "string",
+  "name": "string",
+  "team": "string", 
+  "position": "string",
+  "price": "number",
+  "true_value": "number",
+  "roi": "number",
+  "blended_ppg": "number",
+  "historical_ppg": "number",
+  "current_season_weight": "number",
+  "exponential_form_score": "number",
+  "baseline_xgi": "number",
+  "xgi90": "number",
+  "multipliers": {
+    "form": "number",
+    "fixture": "number", 
+    "starter": "number",
+    "xgi": "number"
+  },
+  "games_played": "number",
+  "games_played_historical": "number",
+  "games_total": "number",
+  "games_display": "string",
+  "v2_calculation": true,
+  "formula_version": "v2.0",
+  "minutes": "number",
+  "last_updated": "timestamp",
+  "v2_metadata": {
+    "caps_applied": {
+      "form": "boolean",
+      "fixture": "boolean",
+      "xgi": "boolean",
+      "global": "boolean"
+    },
+    "blending_info": {
+      "weight_current": "number",
+      "weight_historical": "number",
+      "transition_status": "string"
+    }
+  }
+}
+```
+
+### **V2.0 Configuration Object**
+```json
+{
+  "formula_optimization_v2": {
+    "exponential_form": {
+      "enabled": "boolean",
+      "alpha": "number"
+    },
+    "dynamic_blending": {
+      "enabled": "boolean", 
+      "full_adaptation_gw": "number"
+    },
+    "normalized_xgi": {
+      "enabled": "boolean",
+      "enable_xgi": "boolean"
+    },
+    "exponential_fixtures": {
+      "enabled": "boolean",
+      "base": "number"
+    }
+  },
+  "multiplier_caps": {
+    "form": "number",
+    "fixture": "number",
+    "xgi": "number", 
+    "global": "number"
+  }
+}
+```
+
+---
+
+## **V2.0 Formula Implementation Details**
+
+### **Core V2.0 Formula**
+```
+True Value = Blended_PPG × Form × Fixture × Starter × xGI
+ROI = True Value ÷ Price
+```
+
+### **Dynamic Blending System**
+- **Formula**: `w_current = min(1, (N-1)/(K-1))`  
+- **Early Season (GW2)**: 6.7% current + 93.3% historical
+- **Transition**: Smooth progression to current-only by GW16
+
+### **Exponential Form (EWMA)**
+- **Algorithm**: Exponential Weighted Moving Average
+- **Alpha Parameter**: 0.87 (configurable)
+- **Baseline**: Compared to blended PPG
+
+### **Normalized xGI System**
+- **Calculation**: `current_xgi90 ÷ baseline_xgi`
+- **Position Adjustments**: Defenders 30% reduced impact
+- **Toggle Control**: User can enable/disable
+
+### **Exponential Fixtures**
+- **Formula**: `multiplier = base^(-difficulty_score)`
+- **Base**: 1.05 (configurable)
+- **Position Adjustments**: Defenders +20% impact
+
+---
+
+## **Error Handling - V2.0 Enhanced**
+
+### **Standard Error Response**
+```json
+{
+  "success": false,
+  "error": "error_code",
+  "message": "Human readable error message",
+  "formula_version": "v2.0",
+  "context": {
+    "endpoint": "/api/calculate-values-v2",
+    "timestamp": "2025-08-22T10:30:00Z",
+    "request_id": "req_12345"
+  },
+  "v2_specific": {
+    "missing_baselines": ["player_id_1", "player_id_2"],
+    "calculation_warnings": [],
+    "feature_status": {
+      "dynamic_blending": "operational",
+      "exponential_form": "operational"
+    }
+  }
+}
+```
+
+### **Common V2.0 Error Codes**
+- `missing_baseline_xgi` - Required baseline_xgi data missing
+- `invalid_v2_parameters` - V2.0 parameter validation failed
+- `calculation_engine_error` - V2.0 engine processing error
+- `insufficient_data` - Not enough data for V2.0 calculations
+
+---
+
+## **Performance Specifications - V2.0**
+
+### **Response Time Targets**
+- **Player Data API**: < 500ms for 647 players
+- **V2.0 Calculations**: < 1000ms for full recalculation  
+- **Parameter Updates**: < 300ms for configuration changes
+- **Data Import**: < 5000ms for 300 player CSV
+
+### **Scalability Metrics**
+- **Concurrent Users**: 10+ simultaneous dashboard users
+- **Database Performance**: Sub-second query response
+- **Memory Usage**: < 200MB peak during calculations
+- **Calculation Throughput**: 647 players/second
+
+---
+
+**Last Updated**: 2025-08-22 - V2.0 Enhanced Formula API Complete
+
+*This document reflects the current V2.0-only API structure with all legacy endpoints removed. The API serves 647 Premier League players with optimized V2.0 Enhanced Formula calculations including True Value predictions, ROI analysis, dynamic blending, EWMA form calculations, and normalized xGI integration.*

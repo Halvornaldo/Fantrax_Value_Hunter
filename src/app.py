@@ -30,7 +30,7 @@ except ImportError:
 
 # Add v2.0 calculation engine
 sys.path.append(os.path.join(os.path.dirname(__file__), '..'))
-from calculation_engine_v2 import FormulaEngineV2, LegacyFormulaEngine
+from calculation_engine_v2 import FormulaEngineV2
 
 app = Flask(__name__, 
             template_folder='../templates',
@@ -245,164 +245,134 @@ def calculate_fixture_difficulty_multiplier_cached(team_code: str, position: str
 
 def recalculate_true_values(gameweek: int = 1):
     """
-    Recalculate True Value for all players based on current parameters
-    TrueValue = (PPG ÷ Price) × Form × Fixture × Starter
+    Recalculate True Value for all players using v2.0 Enhanced Formula
+    TrueValue = Blended_PPG × Form × Fixture × Starter × xGI
+    ROI = TrueValue ÷ Price
     """
     start_time = time.time()
     
     params = load_system_parameters()
-    conn = get_db_connection()
     
+    # Use v2.0 calculation engine exclusively
     try:
+        from calculation_engine_v2 import FormulaEngineV2
+        
+        # Initialize v2.0 engine
+        v2_engine = FormulaEngineV2(DB_CONFIG, params)
+        
+        # Get all players with enhanced data for v2.0
+        conn = get_db_connection()
         cursor = conn.cursor(cursor_factory=psycopg2.extras.RealDictCursor)
         
-        # OPTIMIZATION: Pre-load all fixture data into memory
-        fixture_cache = {}
+        # Enhanced query for v2.0 with all required data
         cursor.execute("""
-            SELECT team_code, difficulty_score 
-            FROM team_fixtures 
-            WHERE gameweek = %s
-        """, [gameweek])
-        
-        for row in cursor.fetchall():
-            fixture_cache[row['team_code']] = float(row['difficulty_score'])
-        
-        print(f"Loaded {len(fixture_cache)} team fixtures into cache")
-        
-        # Get all players with current metrics
-        cursor.execute("""
-            SELECT p.id, p.name, p.team, p.position,
-                   p.xgi90,
-                   pm.price, pm.ppg, pm.value_score,
-                   pm.form_multiplier, pm.fixture_multiplier, pm.starter_multiplier
+            SELECT 
+                p.id as player_id, p.name, p.team, p.position,
+                pm.price, pm.ppg, 
+                pm.form_multiplier, pm.fixture_multiplier, pm.starter_multiplier,
+                p.xgi90, p.baseline_xgi,
+                pgd.total_points_historical, pgd.games_played_historical,
+                pgd.total_points_current, pgd.games_played_current,
+                tf.difficulty_score as fixture_difficulty
             FROM players p
             JOIN player_metrics pm ON p.id = pm.player_id
+            LEFT JOIN player_games_data pgd ON p.id = pgd.player_id
+            LEFT JOIN team_fixtures tf ON p.team = tf.team_code AND tf.gameweek = %s
             WHERE pm.gameweek = %s
-        """, [gameweek])
+        """, [gameweek, gameweek])
         
         players = cursor.fetchall()
         updated_count = 0
-        
-        # OPTIMIZATION: Collect all updates for batch processing
         batch_updates = []
         
         for player in players:
-            # Calculate form multiplier if enabled
-            form_mult = 1.0
-            if params.get('form_calculation', {}).get('enabled', False):
-                lookback = params['form_calculation'].get('lookback_period', 3)
-                form_mult = calculate_form_multiplier(player['id'], gameweek, lookback)
-            
-            # Calculate fixture difficulty multiplier from cached data
-            fixture_mult = calculate_fixture_difficulty_multiplier_cached(
-                player['team'], player['position'], params, fixture_cache
-            )
-            starter_mult = float(player.get('starter_multiplier', 1.0))
-            
-            # Calculate xGI multiplier if enabled
-            xgi_mult = 1.0
-            if params.get('xgi_integration', {}).get('enabled', False):
-                xgi_mode = params['xgi_integration'].get('multiplier_mode', 'direct')
-                strength = params['xgi_integration'].get('multiplier_strength', 1.0)
-                xgi90 = float(player.get('xgi90', 0))
+            # Convert to v2.0 calculation format
+            player_data = {
+                'player_id': player['player_id'],
+                'name': player['name'],
+                'position': player['position'],
+                'price': float(player['price']) if player['price'] else 1.0,
+                'ppg': float(player['ppg']) if player['ppg'] else 0.0,
+                'xgi90': float(player['xgi90']) if player['xgi90'] else 0.0,
+                'baseline_xgi': float(player['baseline_xgi']) if player['baseline_xgi'] else None,
+                'fixture_difficulty': float(player['fixture_difficulty']) if player['fixture_difficulty'] else 0.0,
+                'starter_multiplier': float(player['starter_multiplier']) if player['starter_multiplier'] else 1.0,
                 
-                if xgi_mode == 'direct':
-                    xgi_mult = xgi90 * strength if xgi90 > 0 else 1.0
-                elif xgi_mode == 'adjusted':
-                    xgi_mult = 1 + (xgi90 * strength)
-                elif xgi_mode == 'capped':
-                    capped_min = params['xgi_integration']['multiplier_modes']['capped'].get('min', 0.5)
-                    capped_max = params['xgi_integration']['multiplier_modes']['capped'].get('max', 1.5)
-                    xgi_mult = max(capped_min, min(capped_max, xgi90 * strength)) if xgi90 > 0 else 1.0
-                
-                # Debug: Log first few xGI calculations
-                if updated_count < 5 and xgi90 > 0:
-                    print(f"DEBUG: {player['name']} - xGI90: {xgi90}, mode: {xgi_mode}, strength: {strength} -> xgi_mult: {xgi_mult}")
+                # Historical data for dynamic blending
+                'total_points_historical': float(player['total_points_historical']) if player['total_points_historical'] else 0.0,
+                'games_played_historical': int(player['games_played_historical']) if player['games_played_historical'] else 0,
+                'total_points_current': float(player['total_points_current']) if player['total_points_current'] else 0.0,
+                'games_played_current': int(player['games_played_current']) if player['games_played_current'] else 0,
+            }
             
-            # Calculate True Value: (PPG ÷ Price) × Form × Fixture × Starter × xGI
-            ppg = float(player['ppg']) if player['ppg'] else 0
-            price = float(player['price']) if player['price'] else 0
-            base_value = ppg / price if price > 0 else 0
-            true_value = base_value * form_mult * fixture_mult * starter_mult * xgi_mult
+            # Calculate historical PPG for blending
+            if player_data['games_played_historical'] > 0:
+                player_data['historical_ppg'] = player_data['total_points_historical'] / player_data['games_played_historical']
+            else:
+                player_data['historical_ppg'] = 0.0
             
-            # OPTIMIZATION: Add to batch instead of individual UPDATE
-            batch_updates.append({
-                'player_id': player['id'],
-                'value_score': base_value,
-                'true_value': true_value,
-                'form_multiplier': form_mult,
-                'fixture_multiplier': fixture_mult,
-                'starter_multiplier': starter_mult,
-                'xgi_multiplier': xgi_mult
-            })
+            # Use v2.0 engine for calculation
+            v2_result = v2_engine.calculate_player_value(player_data)
             
+            # Prepare batch update
+            batch_updates.append((
+                v2_result['true_value'],
+                v2_result['roi'],
+                v2_result.get('blended_ppg', player_data['ppg']),
+                v2_result['multipliers']['form'],
+                v2_result['multipliers']['fixture'],
+                v2_result['multipliers']['xgi'],
+                player['player_id'],
+                gameweek
+            ))
             updated_count += 1
         
-        # OPTIMIZATION: Execute batch update for all players
-        if batch_updates:
-            print(f"Executing batch update for {len(batch_updates)} players...")
-            batch_start = time.time()
-            
-            # Use psycopg2's execute_values for efficient bulk update
-            
-            update_data = [
-                (
-                    update['value_score'],
-                    update['true_value'], 
-                    update['form_multiplier'],
-                    update['fixture_multiplier'],
-                    update['starter_multiplier'],
-                    update['xgi_multiplier'],
-                    update['player_id'],
-                    gameweek
-                ) for update in batch_updates
-            ]
-            
-            cursor.execute("BEGIN")
-            psycopg2.extras.execute_values(
-                cursor,
-                """
-                UPDATE player_metrics 
-                SET value_score = data.value_score,
-                    true_value = data.true_value,
-                    form_multiplier = data.form_mult,
-                    fixture_multiplier = data.fixture_mult,
-                    starter_multiplier = data.starter_mult,
-                    xgi_multiplier = data.xgi_mult,
-                    last_updated = CURRENT_TIMESTAMP
-                FROM (VALUES %s) AS data(value_score, true_value, form_mult, fixture_mult, starter_mult, xgi_mult, player_id, gameweek)
-                WHERE player_metrics.player_id = data.player_id AND player_metrics.gameweek = data.gameweek
-                """,
-                update_data,
-                template=None
-            )
-            
-            batch_time = time.time() - batch_start
-            print(f"Batch update completed in {batch_time:.3f}s")
+        # Batch update all players
+        cursor.executemany("""
+            UPDATE player_metrics 
+            SET 
+                true_value = %s,
+                roi = %s,
+                value_score = %s,
+                form_multiplier = %s,
+                fixture_multiplier = %s,
+                xgi_multiplier = %s
+            WHERE player_id = %s AND gameweek = %s
+        """, [(u[0], u[1], u[1], u[2], u[3], u[4], u[5], u[6]) for u in batch_updates])
+        
+        # Also update players table with v2.0 columns
+        cursor.executemany("""
+            UPDATE players 
+            SET 
+                true_value = %s,
+                roi = %s,
+                blended_ppg = %s
+            WHERE id = %s
+        """, [(u[0], u[1], u[2], u[6]) for u in batch_updates])
         
         conn.commit()
-        
         elapsed_time = time.time() - start_time
-        print(f"Recalculated True Values for {updated_count} players in {elapsed_time:.2f}s")
-        print(f"DEBUG: xGI integration enabled: {params.get('xgi_integration', {}).get('enabled', False)}")
-        if params.get('xgi_integration', {}):
-            print(f"DEBUG: xGI params: {params['xgi_integration']}")
+        
+        print(f"✅ v2.0 Enhanced: Updated {updated_count} players in {elapsed_time:.2f}s")
         
         return {
             'success': True,
             'updated_count': updated_count,
-            'elapsed_time': elapsed_time
+            'elapsed_time': round(elapsed_time, 2),
+            'formula_version': 'v2.0'
         }
         
     except Exception as e:
-        conn.rollback()
-        print(f"Error recalculating True Values: {e}")
+        if 'conn' in locals():
+            conn.rollback()
+        print(f"❌ v2.0 calculation error: {e}")
         return {
             'success': False,
             'error': str(e)
         }
     finally:
-        conn.close()
+        if 'conn' in locals():
+            conn.close()
 
 @app.route('/')
 def dashboard():
@@ -586,8 +556,8 @@ def get_players():
             player_dict['games_total'] = games_historical + games_current
             players_list.append(player_dict)
         
-        # Apply V2 calculations if V2 mode is enabled
-        v2_enabled = parameters.get('formula_optimization_v2', {}).get('enabled', False)
+        # Apply V2 enhanced calculations (always enabled)
+        v2_enabled = True
         if v2_enabled:
             try:
                 # Import V2 engine
@@ -689,11 +659,6 @@ def update_parameters():
             return jsonify({'error': 'Failed to load current system configuration'}), 500
         
         # Update parameters based on request
-        if 'form_calculation' in data:
-            if 'form_calculation' not in current_params:
-                current_params['form_calculation'] = {}
-            current_params['form_calculation'].update(data['form_calculation'])
-            
         if 'fixture_difficulty' in data:
             if '5_tier_multipliers' in data['fixture_difficulty']:
                 current_params['fixture_difficulty']['5_tier_multipliers'].update(
@@ -1819,14 +1784,7 @@ def import_form_data():
         conn.commit()
         conn.close()
         
-        # Enable form calculations in system parameters if not already enabled
-        try:
-            params = load_system_parameters()
-            if not params.get('form_calculation', {}).get('enabled', False):
-                params['form_calculation']['enabled'] = True
-                save_system_parameters(params)
-        except Exception as e:
-            print(f"Warning: Could not update system parameters: {e}")
+        # V2.0 calculations are always enabled - no parameter toggles needed
         
         return jsonify({
             'success': True,
@@ -3060,11 +3018,8 @@ def calculate_values_v2():
         # Load current parameters
         parameters = load_system_parameters()
         
-        # Choose engine
-        if formula_version == 'v2.0':
-            engine = FormulaEngineV2(DB_CONFIG, parameters)
-        else:
-            engine = LegacyFormulaEngine(DB_CONFIG, parameters)
+        # Always use V2.0 Enhanced Formula Engine
+        engine = FormulaEngineV2(DB_CONFIG, parameters)
         
         # Get player data from database
         conn = get_db_connection()
@@ -3111,25 +3066,7 @@ def calculate_values_v2():
             calculation = engine.calculate_player_value(dict(player))
             results.append(calculation)
         
-        # Optional: Compare versions
-        comparison = None
-        if compare_versions and formula_version == 'v2.0':
-            legacy_engine = LegacyFormulaEngine(DB_CONFIG, parameters)
-            comparison = []
-            
-            for player in players[:10]:  # Limited comparison for performance
-                v2_calc = engine.calculate_player_value(dict(player))
-                v1_calc = legacy_engine.calculate_player_value(dict(player))
-                
-                comparison.append({
-                    'player_id': player['player_id'],
-                    'name': player['name'],
-                    'v1_value': v1_calc['value_score'],
-                    'v2_true_value': v2_calc['true_value'],
-                    'v2_roi': v2_calc['roi'],
-                    'difference_points': v2_calc['true_value'] - (v1_calc['value_score'] * player['price']),
-                    'difference_roi': v2_calc['roi'] - v1_calc['value_score']
-                })
+        # V2.0 calculations only - no version comparisons needed
         
         # Store calculations in database
         if results:
@@ -3141,7 +3078,6 @@ def calculate_values_v2():
             'player_count': len(results),
             'gameweek': gameweek,
             'results': results[:50],  # Limit response size
-            'comparison': comparison,
             'calculation_time': time.time(),
             'summary': {
                 'avg_true_value': sum(r['true_value'] for r in results) / len(results) if results else 0,
@@ -3159,63 +3095,6 @@ def calculate_values_v2():
         }), 500
 
 
-@app.route('/api/toggle-formula-version', methods=['POST'])
-def toggle_formula_version():
-    """Toggle between v1.0 and v2.0 formulas"""
-    try:
-        data = request.get_json() or {}
-        new_version = data.get('version', 'v2.0')
-        
-        # Update parameters
-        parameters = load_system_parameters()
-        
-        # Update v2.0 config
-        if 'formula_optimization_v2' not in parameters:
-            parameters['formula_optimization_v2'] = {}
-        
-        parameters['formula_optimization_v2']['enabled'] = (new_version == 'v2.0')
-        parameters['metadata']['version'] = new_version
-        parameters['metadata']['last_updated'] = datetime.now().strftime('%Y-%m-%d')
-        
-        # Save updated parameters
-        config_path = os.path.join(os.path.dirname(__file__), '..', 'config', 'system_parameters.json')
-        with open(config_path, 'w', encoding='utf-8') as f:
-            json.dump(parameters, f, indent=2, ensure_ascii=False)
-        
-        return jsonify({
-            'success': True,
-            'formula_version': new_version,
-            'message': f'Switched to formula {new_version}',
-            'v2_enabled': parameters['formula_optimization_v2']['enabled']
-        })
-        
-    except Exception as e:
-        return jsonify({
-            'success': False,
-            'error': str(e)
-        }), 500
-
-
-@app.route('/api/get-formula-version', methods=['GET'])
-def get_formula_version():
-    """Get current formula version"""
-    try:
-        parameters = load_system_parameters()
-        v2_enabled = parameters.get('formula_optimization_v2', {}).get('enabled', False)
-        current_version = 'v2.0' if v2_enabled else 'v1.0'
-        
-        return jsonify({
-            'success': True,
-            'version': current_version,
-            'v2_config': parameters.get('formula_optimization_v2', {}),
-            'metadata': parameters.get('metadata', {})
-        })
-        
-    except Exception as e:
-        return jsonify({
-            'success': False,
-            'error': str(e)
-        }), 500
 
 
 def store_v2_calculations(calculations: List[Dict], version: str):
@@ -3494,6 +3373,6 @@ if __name__ == '__main__':
         print("Starting app anyway...")
     
     # Production-ready configuration
-    port = int(os.getenv('PORT', 5000))
+    port = int(os.getenv('PORT', 5001))  # Use 5001 to avoid conflict
     debug = os.getenv('FLASK_ENV') == 'development'
     app.run(debug=debug, host='0.0.0.0', port=port)

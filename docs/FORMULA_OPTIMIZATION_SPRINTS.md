@@ -413,7 +413,8 @@ def calculate_form_multiplier(player_id, current_gameweek, lookback_period=3):
 ```python
 def calculate_exponential_form_multiplier(player_data, params):
     """
-    Exponential Weighted Moving Average (EWMA) form calculation
+    Exponential Weighted Moving Average (
+    ) form calculation
     Research formula: F_N = α × F_(N-1) + (1-α) × P_(N-1)
     """
     recent_games = player_data.get('recent_points', [])

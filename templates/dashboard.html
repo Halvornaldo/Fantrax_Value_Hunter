@@ -3,701 +3,278 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Fantrax Crusher 2000 - Dashboard</title>
+    <title>Fantrax Value Hunter - V2.0 Enhanced - Cache Bust 2025-08-22-213500</title>
     <link rel="stylesheet" href="{{ url_for('static', filename='css/dashboard.css') }}">
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
 </head>
 <body>
-    <div class="container">
-        <!-- Header with Epic Banner -->
-        <header class="header">
-            <div class="banner-container">
-                <img src="{{ url_for('static', filename='images/fantrax-dominator-banner.png') }}" alt="The Fantrax Dominator" class="banner-image">
-                <button class="theme-toggle" id="theme-toggle">🌙 Dark Mode</button>
-                <div class="banner-overlay">
-                    <div class="status-info">
-                        <span id="status-indicator" class="status-ready">⚡ Ready</span>
-                        <span id="player-count" class="player-count">🎯 633 players loaded</span>
-                        <span id="last-updated" class="last-updated">🕐 Last updated: --</span>
-                    </div>
-                </div>
-            </div>
-        </header>
-
-        <!-- Main Dashboard Layout -->
-        <div class="dashboard">
-            <!-- Left Panel - Parameter Controls -->
-            <div class="left-panel">
+    <div class="dashboard-container">
+        <!-- Left Panel: Parameter Controls -->
+        <div class="left-panel">
+            <!-- Header -->
+            <div class="panel-header">
                 <h2>Parameter Controls</h2>
-                
-                <!-- Formula Version Selection (v2.0) -->
-                <div class="parameter-section formula-version-section">
-                    <h3>
-                        <span class="version-badge">v2.0</span>
-                        <label>Formula Version</label>
-                    </h3>
-                    <div class="formula-controls">
-                        <div class="toggle-group">
-                            <input type="radio" id="formula-v1" name="formula-version" value="v1.0">
-                            <label for="formula-v1" class="toggle-label">v1.0 Legacy</label>
-                            <input type="radio" id="formula-v2" name="formula-version" value="v2.0" checked>
-                            <label for="formula-v2" class="toggle-label active">v2.0 Enhanced</label>
-                        </div>
-                        <div class="formula-info">
-                            <div id="formula-v2-info" class="version-info">
-                                ✅ Separated True Value & ROI<br>
-                                ✅ EWMA Form (α=0.87)<br>
-                                ✅ Dynamic Blending<br>
-                                ✅ Normalized xGI<br>
-                                ✅ Exponential Fixtures
-                            </div>
-                            <div id="formula-v1-info" class="version-info" style="display: none;">
-                                ⚠️ Mixed prediction with value<br>
-                                ⚠️ Fixed form weights<br>
-                                ⚠️ Linear fixture calculation<br>
-                                ⚠️ Raw xGI multipliers
-                            </div>
-                        </div>
-                        <p class="help-text">v2.0 provides research-validated calculations with 10-15% better accuracy</p>
-                    </div>
-                </div>
-                
-                <!-- Validation Status Indicators (v2.0) -->
-                <div class="parameter-section validation-status-section">
-                    <h3>
-                        <span class="status-badge" id="validation-badge">Checking...</span>
-                        <label>Model Validation Status</label>
-                    </h3>
-                    <div class="validation-indicators">
-                        <div class="validation-metrics">
-                            <div class="metric-item">
-                                <span class="metric-label">RMSE:</span>
-                                <span class="metric-value" id="rmse-value">--</span>
-                                <span class="metric-status" id="rmse-status">--</span>
-                            </div>
-                            <div class="metric-item">
-                                <span class="metric-label">Correlation:</span>
-                                <span class="metric-value" id="correlation-value">--</span>
-                                <span class="metric-status" id="correlation-status">--</span>
-                            </div>
-                            <div class="metric-item">
-                                <span class="metric-label">Precision@20:</span>
-                                <span class="metric-value" id="precision-value">--</span>
-                                <span class="metric-status" id="precision-status">--</span>
-                            </div>
-                        </div>
-                        <div class="validation-actions">
-                            <button class="validation-btn" id="run-validation" onclick="runValidation()">
-                                🔍 Run Validation
-                            </button>
-                            <button class="validation-btn" id="view-validation" onclick="viewValidationResults()">
-                                📊 View Results
-                            </button>
-                        </div>
-                        <div class="validation-info">
-                            <p class="help-text">Last validation: <span id="last-validation">Not run</span></p>
-                            <p class="quality-text" id="quality-summary">Model quality assessment will appear here</p>
-                        </div>
-                    </div>
-                </div>
-                
-                <!-- Form Calculation Section -->
-                <div class="parameter-section v1-legacy-section">
-                    <h3>
-                        <input type="checkbox" id="form-enabled" checked>
-                        <label for="form-enabled">Form Calculation</label>
-                    </h3>
-                    <div class="form-controls" id="form-controls">
-                        <div class="control-group">
-                            <label for="lookback-period">Lookback Period:</label>
-                            <select id="lookback-period">
-                                <option value="3">3 games</option>
-                                <option value="5" selected>5 games</option>
-                            </select>
-                        </div>
-                        <div class="control-group">
-                            <label for="min-games">Minimum Games:</label>
-                            <input type="number" id="min-games" value="3" min="1" max="10">
-                        </div>
-                        <div class="control-group">
-                            <label for="baseline-switchover">Baseline Switchover Gameweek:</label>
-                            <input type="number" id="baseline-switchover" value="10" min="1" max="38">
-                        </div>
-                        <div class="slider-group">
-                            <label for="form-strength-slider">Form Strength:</label>
-                            <input type="range" id="form-strength-slider" min="0.5" max="2.0" step="0.1" value="1.0">
-                            <span id="form-strength-display">1.00x</span>
-                        </div>
-                        <p class="help-text">Uses weighted average of recent games vs season average. Switches to historical data after switchover gameweek. Form strength adjusts how much form affects True Value.</p>
-                    </div>
-                </div>
-
-                <!-- Fixture Difficulty Section -->
-                <div class="parameter-section v1-legacy-section">
-                    <h3>
-                        <input type="checkbox" id="fixture-enabled" checked>
-                        <label for="fixture-enabled">Odds-Based Fixture Difficulty</label>
-                    </h3>
-                    <div class="fixture-controls" id="fixture-controls">
-                        <!-- Preset Selection -->
-                        <div class="control-group">
-                            <label for="fixture-preset">Preset:</label>
-                            <select id="fixture-preset">
-                                <option value="conservative">Conservative (±10%)</option>
-                                <option value="balanced" selected>Balanced (±20%)</option>
-                                <option value="aggressive">Aggressive (±30%)</option>
-                                <option value="custom">Custom</option>
-                            </select>
-                        </div>
-                        
-                        <!-- Fine-tuning Controls -->
-                        <div class="slider-group">
-                            <label for="multiplier-strength-slider">Multiplier Strength:</label>
-                            <input type="range" id="multiplier-strength-slider" min="0.1" max="0.5" step="0.05" value="0.2">
-                            <span id="multiplier-strength-display">±20%</span>
-                        </div>
-                        
-                        <!-- Position Weights -->
-                        <div class="position-weights-section">
-                            <h4>Position Weights</h4>
-                            <div class="slider-group">
-                                <label for="goalkeeper-weight-slider">Goalkeepers:</label>
-                                <input type="range" id="goalkeeper-weight-slider" min="0.8" max="1.5" step="0.05" value="1.10">
-                                <span id="goalkeeper-weight-display">110%</span>
-                            </div>
-                            <div class="slider-group">
-                                <label for="defender-weight-slider">Defenders:</label>
-                                <input type="range" id="defender-weight-slider" min="0.8" max="1.5" step="0.05" value="1.20">
-                                <span id="defender-weight-display">120%</span>
-                            </div>
-                            <div class="slider-group">
-                                <label for="midfielder-weight-slider">Midfielders:</label>
-                                <input type="range" id="midfielder-weight-slider" min="0.8" max="1.5" step="0.05" value="1.00">
-                                <span id="midfielder-weight-display">100%</span>
-                            </div>
-                            <div class="slider-group">
-                                <label for="forward-weight-slider">Forwards:</label>
-                                <input type="range" id="forward-weight-slider" min="0.8" max="1.5" step="0.05" value="1.05">
-                                <span id="forward-weight-display">105%</span>
-                            </div>
-                        </div>
-                        
-                        <p class="help-text">
-                            Uses real betting odds to calculate 21-point difficulty scale (-10 to +10). 
-                            Position weights adjust impact based on role (defenders benefit more from clean sheets vs weaker teams).
-                            Current data: Gameweek 2 (10 matches imported).
-                        </p>
-                    </div>
-                </div>
-
-                <!-- Starter Predictions Section -->
-                <div class="parameter-section v1-legacy-section">
-                    <h3>
-                        <input type="checkbox" id="starter-enabled" checked>
-                        <label for="starter-enabled">Starter Predictions</label>
-                    </h3>
-                    <div class="starter-controls" id="starter-controls">
-                        <div class="slider-group">
-                            <label for="rotation-penalty-slider">Auto Rotation Penalty:</label>
-                            <input type="range" id="rotation-penalty-slider" min="0.5" max="0.8" step="0.05" value="0.65">
-                            <span id="rotation-penalty-display">0.65x</span>
-                        </div>
-                        <div class="slider-group">
-                            <label for="bench-penalty-slider">Force Bench Penalty:</label>
-                            <input type="range" id="bench-penalty-slider" min="0.4" max="0.8" step="0.05" value="0.6">
-                            <span id="bench-penalty-display">0.60x</span>
-                        </div>
-                        <p class="help-text">CSV import identifies predicted starters. Others receive rotation penalty.</p>
-                    </div>
-                </div>
-
-                <!-- xGI Integration -->
-                <div class="parameter-section v1-legacy-section">
-                    <h3>
-                        <input type="checkbox" id="xgiEnabled">
-                        <label for="xgiEnabled">xGI Integration (Understat)</label>
-                    </h3>
-                    <div class="xgi-controls" id="xgiContent">
-                        <div class="control-group">
-                            <label for="xgiMode">Multiplier Mode:</label>
-                            <select id="xgiMode">
-                                <option value="direct">Direct (xGI90 × strength)</option>
-                                <option value="adjusted">Adjusted (1 + xGI90 × strength)</option>
-                                <option value="capped">Capped (0.5 - 1.5 range)</option>
-                            </select>
-                        </div>
-                        <div class="slider-group">
-                            <label for="xgiStrength">Multiplier Strength:</label>
-                            <input type="range" id="xgiStrength" min="0" max="2" step="0.1" value="1.0">
-                            <span id="xgiStrengthValue">1.0</span>
-                        </div>
-                        <div class="control-group">
-                            <button id="syncUnderstat" class="btn-sync">Sync Understat Data</button>
-                            <span id="syncStatus"></span>
-                        </div>
-                        <div class="stats-display">
-                            <span id="xgiStats">Loading stats...</span>
-                        </div>
-                    </div>
-                </div>
-
-                <!-- Blender Display Configuration -->
-                <div class="parameter-section v1-legacy-section">
-                    <h3>
-                        <input type="checkbox" id="gamesDisplayEnabled" checked>
-                        <label for="gamesDisplayEnabled">Blender Display</label>
-                    </h3>
-                    <div class="games-display-controls" id="gamesDisplayContent">
-                        <div class="control-group">
-                            <label for="baselineSwitchover">Baseline Switchover Gameweek:</label>
-                            <input type="number" id="baselineSwitchover" min="5" max="15" value="10">
-                            <span class="help-text">When to start blending historical + current data</span>
-                        </div>
-                        <div class="control-group">
-                            <label for="transitionEnd">Transition Period End:</label>
-                            <input type="number" id="transitionEnd" min="10" max="20" value="15">
-                            <span class="help-text">When to switch from blended to current-only</span>
-                        </div>
-                        <div class="control-group">
-                            <input type="checkbox" id="showHistorical" checked>
-                            <label for="showHistorical">Show Historical Data (24-25)</label>
-                        </div>
-                    </div>
-                </div>
-
-                <!-- v2.0 Enhanced Parameter Controls - Only visible when v2.0 is enabled -->
-                
-                <!-- EWMA Form Calculation Controls (v2.0) -->
-                <div class="parameter-section v2-enhanced-section" style="display: none;">
-                    <h3>
-                        <span class="version-badge v2-badge">v2.0</span>
-                        <label>EWMA Form Calculation</label>
-                    </h3>
-                    <div class="v2-form-controls">
-                        <div class="slider-group">
-                            <label for="ewma-alpha-slider">EWMA Alpha (α):</label>
-                            <input type="range" id="ewma-alpha-slider" min="0.1" max="1.0" step="0.01" value="0.87">
-                            <span id="ewma-alpha-display">0.87</span>
-                        </div>
-                        <div class="info-display">
-                            <span class="info-label">Half-life:</span>
-                            <span id="ewma-half-life">~5.0 games</span>
-                        </div>
-                        <div class="info-display">
-                            <span class="info-label">Recent Game Weight:</span>
-                            <span id="ewma-recent-weight">87%</span>
-                        </div>
-                        <p class="help-text v2-help">
-                            🔬 <strong>v2.0 Enhancement:</strong> Exponential Weighted Moving Average gives exponentially decreasing weights to older games. Higher α = more weight on recent games.
-                        </p>
-                    </div>
-                </div>
-
-                <!-- Dynamic Blending Controls (v2.0) -->
-                <div class="parameter-section v2-enhanced-section" style="display: none;">
-                    <h3>
-                        <span class="version-badge v2-badge">v2.0</span>
-                        <label>Dynamic Blending</label>
-                    </h3>
-                    <div class="v2-blending-controls">
-                        <div class="control-group">
-                            <label for="adaptation-gameweek">Adaptation Gameweek (K):</label>
-                            <input type="number" id="adaptation-gameweek" min="10" max="20" value="15">
-                            <span class="help-text">Gameweek when current season reaches 100% weight</span>
-                        </div>
-                        <div class="blending-visualization">
-                            <div class="blend-info">
-                                <div class="current-weights">
-                                    <div class="weight-bar">
-                                        <div class="historical-weight" id="historical-weight-bar" style="width: 70%;">
-                                            <span>Historical: 70%</span>
-                                        </div>
-                                        <div class="current-weight" id="current-weight-bar" style="width: 30%;">
-                                            <span>30%</span>
-                                        </div>
-                                    </div>
-                                    <div class="weight-formula">
-                                        Current Weight = min(1, (N-1)/(K-1)) where N=GW, K=adaptation
-                                    </div>
-                                </div>
-                            </div>
-                        </div>
-                        <p class="help-text v2-help">
-                            🔬 <strong>v2.0 Enhancement:</strong> Smooth transition from historical to current season data. Weight automatically adjusts based on gameweek progression.
-                        </p>
-                    </div>
-                </div>
-
-                <!-- Normalized xGI Controls (v2.0) -->
-                <div class="parameter-section v2-enhanced-section" style="display: none;">
-                    <h3>
-                        <span class="version-badge v2-badge">v2.0</span>
-                        <label>Normalized xGI</label>
-                    </h3>
-                    <div class="xgi-enable-toggle">
-                        <label>
-                            <input type="checkbox" id="xgi-enabled">
-                            <span>Apply xGI to True Value Calculation</span>
-                        </label>
-                        <p class="help-text">When unchecked, xGI multiplier = 1.0x (no effect on True Value)</p>
-                    </div>
-                    <div class="v2-xgi-controls">
-                        <div class="position-toggles">
-                            <h4>Position-Specific Adjustments</h4>
-                            <div class="toggle-group">
-                                <input type="checkbox" id="xgi-defenders" checked>
-                                <label for="xgi-defenders">Defenders: Baseline Focus</label>
-                            </div>
-                            <div class="toggle-group">
-                                <input type="checkbox" id="xgi-midfielders" checked>
-                                <label for="xgi-midfielders">Midfielders: xGI Enhancement</label>
-                            </div>
-                            <div class="toggle-group">
-                                <input type="checkbox" id="xgi-forwards" checked>
-                                <label for="xgi-forwards">Forwards: Maximum xGI Impact</label>
-                            </div>
-                        </div>
-                        <div class="slider-group">
-                            <label for="xgi-normalization-strength">Normalization Strength:</label>
-                            <input type="range" id="xgi-normalization-strength" min="0.5" max="2.0" step="0.1" value="1.0">
-                            <span id="xgi-normalization-display">1.0x</span>
-                        </div>
-                        <div class="control-group">
-                            <button id="syncUnderstat-v2" class="btn-sync">Sync Understat Data</button>
-                            <span id="syncStatus-v2"></span>
-                        </div>
-                        <div class="stats-display">
-                            <span id="xgiStats-v2">Loading stats...</span>
-                        </div>
-                        <p class="help-text v2-help">
-                            🔬 <strong>v2.0 Enhancement:</strong> Ratio-based xGI calculation normalized around 1.0 with position-specific adjustments for defensive vs attacking roles.
-                        </p>
-                    </div>
-                </div>
-
-                <!-- Multiplier Cap Controls (v2.0) -->
-                <div class="parameter-section v2-enhanced-section" style="display: none;">
-                    <h3>
-                        <span class="version-badge v2-badge">v2.0</span>
-                        <label>Multiplier Caps</label>
-                    </h3>
-                    <div class="v2-cap-controls">
-                        <div class="cap-grid">
-                            <div class="cap-item">
-                                <label for="form-cap-slider">Form Cap:</label>
-                                <input type="range" id="form-cap-slider" min="1.0" max="3.0" step="0.1" value="2.0">
-                                <span id="form-cap-display">2.0x</span>
-                            </div>
-                            <div class="cap-item">
-                                <label for="fixture-cap-slider">Fixture Cap:</label>
-                                <input type="range" id="fixture-cap-slider" min="1.0" max="2.5" step="0.1" value="1.8">
-                                <span id="fixture-cap-display">1.8x</span>
-                            </div>
-                            <div class="cap-item">
-                                <label for="xgi-cap-slider">xGI Cap:</label>
-                                <input type="range" id="xgi-cap-slider" min="1.0" max="3.0" step="0.1" value="2.5">
-                                <span id="xgi-cap-display">2.5x</span>
-                            </div>
-                            <div class="cap-item">
-                                <label for="global-cap-slider">Global Cap:</label>
-                                <input type="range" id="global-cap-slider" min="2.0" max="5.0" step="0.1" value="3.0">
-                                <span id="global-cap-display">3.0x</span>
-                            </div>
-                        </div>
-                        <div class="cap-info">
-                            <div class="caps-applied" id="caps-applied-indicator" style="display: none;">
-                                ⚠️ <span id="caps-applied-count">0</span> players affected by caps
-                            </div>
-                        </div>
-                        <p class="help-text v2-help">
-                            🔬 <strong>v2.0 Enhancement:</strong> Prevents extreme outlier multipliers that could skew results. Caps applied individually then globally to maintain balanced predictions.
-                        </p>
-                    </div>
-                </div>
-
-                <!-- Action Buttons -->
-                <div class="action-buttons">
-                    <button id="apply-changes" class="btn-primary" disabled>
-                        Apply Changes
-                    </button>
-                    <button id="reset-defaults" class="btn-secondary">
-                        Reset to Defaults
-                    </button>
-                    <button id="import-lineups" class="btn-secondary">
-                        Import Lineups CSV
-                    </button>
-                    <button id="form-upload" class="btn-secondary" onclick="window.open('/form-upload', '_blank')">
-                        📊 Upload Weekly Game Data
-                    </button>
-                    <button id="odds-upload" class="btn-secondary" onclick="window.open('/odds-upload', '_blank')">
-                        ⚽ Upload Fixture Odds
-                    </button>
-                </div>
-
-                <!-- Pending Changes Indicator -->
-                <div id="pending-changes" class="pending-changes" style="display: none;">
-                    <span>⏳ Changes pending...</span>
+                <div class="formula-version-badge v2-enhanced">
+                    <span class="version-indicator">V2.0</span>
+                    <span class="formula-label">Enhanced</span>
                 </div>
             </div>
 
-            <!-- Right Panel - Player Table -->
-            <div class="right-panel">
+            <!-- V2.0 Features List -->
+            <div class="parameter-group v2-features">
+                <div class="feature-list">
+                    <div class="feature-item enabled">
+                        <span class="checkmark">✓</span>
+                        <span>Separated True Value & ROI</span>
+                    </div>
+                    <div class="feature-item enabled">
+                        <span class="checkmark">✓</span>
+                        <span>EWMA Form (α=0.87)</span>
+                    </div>
+                    <div class="feature-item enabled">
+                        <span class="checkmark">✓</span>
+                        <span>Dynamic Blending</span>
+                    </div>
+                    <div class="feature-item enabled">
+                        <span class="checkmark">✓</span>
+                        <span>Normalized xGI</span>
+                    </div>
+                    <div class="feature-item enabled">
+                        <span class="checkmark">✓</span>
+                        <span>Exponential Fixtures</span>
+                    </div>
+                </div>
+                <div class="v2-description">
+                    <em>v2.0 provides research-validated calculations with 10-15% better accuracy</em>
+                </div>
+            </div>
+
+            <!-- Model Validation Status -->
+            <div class="parameter-group model-validation">
+                <div class="group-header">
+                    <span class="status-indicator not-available">●</span>
+                    <h3>Model Validation Status</h3>
+                </div>
+                <div class="validation-grid">
+                    <div class="metric-item">
+                        <div class="metric-label">RMSE:</div>
+                        <div class="metric-value" id="rmse-value">--</div>
+                    </div>
+                    <div class="metric-item">
+                        <div class="metric-label">Correlation:</div>
+                        <div class="metric-value" id="correlation-value">--</div>
+                    </div>
+                    <div class="metric-item">
+                        <div class="metric-label">Precision@20:</div>
+                        <div class="metric-value" id="precision-value">--</div>
+                    </div>
+                </div>
+                <div class="validation-buttons">
+                    <button id="runValidation" class="btn btn-primary btn-small">🏃 Run Validation</button>
+                    <button id="viewResults" class="btn btn-secondary btn-small">📊 View Results</button>
+                </div>
+                <div class="validation-note">
+                    <small>Last validation: Not run<br>
+                    <em>Run validation to assess model quality and performance metrics.</em></small>
+                </div>
+            </div>
+
+            <!-- EWMA Form Calculation -->
+            <div class="parameter-group">
+                <div class="group-header">
+                    <h3>EWMA Form Calculation</h3>
+                </div>
+                <div class="parameter-content">
+                    <div class="slider-container">
+                        <label for="ewmaAlpha">EWMA Alpha (α):</label>
+                        <input type="range" id="ewmaAlpha" min="0.1" max="1.0" step="0.01" value="0.87">
+                        <span class="slider-value" id="ewmaAlphaValue">0.87</span>
+                    </div>
+                    <div class="half-life-display">
+                        <small>Half-life: <span id="halfLife">~0.3 games</span></small>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Dynamic Blending -->
+            <div class="parameter-group">
+                <div class="group-header">
+                    <h3>Dynamic Blending</h3>
+                </div>
+                <div class="parameter-content">
+                    <div class="slider-container">
+                        <label for="adaptationGameweek">Adaptation Gameweek (K):</label>
+                        <input type="range" id="adaptationGameweek" min="8" max="20" step="1" value="16">
+                        <span class="slider-value" id="adaptationGameweekValue">16</span>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Normalized xGI -->
+            <div class="parameter-group">
+                <div class="group-header">
+                    <h3>Normalized xGI</h3>
+                </div>
+                <div class="parameter-content">
+                    <div class="toggle-container">
+                        <label class="toggle-switch">
+                            <input type="checkbox" id="xgiEnabled">
+                            <span class="toggle-slider"></span>
+                        </label>
+                        <span class="toggle-label">Enable xGI Calculations</span>
+                    </div>
+                    <div class="xgi-controls" id="xgiControls" style="display: none;">
+                        <div class="slider-container">
+                            <label for="xgiStrength">Normalization Strength:</label>
+                            <input type="range" id="xgiStrength" min="0.5" max="2.0" step="0.1" value="1.0">
+                            <span class="slider-value" id="xgiStrengthValue">1.0</span>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Multiplier Caps -->
+            <div class="parameter-group">
+                <div class="group-header">
+                    <h3>Multiplier Caps</h3>
+                </div>
+                <div class="parameter-content">
+                    <div class="slider-container">
+                        <label for="formCap">Form Cap:</label>
+                        <input type="range" id="formCap" min="1.5" max="3.0" step="0.1" value="2.0">
+                        <span class="slider-value" id="formCapValue">2.0</span>
+                    </div>
+                    <div class="slider-container">
+                        <label for="fixtureCap">Fixture Cap:</label>
+                        <input type="range" id="fixtureCap" min="1.3" max="2.5" step="0.1" value="1.8">
+                        <span class="slider-value" id="fixtureCapValue">1.8</span>
+                    </div>
+                    <div class="slider-container">
+                        <label for="xgiCap">xGI Cap:</label>
+                        <input type="range" id="xgiCap" min="2.0" max="4.0" step="0.1" value="2.5">
+                        <span class="slider-value" id="xgiCapValue">2.5</span>
+                    </div>
+                    <div class="slider-container">
+                        <label for="globalCap">Global Cap:</label>
+                        <input type="range" id="globalCap" min="2.5" max="5.0" step="0.1" value="3.0">
+                        <span class="slider-value" id="globalCapValue">3.0</span>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Action Buttons -->
+            <div class="action-buttons">
+                <button id="applyChanges" class="btn btn-primary btn-large">Apply Changes</button>
+                <div class="secondary-actions">
+                    <button id="syncUnderstat" class="btn btn-secondary">Sync Understat Data</button>
+                    <button id="importLineup" class="btn btn-secondary">Import Lineup</button>
+                    <a href="/form-upload" class="btn btn-link">Upload Weekly Game Data</a>
+                    <a href="/odds-upload" class="btn btn-link">Upload Odds</a>
+                </div>
+            </div>
+        </div>
+
+        <!-- Right Panel: Player Table -->
+        <div class="right-panel">
+            <!-- Header -->
+            <div class="panel-header">
                 <h2>All 633 Premier League Players</h2>
-                
-                <!-- Filters Section -->
-                <div class="filters-section">
-                    <div class="filter-row">
-                        <div class="filter-group">
-                            <label>Position:</label>
-                            <div class="checkbox-group">
-                                <input type="checkbox" id="pos-g" value="G" checked>
-                                <label for="pos-g">G</label>
-                                <input type="checkbox" id="pos-d" value="D" checked>
-                                <label for="pos-d">D</label>
-                                <input type="checkbox" id="pos-m" value="M" checked>
-                                <label for="pos-m">M</label>
-                                <input type="checkbox" id="pos-f" value="F" checked>
-                                <label for="pos-f">F</label>
-                            </div>
-                        </div>
-                        
-                        <div class="filter-group">
-                            <label for="price-min">Price Range:</label>
-                            <input type="number" id="price-min" value="5.0" step="0.1" min="5.0" max="25.0">
-                            <span>to</span>
-                            <input type="number" id="price-max" value="25.0" step="0.1" min="5.0" max="25.0">
-                        </div>
-                    </div>
-                    
-                    <div class="filter-row">
-                        <div class="filter-group">
-                            <label for="team-select">Team:</label>
-                            <select id="team-select" multiple>
-                                <option value="">All Teams</option>
-                                <!-- Teams will be populated by JavaScript -->
-                            </select>
-                        </div>
-                        
-                        <div class="filter-group">
-                            <label for="player-search">Search Player:</label>
-                            <input type="text" id="player-search" placeholder="Enter player name...">
-                        </div>
-                    </div>
-                    
-                    <div class="filter-summary">
-                        <span id="filter-count">Showing 633 players</span>
-                        <button id="export-csv" class="btn-secondary">Export CSV</button>
-                    </div>
-                </div>
+            </div>
 
-                <!-- Player Table -->
-                <div class="table-container">
-                    <table id="player-table" class="player-table">
-                        <thead>
-                            <tr>
-                                <th data-sort="name">
-                                    <div class="header-content">
-                                        <span class="header-text">Name</span>
-                                        <span class="header-icons">
-                                            <span class="info-icon" data-column="name">ⓘ</span>
-                                            <span class="sort-indicator"></span>
-                                        </span>
-                                    </div>
-                                </th>
-                                <th data-sort="team">
-                                    <div class="header-content">
-                                        <span class="header-text">Team</span>
-                                        <span class="header-icons">
-                                            <span class="info-icon" data-column="team">ⓘ</span>
-                                            <span class="sort-indicator"></span>
-                                        </span>
-                                    </div>
-                                </th>
-                                <th data-sort="position">
-                                    <div class="header-content">
-                                        <span class="header-text">Pos</span>
-                                        <span class="header-icons">
-                                            <span class="info-icon" data-column="position">ⓘ</span>
-                                            <span class="sort-indicator"></span>
-                                        </span>
-                                    </div>
-                                </th>
-                                <th data-sort="price">
-                                    <div class="header-content">
-                                        <span class="header-text">Price</span>
-                                        <span class="header-icons">
-                                            <span class="info-icon" data-column="price">ⓘ</span>
-                                            <span class="sort-indicator"></span>
-                                        </span>
-                                    </div>
-                                </th>
-                                <th data-sort="ppg">
-                                    <div class="header-content">
-                                        <span class="header-text">PPG</span>
-                                        <span class="header-icons">
-                                            <span class="info-icon" data-column="ppg">ⓘ</span>
-                                            <span class="sort-indicator"></span>
-                                        </span>
-                                    </div>
-                                </th>
-                                <th data-sort="value_score">
-                                    <div class="header-content">
-                                        <span class="header-text">PP$</span>
-                                        <span class="header-icons">
-                                            <span class="info-icon" data-column="value_score">ⓘ</span>
-                                            <span class="sort-indicator"></span>
-                                        </span>
-                                    </div>
-                                </th>
-                                <th data-sort="games_total">
-                                    <div class="header-content">
-                                        <span class="header-text">Games</span>
-                                        <span class="header-icons">
-                                            <span class="info-icon" data-column="games">ⓘ</span>
-                                            <span class="sort-indicator"></span>
-                                        </span>
-                                    </div>
-                                </th>
-                                <th data-sort="true_value" class="default-sort">
-                                    <div class="header-content">
-                                        <span class="header-text">True Value</span>
-                                        <span class="header-icons">
-                                            <span class="info-icon" data-column="true_value">ⓘ</span>
-                                            <span class="sort-indicator">▼</span>
-                                        </span>
-                                    </div>
-                                </th>
-                                <th data-sort="roi" class="v2-column">
-                                    <div class="header-content">
-                                        <span class="header-text">ROI</span>
-                                        <span class="header-icons">
-                                            <span class="info-icon" data-column="roi">ⓘ</span>
-                                            <span class="sort-indicator"></span>
-                                        </span>
-                                        <div class="v2-badge">v2.0</div>
-                                    </div>
-                                </th>
-                                <th data-sort="form_multiplier">
-                                    <div class="header-content">
-                                        <span class="header-text">Form</span>
-                                        <span class="header-icons">
-                                            <span class="info-icon" data-column="form_multiplier">ⓘ</span>
-                                            <span class="sort-indicator"></span>
-                                        </span>
-                                    </div>
-                                </th>
-                                <th data-sort="fixture_multiplier">
-                                    <div class="header-content">
-                                        <span class="header-text">Fixture</span>
-                                        <span class="header-icons">
-                                            <span class="info-icon" data-column="fixture_multiplier">ⓘ</span>
-                                            <span class="sort-indicator"></span>
-                                        </span>
-                                    </div>
-                                </th>
-                                <th data-sort="starter_multiplier">
-                                    <div class="header-content">
-                                        <span class="header-text">Starter</span>
-                                        <span class="header-icons">
-                                            <span class="info-icon" data-column="starter_multiplier">ⓘ</span>
-                                            <span class="sort-indicator"></span>
-                                        </span>
-                                    </div>
-                                </th>
-                                <th data-sort="xgi_multiplier">
-                                    <div class="header-content">
-                                        <span class="header-text">xGI</span>
-                                        <span class="header-icons">
-                                            <span class="info-icon" data-column="xgi_multiplier">ⓘ</span>
-                                            <span class="sort-indicator"></span>
-                                        </span>
-                                    </div>
-                                </th>
-                                <th class="manual-override-header">
-                                    <div class="header-content">
-                                        <span class="header-text">Starter Override</span>
-                                        <span class="header-icons">
-                                            <span class="info-icon" data-column="manual_override">ⓘ</span>
-                                        </span>
-                                    </div>
-                                </th>
-                                <th data-sort="xg90">
-                                    <div class="header-content">
-                                        <span class="header-text">xG90</span>
-                                        <span class="header-icons">
-                                            <span class="info-icon" data-column="xg90">ⓘ</span>
-                                            <span class="sort-indicator"></span>
-                                        </span>
-                                    </div>
-                                </th>
-                                <th data-sort="xa90">
-                                    <div class="header-content">
-                                        <span class="header-text">xA90</span>
-                                        <span class="header-icons">
-                                            <span class="info-icon" data-column="xa90">ⓘ</span>
-                                            <span class="sort-indicator"></span>
-                                        </span>
-                                    </div>
-                                </th>
-                                <th data-sort="xgi90">
-                                    <div class="header-content">
-                                        <span class="header-text">xGI90</span>
-                                        <span class="header-icons">
-                                            <span class="info-icon" data-column="xgi90">ⓘ</span>
-                                            <span class="sort-indicator"></span>
-                                        </span>
-                                    </div>
-                                </th>
-                                <th data-sort="minutes">
-                                    <div class="header-content">
-                                        <span class="header-text">Min</span>
-                                        <span class="header-icons">
-                                            <span class="info-icon" data-column="minutes">ⓘ</span>
-                                            <span class="sort-indicator"></span>
-                                        </span>
-                                    </div>
-                                </th>
-                            </tr>
-                        </thead>
-                        <tbody id="player-table-body">
-                            <!-- Player rows will be populated by JavaScript -->
-                            <tr class="loading-row">
-                                <td colspan="18">Loading 633 players...</td>
-                            </tr>
-                        </tbody>
-                    </table>
-                </div>
+            <!-- Filters and Controls -->
+            <div class="table-controls">
+                <div class="filters-row">
+                    <!-- Position Filter -->
+                    <div class="filter-group">
+                        <label>Position:</label>
+                        <div class="position-buttons">
+                            <button class="position-btn active" data-position="all">All</button>
+                            <button class="position-btn" data-position="G">G</button>
+                            <button class="position-btn" data-position="D">D</button>
+                            <button class="position-btn" data-position="M">M</button>
+                            <button class="position-btn" data-position="F">F</button>
+                        </div>
+                    </div>
 
-                <!-- Pagination -->
-                <div class="pagination">
-                    <button id="prev-page" class="btn-secondary" disabled>Previous</button>
-                    <span id="page-info">Page 1 of 1</span>
-                    <button id="next-page" class="btn-secondary" disabled>Next</button>
-                    <div class="page-size">
-                        <label for="page-size-select">Per page:</label>
-                        <select id="page-size-select">
-                            <option value="50">50</option>
-                            <option value="100" selected>100</option>
-                            <option value="200">200</option>
-                            <option value="1000">All</option>
+                    <!-- Price Filter -->
+                    <div class="filter-group">
+                        <label>Price Range:</label>
+                        <input type="number" id="priceMin" placeholder="4.0" step="0.5" value="4.0" style="width: 60px;">
+                        <span>to</span>
+                        <input type="number" id="priceMax" placeholder="15.0" step="0.5" value="15.0" style="width: 60px;">
+                    </div>
+
+                    <!-- Team Filter -->
+                    <div class="filter-group">
+                        <label>Team:</label>
+                        <select id="teamFilter" style="width: 120px;">
+                            <option value="all">All Teams</option>
                         </select>
                     </div>
+
+                    <!-- Search -->
+                    <div class="filter-group">
+                        <label>Search Player:</label>
+                        <input type="text" id="playerSearch" placeholder="Enter player name..." style="width: 150px;">
+                    </div>
                 </div>
+
+                <div class="controls-row">
+                    <div class="pagination-controls">
+                        <span>Showing <span id="playerCount">100</span> players</span>
+                        <select id="pageSize">
+                            <option value="50">50 per page</option>
+                            <option value="100" selected>100 per page</option>
+                            <option value="200">200 per page</option>
+                            <option value="all">All</option>
+                        </select>
+                    </div>
+                    <button id="exportCSV" class="btn btn-secondary">Export CSV</button>
+                </div>
+            </div>
+
+            <!-- Player Table -->
+            <div class="table-container">
+                <table id="playersTable" class="players-table">
+                    <thead>
+                        <tr>
+                            <th data-sort="name" class="sortable">Name ↕</th>
+                            <th data-sort="team" class="sortable">Team ↕</th>
+                            <th data-sort="position" class="sortable">Pos ↕</th>
+                            <th data-sort="price" class="sortable">Price ↕</th>
+                            <th data-sort="ppg" class="sortable">PPG ↕</th>
+                            <th data-sort="pps" class="sortable">PPS ↕</th>
+                            <th data-sort="games" class="sortable">Games ↕</th>
+                            <th data-sort="true_value" class="sortable highlight-column">True Value ↕</th>
+                            <th data-sort="roi" class="sortable highlight-column">ROI ↕</th>
+                            <th data-sort="form" class="sortable">Form ↕</th>
+                            <th data-sort="fixture" class="sortable">Fixture ↕</th>
+                            <th data-sort="starter" class="sortable">Starter ↕</th>
+                            <th data-sort="xgi" class="sortable">xGI ↕</th>
+                            <th data-sort="starter_override" class="sortable">Starter Override ↕</th>
+                            <th data-sort="xgi90" class="sortable">xGI90 ↕</th>
+                            <th data-sort="xgi90_h" class="sortable">xGI90_H ↕</th>
+                            <th data-sort="min" class="sortable">Min ↕</th>
+                        </tr>
+                    </thead>
+                    <tbody id="playersTableBody">
+                        <!-- Table rows will be populated by JavaScript -->
+                    </tbody>
+                </table>
+            </div>
+
+            <!-- Pagination -->
+            <div class="pagination">
+                <button id="prevPage" class="btn btn-secondary">Previous</button>
+                <span id="pageInfo">Page 1 of 1</span>
+                <button id="nextPage" class="btn btn-secondary">Next</button>
             </div>
         </div>
     </div>
 
-    <!-- Loading Overlay -->
-    <div id="loading-overlay" class="loading-overlay" style="display: none;">
-        <div class="loading-content">
-            <div class="spinner"></div>
-            <p>Recalculating True Values...</p>
-        </div>
-    </div>
-
-    <!-- File Input for CSV Import (Hidden) -->
-    <input type="file" id="csv-file-input" accept=".csv" style="display: none;">
-
-    <!-- JavaScript -->
+    <!-- Load JavaScript -->
     <script src="{{ url_for('static', filename='js/dashboard.js') }}"></script>
 </body>
 </html>

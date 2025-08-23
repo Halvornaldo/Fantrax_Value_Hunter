@@ -1,84 +1,109 @@
-# Database Schema
+# Database Schema - V2.0 Enhanced Formula System
+## Fantasy Football Value Hunter Database Structure
 
-## Connection Details
+### **System Status: V2.0 Production Database**
 
-**Database**: `fantrax_value_hunter`  
-**Host**: `localhost`  
-**Port**: `5433`  
-**Username**: `fantrax_user`  
-**Password**: `fantrax_password`
+This document describes the complete database schema for the V2.0 Enhanced Formula system. The system has been consolidated to a single V2.0 engine with all legacy components removed.
 
-## Core Tables
+**Database Environment:**
+- **Database**: `fantrax_value_hunter`  
+- **Host**: `localhost`  
+- **Port**: `5433`  
+- **Username**: `fantrax_user`  
+- **Password**: `fantrax_password`
+- **Total Players**: 647 Premier League players
 
-### `players`
-Primary player data table
-- **Primary Key**: `id` (VARCHAR)
-- **Core Columns**: `id`, `name`, `team`, `position`, `minutes`, `xg90`, `xa90`, `xgi90`
-- **v2.0 Columns** (added 2025-08-21):
-  - `true_value` (DECIMAL 8,2) - True point prediction (separate from price)
-  - `roi` (DECIMAL 8,3) - Return on investment (true_value/price)
-  - `formula_version` (VARCHAR 10, DEFAULT 'v2.0') - Formula version used
-  - `exponential_form_score` (DECIMAL 5,3) - EWMA form calculation
-  - `baseline_xgi` (DECIMAL 5,3) - **Sprint 2: Historical 2024/25 xGI baseline for normalization** ⚠️ REQUIRED for v2.0 engine
-  - `blended_ppg` (DECIMAL 5,2) - **Sprint 2: Dynamic blend of historical/current PPG**
-  - `current_season_weight` (DECIMAL 4,3) - **Sprint 2: Current season data weight for blending**
-- **Description**: Contains basic player information, xG statistics, and v2.0 Sprint 2 enhancements
+---
 
-### `player_metrics`
-Player performance metrics by gameweek
-- **Primary Key**: `(player_id, gameweek)`
-- **Foreign Key**: `player_id` → `players.id`
+## **Core Data Tables**
 
-**Core Columns**:
+### **`players`** - Primary Player Data
+**Purpose**: Central player registry with V2.0 Enhanced Formula calculations
+
+**Primary Key**: `id` (VARCHAR) - Fantrax player identifier
+
+**Core Player Information**:
+- `id` (VARCHAR) - Unique player identifier
+- `name` (VARCHAR) - Player name
+- `team` (VARCHAR) - Team code (3-letter)
+- `position` (VARCHAR) - Playing position
+- `minutes` (INTEGER) - Total minutes played
+- `price` (DECIMAL 5,2) - Current Fantrax price
+
+**V2.0 Enhanced Formula Columns**:
+- `true_value` (DECIMAL 8,2) - **Pure point prediction** (separate from price)
+- `roi` (DECIMAL 8,3) - **Return on investment** (true_value ÷ price)
+- `blended_ppg` (DECIMAL 5,2) - **Dynamic blend** of historical/current PPG
+- `current_season_weight` (DECIMAL 4,3) - **Blending weight** for current season data
+- `historical_ppg` (DECIMAL 5,2) - **2024-25 season** calculated PPG baseline
+- `exponential_form_score` (DECIMAL 5,3) - **EWMA form multiplier** (α=0.87)
+- `baseline_xgi` (DECIMAL 5,3) - **⚠️ REQUIRED** Historical 2024-25 xGI baseline for normalization
+- `formula_version` (VARCHAR 10, DEFAULT 'v2.0') - Formula version used
+
+**Expected Goals Data** (Understat integration):
+- `xg90` (DECIMAL 5,3) - Expected goals per 90 minutes
+- `xa90` (DECIMAL 5,3) - Expected assists per 90 minutes  
+- `xgi90` (DECIMAL 5,3) - Expected goals involvement per 90 minutes
+
+**Description**: Contains all player data for V2.0 Enhanced Formula calculations with separated True Value and ROI metrics.
+
+### **`player_metrics`** - Weekly Performance Data
+**Purpose**: Gameweek-by-gameweek player performance tracking with V2.0 multipliers
+
+**Primary Key**: `(player_id, gameweek)`
+**Foreign Key**: `player_id` → `players.id`
+
+**Core Metrics**:
 - `player_id` (VARCHAR) - References players.id
 - `gameweek` (INTEGER) - Gameweek number
-- `price` (DECIMAL) - Current Fantrax price
+- `price` (DECIMAL) - Fantrax price for that gameweek
 - `ppg` (DECIMAL) - Points per game
-- `value_score` (DECIMAL) - PPG ÷ Price (PP$)
-- `true_value` (DECIMAL) - Calculated true value
-- `last_updated` (TIMESTAMP)
+- `true_value` (DECIMAL) - **V2.0 True Value** calculation result
+- `last_updated` (TIMESTAMP) - Last calculation time
 
-**Computed Fields** (calculated in queries):
-- `games_total` - Sum of games_played + games_played_historical for sorting
+**V2.0 Multiplier System**:
+- `form_multiplier` (DECIMAL 5,3, DEFAULT 1.0) - EWMA form calculation
+- `fixture_multiplier` (DECIMAL 5,3, DEFAULT 1.0) - Exponential fixture difficulty
+- `starter_multiplier` (DECIMAL 5,3, DEFAULT 1.0) - Rotation penalty
+- `xgi_multiplier` (DECIMAL 5,3, DEFAULT 1.0) - Normalized xGI ratio
 
-**Multiplier Columns**:
-- `form_multiplier` (DECIMAL 5,3, DEFAULT 1.0)
-- `fixture_multiplier` (DECIMAL 5,3, DEFAULT 1.0)
-- `starter_multiplier` (DECIMAL 5,3, DEFAULT 1.0)
-- `xgi_multiplier` (DECIMAL 5,3, DEFAULT 1.0)
-
-**Games Tracking Columns** (added via migration):
-- `total_points` (DECIMAL 8,2, DEFAULT 0) - Current season total
+**Games Tracking** (V2.0 Dynamic Blending):
+- `total_points` (DECIMAL 8,2, DEFAULT 0) - Current season total points
 - `games_played` (INTEGER, DEFAULT 0) - Current season games
 - `total_points_historical` (DECIMAL 8,2, DEFAULT 0) - 2024-25 season total
 - `games_played_historical` (INTEGER, DEFAULT 0) - 2024-25 season games
 - `data_source` (VARCHAR 20, DEFAULT 'current') - Primary data source
 
-### `player_games_data`
-Separate table for detailed games tracking (created via create_games_table.py)
-- **Primary Key**: `(player_id, gameweek)`
-- **Owner**: `fantrax_user`
+**Computed Fields** (calculated in queries):
+- `games_total` - Sum of `games_played + games_played_historical` for sorting
+
+### **`player_games_data`** - Detailed Games Tracking
+**Purpose**: Separate table for comprehensive games and points tracking across seasons
+
+**Primary Key**: `(player_id, gameweek)`
+**Owner**: `fantrax_user`
 
 **Columns**:
 - `player_id` (VARCHAR 50, NOT NULL) - Player identifier
 - `gameweek` (INTEGER, NOT NULL) - Gameweek number  
-- `total_points` (DECIMAL 8,2, DEFAULT 0) - Current season total
-- `games_played` (INTEGER, DEFAULT 0) - Current season games
-- `total_points_historical` (DECIMAL 8,2, DEFAULT 0) - 2024-25 total
-- `games_played_historical` (INTEGER, DEFAULT 0) - 2024-25 games
-- `data_source` (VARCHAR 20, DEFAULT 'current') - Data source
-- `last_updated` (TIMESTAMP, DEFAULT CURRENT_TIMESTAMP) - Update time
+- `total_points` (DECIMAL 8,2, DEFAULT 0) - Current season running total
+- `games_played` (INTEGER, DEFAULT 0) - Current season games count
+- `total_points_historical` (DECIMAL 8,2, DEFAULT 0) - 2024-25 season total
+- `games_played_historical` (INTEGER, DEFAULT 0) - 2024-25 season games
+- `data_source` (VARCHAR 20, DEFAULT 'current') - Data source identifier
+- `last_updated` (TIMESTAMP, DEFAULT CURRENT_TIMESTAMP) - Update timestamp
 
-**Indexes**:
-- `idx_player_games_player_id` - On player_id
-- `idx_player_games_gameweek` - On gameweek
-- `idx_player_games_data_source` - On data_source
-- `idx_player_games_historical` - On games_played_historical
+**Performance Indexes**:
+- `idx_player_games_player_id` - Player lookup
+- `idx_player_games_gameweek` - Gameweek filtering
+- `idx_player_games_data_source` - Source filtering
+- `idx_player_games_historical` - Historical data queries
 
-### `player_form`
-Historical form data for calculations
-- **Primary Key**: `(player_id, gameweek)`
-- **Unique Constraint**: `(player_id, gameweek)`
+### **`player_form`** - Historical Form Data
+**Purpose**: Point-by-point form history for EWMA calculations
+
+**Primary Key**: `(player_id, gameweek)`
+**Unique Constraint**: `(player_id, gameweek)`
 
 **Columns**:
 - `id` (SERIAL PRIMARY KEY)
@@ -87,10 +112,17 @@ Historical form data for calculations
 - `points` (DECIMAL 5,2, NOT NULL) - Points scored that gameweek
 - `timestamp` (TIMESTAMP, DEFAULT NOW()) - Data timestamp
 
-### `team_fixtures`
-Team fixture difficulty data from betting odds
-- **Primary Key**: `id` (SERIAL)
-- **Unique Constraint**: `(team_code, gameweek)`
+**Purpose**: Provides historical point data for exponential weighted moving average (EWMA) form calculations with α=0.87 parameter.
+
+---
+
+## **Fixture & Team Data**
+
+### **`team_fixtures`** - Fixture Difficulty System
+**Purpose**: Odds-based fixture difficulty calculations for V2.0 exponential multipliers
+
+**Primary Key**: `id` (SERIAL)
+**Unique Constraint**: `(team_code, gameweek)`
 
 **Columns**:
 - `id` (SERIAL PRIMARY KEY)
@@ -98,13 +130,16 @@ Team fixture difficulty data from betting odds
 - `gameweek` (INTEGER, NOT NULL) - Gameweek number
 - `opponent_code` (VARCHAR 3, NOT NULL) - Opponent team code
 - `is_home` (BOOLEAN, NOT NULL) - Home/away indicator
-- `difficulty_score` (DECIMAL 5,2, NOT NULL) - Calculated difficulty (-10 to +10)
+- `difficulty_score` (DECIMAL 5,2, NOT NULL) - **Calculated difficulty** (-10 to +10 scale)
 - `created_at` (TIMESTAMP, DEFAULT NOW()) - Creation timestamp
 
-### `fixture_odds`
-Raw betting odds data for CSV imports
-- **Primary Key**: `id` (SERIAL)
-- **Unique Constraint**: `(gameweek, home_team, away_team)`
+**V2.0 Integration**: Used for exponential fixture multipliers with formula `base^(-difficulty_score)` where base=1.05.
+
+### **`fixture_odds`** - Raw Betting Odds Data
+**Purpose**: Source data for fixture difficulty calculations
+
+**Primary Key**: `id` (SERIAL)
+**Unique Constraint**: `(gameweek, home_team, away_team)`
 
 **Columns**:
 - `id` (SERIAL PRIMARY KEY)
@@ -116,30 +151,34 @@ Raw betting odds data for CSV imports
 - `away_odds` (DECIMAL 6,2) - Away win odds
 - `imported_at` (TIMESTAMP, DEFAULT NOW()) - Import timestamp
 
-## v2.0 Formula Optimization Tables (Sprint 1 & 2)
+---
 
-### `player_predictions` 
-**Sprint 3 Ready**: Validation tracking for formula accuracy (added 2025-08-21)
-- **Primary Key**: `(player_id, gameweek, model_version)`
-- **Foreign Key**: `player_id` → `players.id`
+## **V2.0 Validation & Optimization Tables**
+
+### **`player_predictions`** - Prediction Tracking
+**Purpose**: V2.0 formula accuracy validation and backtesting
+
+**Primary Key**: `(player_id, gameweek, model_version)`
+**Foreign Key**: `player_id` → `players.id`
 
 **Columns**:
 - `player_id` (VARCHAR 50) - References players.id
 - `gameweek` (INTEGER) - Gameweek number
-- `predicted_value` (DECIMAL 8,2) - v2.0 true value prediction
+- `predicted_value` (DECIMAL 8,2) - **V2.0 True Value prediction**
 - `actual_points` (DECIMAL 5,2) - Actual points scored
-- `model_version` (VARCHAR 50) - Model version identifier
+- `model_version` (VARCHAR 50) - Model version identifier ('v2.0')
 - `error_abs` (DECIMAL 8,2) GENERATED - Absolute prediction error |predicted - actual|
 - `error_signed` (DECIMAL 8,2) GENERATED - Signed prediction error (predicted - actual)
 - `created_at` (TIMESTAMP, DEFAULT NOW()) - Prediction timestamp
 
-### `validation_results`
-**Sprint 3 Ready**: Backtesting and validation metrics (added 2025-08-21)
-- **Primary Key**: `id` (SERIAL)
+### **`validation_results`** - Model Performance Metrics
+**Purpose**: Statistical validation of V2.0 formula accuracy
+
+**Primary Key**: `id` (SERIAL)
 
 **Columns**:
 - `id` (SERIAL PRIMARY KEY)
-- `model_version` (VARCHAR 50) - Model version tested
+- `model_version` (VARCHAR 50) - Model version tested ('v2.0')
 - `season` (VARCHAR 10) - Season tested ('2025-26')
 - `rmse` (DECIMAL 5,3) - Root Mean Square Error
 - `mae` (DECIMAL 5,3) - Mean Absolute Error
@@ -152,9 +191,10 @@ Raw betting odds data for CSV imports
 - `parameters` (JSONB) - Model parameters used
 - `notes` (TEXT) - Additional test notes
 
-### `parameter_optimization`
-**Sprint 3 Ready**: Parameter tuning results (added 2025-08-21)
-- **Primary Key**: `id` (SERIAL)
+### **`parameter_optimization`** - V2.0 Parameter Tuning
+**Purpose**: Track parameter optimization results for V2.0 formula components
+
+**Primary Key**: `id` (SERIAL)
 
 **Columns**:
 - `id` (SERIAL PRIMARY KEY)
@@ -166,17 +206,20 @@ Raw betting odds data for CSV imports
 - `fitness_score` (DECIMAL 6,3) - Combined fitness metric
 - `notes` (TEXT) - Optimization notes
 
-## Name Mapping System
+---
 
-### `name_mappings`
-Master table for external data source name mapping
-- **Primary Key**: `id` (SERIAL)
-- **Unique Constraint**: `(source_system, source_name)`
-- **Foreign Key**: `fantrax_id` → `players.id`
+## **Name Mapping System**
+
+### **`name_mappings`** - External Data Integration
+**Purpose**: Cross-platform player name resolution for data imports
+
+**Primary Key**: `id` (SERIAL)
+**Unique Constraint**: `(source_system, source_name)`
+**Foreign Key**: `fantrax_id` → `players.id`
 
 **Columns**:
 - `id` (SERIAL PRIMARY KEY)
-- `source_system` (VARCHAR 50) - External source ('ffs', 'understat', etc.)
+- `source_system` (VARCHAR 50) - External source ('understat', 'ffs', etc.)
 - `source_name` (VARCHAR 255) - Original external name
 - `fantrax_id` (VARCHAR 50) - Our canonical player ID
 - `fantrax_name` (VARCHAR 255) - Current Fantrax name
@@ -193,17 +236,18 @@ Master table for external data source name mapping
 - `created_at` (TIMESTAMP, DEFAULT CURRENT_TIMESTAMP)
 - `updated_at` (TIMESTAMP, DEFAULT CURRENT_TIMESTAMP)
 
-**Indexes**:
+**Performance Indexes**:
 - `idx_name_mappings_source` - On (source_system, source_name)
 - `idx_name_mappings_fantrax` - On fantrax_id
 - `idx_name_mappings_verified` - On verified
 - `idx_name_mappings_team_pos` - On (team, position)
 - `idx_name_mappings_confidence` - On confidence_score DESC
 
-### `name_mapping_history`
-Audit trail for name mapping changes
-- **Primary Key**: `id` (SERIAL)
-- **Foreign Key**: `mapping_id` → `name_mappings.id` (ON DELETE SET NULL)
+### **`name_mapping_history`** - Change Audit Trail
+**Purpose**: Track all changes to name mappings for accountability
+
+**Primary Key**: `id` (SERIAL)
+**Foreign Key**: `mapping_id` → `name_mappings.id` (ON DELETE SET NULL)
 
 **Columns**:
 - `id` (SERIAL PRIMARY KEY)
@@ -218,10 +262,14 @@ Audit trail for name mapping changes
 - `notes` (TEXT) - Optional notes
 - `created_at` (TIMESTAMP, DEFAULT CURRENT_TIMESTAMP)
 
-## Database Views
+---
 
-### `verified_name_mappings`
-Pre-filtered view of verified name mappings
+## **Database Views & Functions**
+
+### **Views for Data Access**
+
+#### **`verified_name_mappings`**
+Pre-filtered view of verified name mappings for production use:
 ```sql
 SELECT source_system, source_name, fantrax_id, fantrax_name, team, position, 
        confidence_score, match_type, verification_date, verified_by, 
@@ -231,8 +279,8 @@ WHERE verified = TRUE
 ORDER BY source_system, source_name
 ```
 
-### `name_mapping_stats`
-Statistics view for mapping system performance
+#### **`name_mapping_stats`**
+Statistics view for mapping system performance monitoring:
 ```sql
 SELECT source_system, 
        COUNT(*) as total_mappings,
@@ -248,73 +296,155 @@ GROUP BY source_system
 ORDER BY total_mappings DESC
 ```
 
-## Database Functions
+### **Database Functions**
 
-### `update_name_mappings_timestamp()`
-Automatically updates `updated_at` timestamp on name_mappings updates
+#### **`update_name_mappings_timestamp()`**
+Automatically updates `updated_at` timestamp on name_mappings table modifications.
 
-### `log_name_mapping_changes()`
-Automatically logs all changes to name_mappings in the audit history table
-
-## Data Flow
-
-1. **Player Data**: Core player info stored in `players` table
-2. **Weekly Metrics**: Performance data stored in `player_metrics` by gameweek
-3. **Games Tracking**: Games played data in both `player_metrics` and `player_games_data`
-4. **External Data**: Name mappings handle external data source integration
-5. **Form Calculation**: Historical points stored in `player_form` for form multipliers
-6. **Fixture Data**: Odds-based difficulty stored in `fixture_difficulty`
-
-## Recent Data Fixes
-
-**Player Data Corrections** (applied to database):
-- Fixed Leandro Trossard incorrect xGI/minutes data (set to 0)
-- Updated 50 players with 0 games but >0 minutes to set games_played=1
-- Added name mappings for Rodrigo Muniz and Rodrigo Gomes (correct team associations)
-
-## Key Relationships
-
-- `players.id` ← `player_metrics.player_id` (1:many)
-- `players.id` ← `player_games_data.player_id` (1:many)  
-- `players.id` ← `name_mappings.fantrax_id` (1:many)
-- `players.id` ← `player_form.player_id` (1:many)
-
-## Performance Indexes
-
-All tables include appropriate indexes for:
-- Primary key lookups
-- Foreign key relationships  
-- Common query patterns (gameweek, team, position)
-- Time-based queries (created_at, updated_at)
-- Games tracking queries
+#### **`log_name_mapping_changes()`**
+Automatically logs all changes to name_mappings in the audit history table for accountability.
 
 ---
 
-**Maintenance Note**: This document must be updated after each Formula Optimization sprint with new columns, tables, and migration status. See `docs/DOCUMENTATION_MAINTENANCE.md` for complete update requirements.
+## **V2.0 Data Flow Architecture**
 
-## V2.0 Engine Column Dependencies (Added 2025-08-22)
+### **Primary Data Pipeline**
+1. **Player Registration**: Core player info stored in `players` table with V2.0 columns
+2. **Weekly Updates**: Performance data stored in `player_metrics` by gameweek
+3. **Games Tracking**: Current/historical data in both `player_metrics` and `player_games_data`
+4. **External Integration**: Understat xGI data via `name_mappings` system (99% success rate)
+5. **Form Calculation**: Point history in `player_form` for EWMA calculations
+6. **Fixture Integration**: Odds-based difficulty in `team_fixtures` for exponential multipliers
 
-**⚠️ CRITICAL: baseline_xgi Column Required for V2.0 API Endpoints**
-
-The v2.0 Enhanced formula engine requires the `baseline_xgi` column to be included in ALL player API queries:
+### **V2.0 Calculation Dependencies**
+**⚠️ CRITICAL: All V2.0 API endpoints MUST include baseline_xgi in queries**
 
 ```sql
--- REQUIRED for v2.0 engine functionality
-SELECT p.baseline_xgi FROM players p WHERE ...
+-- REQUIRED for V2.0 functionality
+SELECT p.id, p.name, p.baseline_xgi, p.true_value, p.roi, p.blended_ppg
+FROM players p 
+WHERE ...
 ```
 
-**Engine-Specific Column Usage:**
-- **v1.0 Legacy Engine**: Uses `value_score` column, ignores v2.0 columns
-- **v2.0 Enhanced Engine**: Writes to `true_value` + `roi`, REQUIRES `baseline_xgi` for normalized xGI calculations
+**Column Dependencies by Engine**:
+- **V2.0 Enhanced Engine**: Writes to `true_value` + `roi`, REQUIRES `baseline_xgi`
+- **Dynamic Blending**: Uses `blended_ppg`, `current_season_weight`, `historical_ppg`
+- **EWMA Form**: Uses `exponential_form_score` with α=0.87 parameter
+- **Normalized xGI**: Uses `baseline_xgi` for ratio calculations with position adjustments
 
-**xGI Toggle Implementation (2025-08-22):**
-- Frontend toggle: "Apply xGI to True Value Calculation" (default: disabled)
-- When disabled: xGI multiplier = 1.0x (no effect on True Value)
-- When enabled: Uses normalized xGI calculation with position-specific adjustments
-- Early season strategy: Recommended disabled due to sample size volatility
+---
 
-**API Endpoint Dependencies:**
-- `/api/players` - MUST include `p.baseline_xgi` in SELECT for v2.0 mode
-- `/api/calculate-values-v2` - Requires baseline_xgi for normalized calculations
+## **Recent Data Quality Fixes**
 
-*Last updated: 2025-08-22 - Added v2.0 xGI implementation and column dependency documentation*
+### **Player Data Corrections** (Applied to production database)
+- **Leandro Trossard**: Fixed incorrect xGI/minutes data (reset to 0 for clean calculation)
+- **Games Played Fix**: Updated 50 players with 0 games but >0 minutes to set games_played=1
+- **Name Mappings**: Added Rodrigo Muniz and Rodrigo Gomes with correct team associations
+- **Baseline Data**: Cleaned 63 players with corrupted baseline data from Championship/lower leagues
+
+### **Database Performance Optimizations**
+- **Fixture Calculation**: Improved 2x speed (90s → 46s) through query optimization
+- **Index Strategy**: All tables include appropriate indexes for V2.0 query patterns
+- **Data Types**: Optimized DECIMAL precision for calculation accuracy vs storage efficiency
+
+---
+
+## **Key Relationships & Constraints**
+
+### **Foreign Key Relationships**
+- `players.id` ← `player_metrics.player_id` (1:many) - Weekly performance data
+- `players.id` ← `player_games_data.player_id` (1:many) - Games tracking
+- `players.id` ← `name_mappings.fantrax_id` (1:many) - External source mapping
+- `players.id` ← `player_form.player_id` (1:many) - Form history
+- `players.id` ← `player_predictions.player_id` (1:many) - Validation tracking
+
+### **Data Integrity Constraints**
+- **Unique Constraints**: Prevent duplicate gameweek data per player
+- **Check Constraints**: Ensure multipliers stay within reasonable ranges
+- **Foreign Key Constraints**: Maintain referential integrity across related tables
+- **Generated Columns**: Automatic error calculations in validation tables
+
+---
+
+## **V2.0 Performance Metrics**
+
+### **Current System Performance**
+- **Total Players**: 647 Premier League players
+- **Database Size**: Optimized for efficient queries
+- **API Response Time**: Sub-second response times
+- **Calculation Speed**: All 647 players recalculated efficiently
+- **Name Matching**: 99% success rate for external data integration
+- **Data Freshness**: Real-time updates via weekly upload workflows
+
+### **V2.0 Formula Validation**
+```
+Example Calculations (Validated):
+Danny Ballard: True Value = 29.81 = 30.0 × 1.0 × 0.994 × 1.0 × 1.0 ✅
+Chris Wood: Blended PPG = 8.8 (6.7% current + 93.3% historical) ✅
+Calafiori: xGI Multiplier = 2.500x (capped from 9.64x) ✅
+```
+
+---
+
+## **Maintenance & Monitoring**
+
+### **Database Health Checks**
+```sql
+-- Verify V2.0 data completeness
+SELECT 
+    COUNT(*) as total_players,
+    COUNT(true_value) as with_true_value,
+    COUNT(roi) as with_roi,
+    COUNT(blended_ppg) as with_blending,
+    COUNT(baseline_xgi) as with_baseline_xgi
+FROM players;
+-- Expected: 647 players with all V2.0 columns populated
+```
+
+### **Performance Monitoring**
+```sql
+-- Check calculation freshness
+SELECT 
+    MAX(last_updated) as latest_calculation,
+    COUNT(*) as calculated_players
+FROM player_metrics
+WHERE gameweek = (SELECT MAX(gameweek) FROM player_metrics);
+```
+
+### **Data Quality Validation**
+```sql
+-- Verify multiplier ranges
+SELECT 
+    COUNT(*) as total_records,
+    COUNT(*) FILTER (WHERE form_multiplier BETWEEN 0.5 AND 2.0) as valid_form,
+    COUNT(*) FILTER (WHERE fixture_multiplier BETWEEN 0.5 AND 1.8) as valid_fixture,
+    COUNT(*) FILTER (WHERE xgi_multiplier BETWEEN 0.5 AND 2.5) as valid_xgi
+FROM player_metrics
+WHERE gameweek = (SELECT MAX(gameweek) FROM player_metrics);
+```
+
+---
+
+## **Technical Specifications**
+
+### **Database Engine Requirements**
+- **PostgreSQL Version**: 12+ recommended
+- **Character Set**: UTF8
+- **Collation**: English locale support
+- **Extensions**: None required (pure SQL implementation)
+
+### **Connection Pooling**
+- **Max Connections**: Configured for Flask application load
+- **Connection Timeout**: Optimized for web application usage
+- **Query Timeout**: Set for complex calculation queries
+
+### **Backup Strategy**
+- **Schema Backup**: Regular structure exports
+- **Data Backup**: Player data and calculations preserved
+- **Point-in-Time Recovery**: Available for data corruption scenarios
+
+---
+
+**Last Updated**: 2025-08-22 - V2.0 Enhanced Formula Database Schema Complete
+
+*This document reflects the current V2.0-only database structure with all legacy components removed. The database serves 647 Premier League players with optimized V2.0 Enhanced Formula calculations including True Value predictions, ROI analysis, dynamic blending, EWMA form calculations, and normalized xGI integration.*
