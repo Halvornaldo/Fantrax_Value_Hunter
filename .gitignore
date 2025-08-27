@@ -8,10 +8,15 @@ config/*.json.local
 
 # Data Cache (regenerated from API)
 data/
-*.json
-*.csv
 cache/
 temp/
+nul
+
+# Development artifacts
+Dashboard pics/
+screenshots/
+*.bat
+dashboard.html
 
 # Python
 __pycache__/
@@ -79,6 +84,16 @@ instance/
 *.db
 *.sqlite
 *.sqlite3
+fantrax_backup.sql
+
+# Node.js / React
+node_modules/
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+package-lock.json
+yarn.lock
+frontend/build/
 
 # Temporary Files
 *.tmp
