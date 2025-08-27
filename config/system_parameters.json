@@ -6,34 +6,37 @@
   },
   "xgi_integration": {
     "enabled": true,
-    "last_sync": 1755945608.5077126,
-    "matched_players": 298,
+    "last_sync": 1756229256.3588278,
+    "matched_players": 343,
     "unmatched_players": 6,
     "description": "xGI integration toggle and statistics"
   },
   "starter_prediction": {
     "enabled": true,
     "manual_overrides": {},
-    "description": "Starter prediction system with manual overrides"
+    "auto_rotation_penalty": 0.75,
+    "force_bench_penalty": 0.6,
+    "force_out_penalty": 0.0,
+    "description": "Starter prediction system with manual overrides and penalty settings"
   },
   "formula_optimization_v2": {
     "enabled": true,
+    "formula_toggles": {
+      "form_enabled": false,
+      "fixture_enabled": true,
+      "starter_enabled": true,
+      "xgi_enabled": true
+    },
     "exponential_form": {
-      "enabled": true,
-      "alpha": 0.87
+      "enabled": true
     },
     "dynamic_blending": {
       "enabled": true,
-      "full_adaptation_gw": 16
+      "full_adaptation_gw": 12
     },
     "normalized_xgi": {
-      "enabled": true,
-      "normalization_strength": 1,
-      "position_adjustments": {
-        "defenders": true,
-        "midfielders": true,
-        "forwards": true
-      }
+      "enabled": false,
+      "normalization_strength": 1.0
     },
     "exponential_fixture": {
       "enabled": true,
@@ -46,7 +49,6 @@
       }
     },
     "multiplier_caps": {
-      "enabled": true,
       "form": 2.0,
       "fixture": 1.8,
       "xgi": 2.5,
