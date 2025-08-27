@@ -31,13 +31,13 @@ ROI = True Value ÷ Player_Price
 **Purpose**: Smooth transition from historical (2024-25) to current season data
 
 **Formula**: 
-- `w_current = min(1, (N-1)/(K-1))` where N=current gameweek, K=16
+- `w_current = min(1, (N-1)/(K-1))` where N=current gameweek, K=12
 - `Blended_PPG = (w_current × Current_PPG) + (w_historical × Historical_PPG)`
 
 **Examples**:
-- GW2: 6.7% current + 93.3% historical
-- GW8: 46.7% current + 53.3% historical  
-- GW16: 100% current
+- GW2: 9.1% current + 90.9% historical
+- GW7: 54.5% current + 45.5% historical  
+- GW12: 100% current
 
 **Display Format**: "38+2" (historical+current games)
 
@@ -123,7 +123,7 @@ ROI = True Value ÷ Player_Price
     },
     "dynamic_blending": {
       "enabled": true,
-      "full_adaptation_gw": 16
+      "full_adaptation_gw": 12
     },
     "normalized_xgi": {
       "enabled": true
@@ -208,7 +208,7 @@ last_updated TIMESTAMP            -- Calculation timestamp
 **V2.0 Calculation**:
 1. **Dynamic Blending**:
    - Current PPG: 19.0, Historical PPG: 11.61
-   - Weight: 6.7% current + 93.3% historical
+   - Weight: 9.1% current + 90.9% historical
    - Blended PPG: 12.11
 
 2. **EWMA Form** (α=0.87):

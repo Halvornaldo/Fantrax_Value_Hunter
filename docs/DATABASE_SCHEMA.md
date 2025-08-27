@@ -175,6 +175,91 @@ SELECT MAX(gameweek) FROM raw_player_snapshots WHERE gameweek IS NOT NULL
 4. **Odds CSV Import**: Captures fixture difficulty → `raw_fixture_snapshots`
 5. **Form Calculation**: Aggregates weekly points → `raw_form_snapshots`
 
+### **🎯 NEW: Rolling Minutes-Based Games Detection (2025-08-26)**
+**Purpose**: Intelligent games_played detection using minutes comparison across gameweeks
+
+**Algorithm**:
+```sql
+-- Get current total minutes from Understat sync
+SELECT COALESCE(minutes, 0) FROM players WHERE id = %s
+
+-- Get previous gameweek snapshot minutes
+SELECT COALESCE(minutes_played, 0) 
+FROM raw_player_snapshots 
+WHERE player_id = %s AND gameweek = %s-1
+
+-- Determine if player played this gameweek
+games_played = 1 IF current_total_minutes > previous_gameweek_minutes ELSE 0
+```
+
+**Rolling Pattern**: Uses `gameweek - 1` snapshot for dynamic comparison:
+- **GW2 Upload**: Compares total minutes vs GW1 snapshot
+- **GW3 Upload**: Compares total minutes vs GW2 snapshot  
+- **GW4 Upload**: Compares total minutes vs GW3 snapshot
+
+**Workflow Integration**:
+1. **Sync Understat Data** → Updates `players.minutes` with current total
+2. **Upload CSV** → Uses minutes comparison for accurate `games_played` detection
+3. **Create New Snapshot** → Captures current gameweek data for next comparison
+
+### **🎯 PPG CALCULATION ENHANCEMENT (2025-08-26)**
+**Purpose**: Fixed critical PPG calculation discrepancy in V2.0 True Value formula
+
+**Problem Identified**: 
+- Display PPG was correctly calculated using MAX(points) from cumulative form data
+- V2.0 calculations used stale stored PPG values instead of fresh calculations
+- Form imports triggered PPG recalculation but not V2.0 True Value updates
+
+**Enhanced PPG Query Pattern**:
+```sql
+-- Correct PPG calculation using MAX(points) from player_form
+CASE 
+    WHEN COALESCE(pgd.games_played, 0) > 0 
+    THEN COALESCE(pf_max.total_points, 0) / pgd.games_played
+    ELSE 0 
+END as ppg,
+
+-- With form data aggregation
+LEFT JOIN (
+    SELECT player_id, MAX(points) as total_points
+    FROM player_form
+    GROUP BY player_id
+) pf_max ON p.id = pf_max.player_id
+```
+
+**Auto-Trigger V2.0 Recalculation**:
+```python
+# Added to form import workflow in app.py lines 2134-2200
+print(f"Triggering V2.0 True Value recalculation...")
+try:
+    from calculation_engine_v2 import FormulaEngineV2
+    parameters = load_system_parameters()
+    engine = FormulaEngineV2(DB_CONFIG, parameters)
+    results = engine.calculate_all_players()
+    
+    # Store results with corrected PPG
+    store_v2_calculations(results, parameters, gameweek_num)
+```
+
+**PPG Storage Integration**:
+```sql
+-- Enhanced store_v2_calculations to include PPG (app.py lines 3657-3671)
+UPDATE player_metrics 
+SET 
+    true_value = %s,
+    value_score = %s,
+    ppg = %s,  -- Added corrected PPG storage
+    last_updated = NOW()
+WHERE player_id = %s AND gameweek = %s
+```
+
+**Complete Workflow (2025-08-26)**:
+1. **Understat Sync** → Updates `players.minutes` with current total minutes
+2. **Form Upload** → PPG recalculation using correct MAX(points) aggregation
+3. **Auto V2.0 Trigger** → V2.0 True Value recalculation with fresh PPG data
+4. **PPG Storage** → Store corrected PPG alongside True Value and ROI
+5. **Verification** → New `/api/verify-ppg` endpoint for ongoing consistency monitoring
+
 **Testing Requirements:**
 - Verify raw data capture during weekly imports (Fantrax, Understat, odds)
 - Test trend analysis endpoints with historical gameweek data  
@@ -201,8 +286,8 @@ SELECT MAX(gameweek) FROM raw_player_snapshots WHERE gameweek IS NOT NULL
 **V2.0 Enhanced Formula Columns**:
 - `true_value` (DECIMAL 8,2) - **Pure point prediction** (separate from price)
 - `roi` (DECIMAL 8,3) - **Return on investment** (true_value ÷ price)
-- `blended_ppg` (DECIMAL 5,2) - **Dynamic blend** of historical/current PPG
-- `current_season_weight` (DECIMAL 4,3) - **Blending weight** for current season data
+- `blended_ppg` (DECIMAL 5,2) - **✅ NEW: Dynamic blend** of historical/current season PPG using adaptation formula
+- `current_season_weight` (DECIMAL 4,3) - **✅ NEW: Blending weight** for current season data (0-1 scale)
 - `historical_ppg` (DECIMAL 5,2) - **2024-25 season** calculated PPG baseline
 - `exponential_form_score` (DECIMAL 5,3) - **EWMA form multiplier** (α=0.87)
 - `baseline_xgi` (DECIMAL 5,3) - **⚠️ REQUIRED** Historical 2024-25 xGI baseline for normalization
@@ -560,6 +645,101 @@ Calafiori: xGI Multiplier = 2.500x (capped from 9.64x) ✅
 
 ---
 
+## **V2.0 Enhanced System Configuration**
+
+### **Starter Prediction System Parameters**
+
+The V2.0 Enhanced Formula includes an advanced starter prediction system with adjustable penalty multipliers and manual override capabilities. Configuration is managed through the `config/system_parameters.json` file.
+
+**Configuration Structure**:
+```json
+{
+  "starter_prediction": {
+    "enabled": true,
+    "manual_overrides": {},
+    "auto_rotation_penalty": 0.75,
+    "force_bench_penalty": 0.6,
+    "force_out_penalty": 0.0,
+    "description": "Starter prediction system with manual overrides and penalty settings"
+  }
+}
+```
+
+**Parameter Details**:
+- **`auto_rotation_penalty`** (0.75): Multiplier for players at rotation risk
+- **`force_bench_penalty`** (0.6): Multiplier for likely bench players  
+- **`force_out_penalty`** (0.0): Multiplier for players definitely out
+- **Starter multiplier**: 1.0 (implicit default, no configuration needed)
+
+**Manual Override System**:
+The `manual_overrides` object stores player-specific starter status overrides:
+```json
+{
+  "manual_overrides": {
+    "player_123": {
+      "type": "rotation",
+      "applied_gameweek": 8,
+      "timestamp": "2025-08-26T10:30:00Z"
+    }
+  }
+}
+```
+
+**Override Types**:
+- **`starter`**: 1.0x multiplier (guaranteed starter)
+- **`rotation`**: Uses `auto_rotation_penalty` value (rotation risk)  
+- **`bench`**: Uses `force_bench_penalty` value (likely bench)
+- **`out`**: Uses `force_out_penalty` value (definitely out)
+- **`auto`**: Removes override, uses CSV prediction data
+
+**Database Storage**:
+Starter multipliers are stored in the `player_metrics` table:
+```sql
+-- Updated during manual overrides and CSV imports
+UPDATE player_metrics 
+SET starter_multiplier = 0.75 
+WHERE player_id = 'player_123' AND gameweek = 8;
+```
+
+**V2.0 Enhanced Formula Integration**:
+```
+True Value = Blended_PPG × Form × Fixture × Starter × xGI
+```
+Where Starter multiplier directly affects the final True Value calculation.
+
+### **Formula Toggle System Parameters**
+
+The V2.0 Enhanced Formula supports individual component toggles for testing and optimization:
+
+**Configuration Structure**:
+```json
+{
+  "formula_optimization_v2": {
+    "formula_toggles": {
+      "form_enabled": true,
+      "fixture_enabled": true, 
+      "starter_enabled": true,
+      "xgi_enabled": true
+    }
+  }
+}
+```
+
+**Toggle Effects**:
+- **Disabled components**: Default to 1.0x multiplier (no effect)
+- **Enabled components**: Calculate and apply respective multipliers
+- **Real-time updates**: Changes trigger immediate V2.0 recalculation
+
+**Database Impact**:
+When formula components are toggled off, the calculation engine applies 1.0x multipliers:
+```python
+# From calculation_engine_v2.py
+form_mult = self._calculate_form_multiplier(player_data) if formula_toggles.get('form_enabled', True) else 1.0
+starter_mult = player_data.get('starter_multiplier', 1.0) if formula_toggles.get('starter_enabled', True) else 1.0
+```
+
+---
+
 ## **Maintenance & Monitoring**
 
 ### **Database Health Checks**
@@ -619,6 +799,58 @@ WHERE gameweek = (SELECT MAX(gameweek) FROM player_metrics);
 
 ---
 
-**Last Updated**: 2025-08-23 - V2.0 Enhanced Formula Database Schema with Raw Data Snapshot System
+---
 
-*This document reflects the current V2.0-only database structure with all legacy components removed. The database serves 647 Premier League players with optimized V2.0 Enhanced Formula calculations including True Value predictions, ROI analysis, dynamic blending, EWMA form calculations, and normalized xGI integration. The raw data snapshot system enables retrospective trend analysis by capturing weekly imported data without calculations.*
+## **🎯 NEW: Dynamic Blending Implementation (2025-08-27)**
+
+### **Enhanced `blended_ppg` and `current_season_weight` Columns**
+
+**Purpose**: Transparent dynamic blending of historical (2024-25) and current season PPG data using configurable adaptation parameter.
+
+**Implementation Details**:
+- **`blended_ppg`** (DECIMAL 5,2) - The actual PPG value used in V2.0 True Value calculations
+- **`current_season_weight`** (DECIMAL 4,3) - Weight applied to current season data (0-1 scale)
+- **Adaptation Formula**: `w_current = min(1, (N-1)/(K-1))` where N=current gameweek, K=adaptation gameweek
+- **Configuration**: `full_adaptation_gw: 12` (changed from 16 - faster transition to current season data)
+
+**Database Integration**:
+```sql
+-- Enhanced API query includes blended PPG data
+SELECT 
+    p.id, p.name, p.true_value, p.roi,
+    p.blended_ppg,           -- ✅ NEW: Dynamic PPG used in calculations
+    p.current_season_weight, -- ✅ NEW: Blending transparency
+    p.historical_ppg         -- Historical 2024-25 baseline
+FROM players p
+```
+
+**Example Blending (GW3)**:
+- **Current Season Weight**: 18.2% (2 games played, adapts by GW12)
+- **Historical Weight**: 81.8% (2024-25 season baseline)
+- **Blended PPG**: (0.182 × 15.0) + (0.818 × 11.0) = 11.7 points
+
+**API Response Enhancement**:
+```json
+{
+  "id": "123456",
+  "name": "Test Player",
+  "true_value": 14.5,
+  "roi": 1.21,
+  "blended_ppg": 11.7,
+  "current_season_weight": 0.182,
+  "historical_ppg": 11.0
+}
+```
+
+**CSV Export Integration**:
+The Export CSV feature now includes blended PPG data:
+- `blended_ppg` - Dynamic PPG used in True Value calculations
+- `current_season_weight` - Transparency into current/historical blend
+- `roi` - Return on investment calculation
+- `xgi_multiplier` - Normalized xGI impact factor
+
+---
+
+**Last Updated**: 2025-08-27 - Added Dynamic Blending columns and adaptation parameter documentation
+
+*This document reflects the current V2.0-only database structure with enhanced dynamic blending transparency. The database serves 647 Premier League players with optimized V2.0 Enhanced Formula calculations including True Value predictions, ROI analysis, dynamic blending (GW12 adaptation), EWMA form calculations, and normalized xGI integration. The raw data snapshot system enables retrospective trend analysis by capturing weekly imported data without calculations.*

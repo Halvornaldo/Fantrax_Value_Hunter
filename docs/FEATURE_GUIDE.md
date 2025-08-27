@@ -87,13 +87,13 @@ All V2.0 features are configured through the Parameter Controls panel with enhan
 
 **V2.0 Enhanced Controls**:
 - **Enable Dynamic Blending**: Toggle for V2.0 blending system (always enabled)
-- **Full Adaptation Gameweek**: When to reach current-only data (default: 16)
+- **Full Adaptation Gameweek**: When to reach current-only data (default: 12, updated 2025-08-27)
 - **Blending Progress**: Visual indicator showing current weights
 - **Transition Status**: Early season, transitioning, or current-only indicators
 
 **Technical Implementation**:
 - **Mathematical Formula**: `w_current = min(1, (N-1)/(K-1))`
-- **Current Formula (GW2)**: 6.7% current + 93.3% historical
+- **Enhanced Formula (GW3)**: 18.2% current + 81.8% historical (GW12 adaptation)
 - **Smooth Transition**: No hard cutoffs, gradual weight progression
 - **Database Integration**: Real-time calculation of `historical_ppg` from 2024-25 data
 
@@ -184,6 +184,44 @@ All V2.0 features are configured through the Parameter Controls panel with enhan
 
 ---
 
+## **V2.0 Enhanced Dashboard Controls**
+
+### **Formula Component Toggles**
+**Purpose**: Real-time control over individual V2.0 Enhanced Formula components for flexible analysis
+
+**Available Toggles**:
+- **Form Toggle**: Enable/disable EWMA form calculation (default: disabled)
+- **Fixture Toggle**: Enable/disable exponential fixture multiplier (default: enabled) 
+- **Starter Toggle**: Enable/disable starter prediction multiplier (default: enabled)
+- **xGI Toggle**: Enable/disable normalized xGI multiplier (default: enabled)
+
+**Form Toggle Behavior**:
+- **Enabled**: Form multiplier calculated using EWMA with α=0.87
+- **Disabled**: Form multiplier set to 1.0x (no form weighting applied)
+- **Default State**: Disabled for neutral baseline analysis
+- **Rationale**: Early season form can be volatile; users enable when confident in data
+
+**Technical Implementation**:
+- **Configuration**: `formula_optimization_v2.formula_toggles.form_enabled: false`
+- **API Endpoints**: `/api/system/config` and `/api/system/update-parameters`
+- **Real-time Updates**: Changes trigger immediate V2.0 recalculation
+- **Dashboard Sync**: React dashboard reflects configuration state from backend
+
+**Parameter Controls**:
+- **EWMA Alpha**: Form calculation responsiveness (0.1-1.0, default: 0.87)
+- **Adaptation Gameweek**: Dynamic blending transition point (8-20, default: 12)
+- **xGI Strength**: xGI impact multiplier when enabled (0.5-2.0, default: 1.0)
+- **Multiplier Caps**: Individual caps for Form (2.0x), Fixture (1.8x), xGI (2.5x), Global (3.0x)
+- **Starter Penalties**: Rotation (0.75x), Bench (0.6x), Out (0.0x)
+
+**Usage Examples**:
+```
+Form Disabled (Default): True Value = PPG × 1.0 × Fixture × Starter × xGI  
+Form Enabled: True Value = PPG × EWMA_Form × Fixture × Starter × xGI
+```
+
+---
+
 ## **V2.0 Enhanced Player Table**
 
 ### **Core V2.0 Columns**
@@ -191,7 +229,7 @@ All V2.0 features are configured through the Parameter Controls panel with enhan
 **Enhanced Value Columns**:
 - **True Value**: V2.0 point prediction (separate from price consideration)
 - **ROI**: Return on Investment (True Value ÷ Price) with green gradient styling
-- **Blended PPG**: Dynamic blend of historical/current season data
+- **Dynamic PPG**: ✅ **NEW (2025-08-27)** - The actual PPG used in True Value calculations with blending transparency
 - **Games Display**: Shows blending format ("27+1", "38+2", "5")
 
 **V2.0 Multiplier Columns**:
@@ -203,7 +241,7 @@ All V2.0 features are configured through the Parameter Controls panel with enhan
 **Enhanced Data Columns**:
 - **Baseline xGI**: Historical 2024-25 xGI average for normalization
 - **Historical PPG**: 2024-25 season PPG for blending calculations
-- **Current Weight**: Dynamic blending weight (e.g., 0.067 for 6.7% current)
+- **Current Weight**: Dynamic blending weight (e.g., 0.182 for 18.2% current @ GW3)
 
 ### **V2.0 Color Coding System**
 
@@ -218,6 +256,13 @@ All V2.0 features are configured through the Parameter Controls panel with enhan
 - **Green Gradient**: Higher ROI values receive stronger green intensity
 - **Threshold Indicators**: >2.0 (excellent), 1.5-2.0 (good), 1.0-1.5 (fair), <1.0 (poor)
 - **NULL Handling**: Missing ROI values display appropriately
+
+**✅ Dynamic PPG Column** (NEW 2025-08-27):
+- **Green (≥50% current)**: Reliable current season data - current season has meaningful influence
+- **Yellow (20-49% current)**: Transitioning blend - balanced historical and current influence
+- **Red (<20% current)**: Early season - heavily weighted toward historical data
+- **Display Format**: "11.2 (18% curr)" showing actual PPG used and current season percentage
+- **Tooltip Information**: Shows historical PPG, current season weight, and adaptation timeline
 
 **Games Display Column**:
 - **Color Intensity**: Based on total games (current + historical)
@@ -321,22 +366,29 @@ True Value = Blended_PPG × Form × Fixture × Starter × xGI
 ROI = True Value ÷ Price
 ```
 
-### **Detailed V2.0 Example**
+### **Detailed V2.0 Example with Starter Controls**
 ```
 Player: Erling Haaland (Manchester City)
 Price: £15.00
 
 Components:
-- Blended PPG: 8.45 (6.7% current + 93.3% historical)
-- Form Multiplier: 0.952 (EWMA below baseline)
-- Fixture Multiplier: 1.006 (neutral difficulty)
-- Starter Multiplier: 1.000 (predicted starter)
-- xGI Multiplier: 0.895 (normalized xGI ratio)
+- Blended PPG: 8.45 (18.2% current + 81.8% historical @ GW3)
+- Form Multiplier: 0.952 (EWMA below baseline) [Toggle: Enabled]
+- Fixture Multiplier: 1.006 (neutral difficulty) [Toggle: Enabled]
+- Starter Multiplier: 1.000 (predicted starter) [Manual Override: Auto]
+- xGI Multiplier: 0.895 (normalized xGI ratio) [Toggle: Disabled]
 
 Calculation:
 True Value = 8.45 × 0.952 × 1.006 × 1.000 × 0.895 = 7.25
 
 ROI = 7.25 ÷ 15.00 = 0.483
+
+Manual Override Options:
+- S (Starter): 1.000x → True Value: 7.25
+- R (Rotation): 0.750x → True Value: 5.44
+- B (Bench): 0.600x → True Value: 4.35  
+- O (Out): 0.000x → True Value: 0.00
+- A (Auto): CSV prediction (current: Starter)
 
 Result: Moderate True Value with below-average ROI due to premium pricing
 ```
@@ -463,6 +515,6 @@ Result: Moderate True Value with below-average ROI due to premium pricing
 
 ---
 
-**Last Updated**: 2025-08-23 - V2.0 Enhanced Formula Dashboard with Trend Analysis System
+**Last Updated**: 2025-08-26 - V2.0 Enhanced Formula Dashboard with Form Toggle Controls
 
 *This document reflects the current V2.0-only dashboard features with all legacy components removed. The dashboard serves 647 Premier League players with optimized V2.0 Enhanced Formula calculations including True Value predictions, ROI analysis, dynamic blending, EWMA form calculations, and normalized xGI integration. The trend analysis system enables retrospective analysis using captured raw data snapshots for season-long performance tracking.*

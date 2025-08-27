@@ -1,12 +1,13 @@
 # API Reference - V2.0 Enhanced Formula System
 ## Fantasy Football Value Hunter API Documentation
 
-### **System Status: V2.0 Production API**
+### **System Status: V2.0 Production API + Enterprise Gameweek Management**
 
-This document describes the complete API for the V2.0 Enhanced Formula system. The system has been consolidated to a single V2.0 engine with all legacy components removed.
+This document describes the complete API for the V2.0 Enhanced Formula system with unified gameweek management. The system has been consolidated to a single V2.0 engine with enterprise-grade gameweek consistency across all functions.
 
 **Base URL**: `http://localhost:5001`  
-**Server Status**: V2.0 Enhanced Formula fully operational
+**Server Status**: V2.0 Enhanced Formula + GameweekManager fully operational  
+**Gameweek Management**: 100% unified detection with smart anomaly filtering
 
 ---
 
@@ -36,6 +37,74 @@ This document describes the complete API for the V2.0 Enhanced Formula system. T
 #### `GET /monitoring`
 **Description**: V2.0 system monitoring interface  
 **Returns**: HTML monitoring page with performance metrics
+
+---
+
+## **Gameweek Management API - Enterprise Monitoring System**
+
+### **`GET /api/gameweek-status`** - Smart Upload System Status
+**Description**: Current gameweek status for intelligent upload suggestions  
+**Returns**: JSON with current gameweek, upload guidance, and system status
+
+**Response Example**:
+```json
+{
+  "success": true,
+  "current_gameweek": 2,
+  "next_gameweek": 3,
+  "current_status": {
+    "data_completeness": 647,
+    "protection_status": "GW1_PROTECTED"
+  },
+  "system_message": "System currently at GW2. Upload GW2 to update or GW3 for new data."
+}
+```
+
+**Use Cases**:
+- Form upload page pre-fills current gameweek
+- Smart validation preventing anomalous uploads
+- Upload guidance for users
+
+### **`GET /api/gameweek-consistency`** - Enterprise Health Monitoring ⭐ NEW
+**Description**: Comprehensive gameweek consistency monitoring across all tables  
+**Returns**: JSON health report with consistency analysis and anomaly detection
+
+**Response Example**:
+```json
+{
+  "timestamp": "2025-08-23T18:00:00.000Z",
+  "gameweek_manager_detection": 2,
+  "overall_status": "HEALTHY",
+  "table_analysis": {
+    "player_metrics": {
+      "latest_gameweek": 2,
+      "latest_record_count": 647,
+      "latest_update": "2025-08-23T17:30:00.000Z",
+      "gameweek_distribution": [
+        {"gameweek": 2, "count": 647},
+        {"gameweek": 1, "count": 647}
+      ]
+    }
+  },
+  "consistency_issues": [],
+  "summary": {
+    "total_issues": 0,
+    "high_severity": 0,
+    "tables_checked": 5,
+    "healthy_tables": 5
+  }
+}
+```
+
+**Status Levels**:
+- `HEALTHY`: All systems consistent
+- `WARNING`: Minor inconsistencies detected
+- `CRITICAL`: Major consistency issues requiring attention
+
+**Use Cases**:
+- Production monitoring dashboards
+- Automated health checks
+- Anomaly detection and alerting
 
 ---
 
@@ -275,8 +344,8 @@ ORDER BY gameweek
       "true_value": 28.45,
       "roi": 1.896,
       "blended_ppg": 8.45,
-      "historical_ppg": 8.0,
       "current_season_weight": 0.067,
+      "historical_ppg": 8.0,
       "exponential_form_score": 0.952,
       "baseline_xgi": 2.064,
       "xgi90": 1.845,
@@ -315,6 +384,30 @@ ORDER BY gameweek
       "exponential_form": true,
       "normalized_xgi": true,
       "exponential_fixtures": true
+    }
+  },
+  "gameweek_info": {
+    "current_gameweek": 2,
+    "detection_method": "GameweekManager",
+    "data_source": "unified_detection",
+    "emergency_protection_active": true,
+    "data_freshness": {
+      "gameweek": 2,
+      "last_updated": {
+        "player_metrics": "2025-08-23T17:30:00.000Z",
+        "player_form": "2025-08-23T16:45:00.000Z",
+        "raw_snapshots": "2025-08-23T18:00:00.000Z"
+      },
+      "record_counts": {
+        "player_metrics": 647,
+        "player_form": 647,
+        "raw_snapshots": 647
+      },
+      "data_completeness": {
+        "player_metrics": 100.0,
+        "player_form": 100.0,
+        "raw_snapshots": 100.0
+      }
     }
   }
 }
@@ -362,7 +455,7 @@ WHERE ...
   "parameters": {
     "dynamic_blending": {
       "enabled": true,
-      "full_adaptation_gw": 16
+      "full_adaptation_gw": 12
     },
     "exponential_form": {
       "enabled": true,
@@ -454,7 +547,11 @@ WHERE ...
 ## **Configuration API - V2.0 Enhanced**
 
 ### **`GET /api/config`**
-**Description**: Get V2.0 Enhanced system configuration
+**Description**: Get V2.0 Enhanced system configuration (legacy endpoint)
+
+### **`GET /api/system/config`**  
+**Description**: Get V2.0 Enhanced system configuration (React dashboard endpoint)  
+**Returns**: Configuration object directly (not wrapped in success response)
 
 **V2.0 Configuration Response**:
 ```json
@@ -466,7 +563,7 @@ WHERE ...
     },
     "dynamic_blending": {
       "enabled": true,
-      "full_adaptation_gw": 16
+      "full_adaptation_gw": 12
     },
     "normalized_xgi": {
       "enabled": true,
@@ -493,20 +590,82 @@ WHERE ...
 ```
 
 ### **`POST /api/update-parameters`**
-**Description**: Update V2.0 Enhanced system parameters  
+**Description**: Update V2.0 Enhanced system parameters (legacy endpoint)  
 **Body**: V2.0 configuration object with enhanced parameters  
 **Returns**: Success confirmation with updated parameter values
+
+### **`POST /api/system/update-parameters`**
+**Description**: Update V2.0 Enhanced system parameters (React dashboard endpoint)  
+**Body**: V2.0 configuration object with enhanced parameters and deep merge support  
+**Returns**: Success confirmation with updated configuration object
+
+**Request Body Example**:
+```json
+{
+  "formula_optimization_v2": {
+    "formula_toggles": {
+      "form_enabled": false,
+      "fixture_enabled": true,
+      "starter_enabled": true,
+      "xgi_enabled": true
+    },
+    "ewma_form": {
+      "alpha": 0.87
+    },
+    "multiplier_caps": {
+      "form": 2.0,
+      "fixture": 1.8,
+      "xgi": 2.5,
+      "global": 3.0
+    }
+  },
+  "starter_prediction": {
+    "auto_rotation_penalty": 0.75,
+    "force_bench_penalty": 0.6,
+    "force_out_penalty": 0.0
+  }
+}
+```
+
+**Response Example**:
+```json
+{
+  "success": true,
+  "message": "Parameters updated successfully",
+  "updated_config": {
+    "formula_optimization_v2": {
+      "formula_toggles": {
+        "form_enabled": false,
+        "fixture_enabled": true,
+        "starter_enabled": true,
+        "xgi_enabled": true
+      }
+    }
+  }
+}
+```
 
 ---
 
 ## **Data Import API - V2.0 Enhanced**
 
 ### **`POST /api/import-form-data`**
-**Description**: Import weekly game data with V2.0 name matching system
+**Description**: Import weekly game data with V2.0 name matching system and rolling minutes-based games detection
 
 **Parameters**:
 - `gameweek` (string, required): Gameweek number
 - `file` (file, required): CSV file upload
+
+**🎯 NEW: Rolling Minutes-Based Games Detection (2025-08-26)**:
+The system now uses intelligent minutes comparison to detect which players actually played:
+- **Compares**: Current total minutes (from Understat sync) vs previous gameweek snapshot minutes
+- **Logic**: `games_played = 1` if `total_minutes > previous_gameweek_minutes`, otherwise `0`
+- **Rolling Pattern**: Uses `gameweek - 1` snapshot for dynamic comparison across all gameweeks
+- **Workflow**: Sync Understat data FIRST, then upload CSV for accurate games detection
+
+**Prerequisites**:
+1. **Sync Understat Data** - Updates player total minutes before upload
+2. **Raw Snapshot Available** - Previous gameweek snapshot must exist for comparison
 
 **V2.0 Enhanced Response**:
 ```json
@@ -550,10 +709,17 @@ WHERE ...
 ```json
 {
   "player_id": "haaland_e", 
-  "override_type": "starter|bench|out|auto",
+  "override_type": "starter|rotation|bench|out|auto",
   "gameweek": 2
 }
 ```
+
+**Override Types**:
+- **`starter`**: 1.0x multiplier (guaranteed starter)
+- **`rotation`**: 0.75x multiplier (rotation risk)  
+- **`bench`**: 0.6x multiplier (likely bench player)
+- **`out`**: 0.0x multiplier (definitely out)
+- **`auto`**: Remove override, use CSV prediction data
 
 **V2.0 Response**:
 ```json
@@ -718,11 +884,13 @@ WHERE ...
 ### **`GET /api/export`**
 **Description**: Export V2.0 player data as CSV with all enhanced columns
 
-**Enhanced Export Columns**:
-- All standard player data
-- `true_value` - V2.0 point predictions
+**✅ Enhanced Export Columns (2025-08-27)**:
+- All standard player data (name, team, position, price)
+- `true_value` - V2.0 point predictions  
 - `roi` - Return on investment ratios
-- `blended_ppg` - Dynamic blending results
+- `blended_ppg` - **NEW:** Dynamic blending results used in calculations
+- `current_season_weight` - **NEW:** Blending transparency (0-1 scale)
+- `xgi_multiplier` - **NEW:** Normalized xGI impact factor  
 - `exponential_form_score` - EWMA form scores
 - `baseline_xgi` - Historical xGI baselines
 - V2.0 multiplier breakdown
@@ -754,6 +922,148 @@ WHERE ...
   }
 }
 ```
+
+### **`GET /api/verify-ppg`** - PPG Calculation Verification ⭐ NEW
+**Description**: Diagnostic endpoint to verify PPG calculation consistency between stored and calculated values
+**Added**: 2025-08-26 (PPG Calculation Fix)
+
+**Purpose**: Identify discrepancies between stored `player_metrics.ppg` and fresh calculations using `MAX(points)/games_played`
+
+**Response Structure**:
+```json
+{
+  "gameweek": 3,
+  "summary": {
+    "total_players_checked": 50,
+    "players_with_discrepancies": 12,
+    "accuracy_rate": 76.0
+  },
+  "top_discrepancies": [
+    {
+      "name": "Antoine Semenyo",
+      "team": "BOU", 
+      "stored_ppg": "25.00",
+      "calculated_ppg": "14.0000000000000000",
+      "difference": "11.00",
+      "total_points": "28.00",
+      "games_played": 2,
+      "true_value": "25.210",
+      "roi": "1.845"
+    }
+  ],
+  "message": "PPG verification completed for gameweek 3"
+}
+```
+
+**Key Features**:
+- **Real-time Verification**: Compares stored vs calculated PPG values
+- **Discrepancy Detection**: Identifies players with PPG calculation issues  
+- **Summary Statistics**: Shows overall system accuracy rate
+- **Production Safe**: Excludes test players (`team != 'TST'`)
+- **V2.0 Integration**: Uses same MAX(points) aggregation logic as V2.0 calculations
+
+**Usage Examples**:
+```bash
+# Check current PPG consistency
+curl "http://localhost:5001/api/verify-ppg"
+
+# Use for monitoring system health after form imports
+curl "http://localhost:5001/api/verify-ppg" | jq '.summary.accuracy_rate'
+```
+
+**Troubleshooting**:
+- **High discrepancies**: May indicate form import issues or stale V2.0 calculations
+- **0% accuracy rate**: Suggests systematic PPG calculation problems
+- **Individual discrepancies**: Can help identify specific players needing attention
+
+### **`GET /api/verify-starter-status`** - Starter System Validation ⭐ NEW
+**Description**: Comprehensive starter system health monitoring and validation
+**Added**: 2025-08-26 (Starter System Enhancement)
+
+**Purpose**: Validate starter multiplier distribution, identify unusual values, and monitor manual override system health
+
+**Response Structure**:
+```json
+{
+  "success": true,
+  "gameweek": 8,
+  "health_status": "HEALTHY",
+  "issues": [],
+  "statistics": {
+    "total_players": 647,
+    "starters": 340,
+    "rotation_risks": 180,
+    "bench_players": 85,
+    "out_players": 42,
+    "missing_data": 0
+  },
+  "multiplier_distribution": [
+    {
+      "multiplier": 1.0,
+      "count": 340,
+      "players": ["Player A", "Player B", "Player C", "..."]
+    },
+    {
+      "multiplier": 0.75,
+      "count": 180,
+      "players": ["Player D", "Player E", "Player F", "..."]
+    },
+    {
+      "multiplier": 0.6,
+      "count": 85,
+      "players": ["Player G", "Player H", "..."]
+    },
+    {
+      "multiplier": 0.0,
+      "count": 42,
+      "players": ["Player I", "Player J", "..."]
+    }
+  ],
+  "unusual_multipliers": [
+    {
+      "player_name": "Test Player",
+      "multiplier": 0.42,
+      "team": "TST",
+      "position": "M"
+    }
+  ],
+  "validation_timestamp": "2025-08-26T15:30:00.123Z"
+}
+```
+
+**Health Status Levels**:
+- **`HEALTHY`**: All multipliers within standard ranges, minimal missing data
+- **`WARNING`**: Non-standard multipliers detected or moderate missing data  
+- **`CRITICAL`**: Significant data issues requiring immediate attention
+
+**Standard Multiplier Values**:
+- **1.0**: Guaranteed starters
+- **0.75**: Rotation risk players (configurable via `auto_rotation_penalty`)
+- **0.6**: Likely bench players (configurable via `force_bench_penalty`)
+- **0.0**: Players definitely out (configurable via `force_out_penalty`)
+
+**Key Features**:
+- **Distribution Analysis**: Shows how many players in each starter category
+- **Anomaly Detection**: Identifies non-standard multiplier values
+- **Missing Data Monitoring**: Tracks players without starter multiplier data
+- **GameweekManager Integration**: Uses unified gameweek detection for consistency
+
+**Usage Examples**:
+```bash
+# Monitor starter system health
+curl "http://localhost:5001/api/verify-starter-status"
+
+# Check for system issues after lineup imports
+curl "http://localhost:5001/api/verify-starter-status" | jq '.health_status'
+
+# Review multiplier distribution
+curl "http://localhost:5001/api/verify-starter-status" | jq '.multiplier_distribution'
+```
+
+**Integration Notes**:
+- **Configurable Penalties**: Reads current values from `system_parameters.json`
+- **Manual Override Support**: Monitors health of 5-option override system (S/R/B/O/A)
+- **V2.0 Formula Impact**: Validates data feeding into True Value calculations
 
 ---
 
@@ -848,7 +1158,7 @@ ROI = True Value ÷ Price
 ### **Dynamic Blending System**
 - **Formula**: `w_current = min(1, (N-1)/(K-1))`  
 - **Early Season (GW2)**: 6.7% current + 93.3% historical
-- **Transition**: Smooth progression to current-only by GW16
+- **Transition**: Smooth progression to current-only by GW12 (updated 2025-08-27)
 
 ### **Exponential Form (EWMA)**
 - **Algorithm**: Exponential Weighted Moving Average
@@ -916,6 +1226,48 @@ ROI = True Value ÷ Price
 
 ---
 
-**Last Updated**: 2025-08-23 - V2.0 Enhanced Formula API with Trend Analysis System
+---
 
-*This document reflects the current V2.0-only API structure with all legacy endpoints removed. The API serves 647 Premier League players with optimized V2.0 Enhanced Formula calculations including True Value predictions, ROI analysis, dynamic blending, EWMA form calculations, and normalized xGI integration. The trend analysis system enables retrospective analysis using captured raw data snapshots.*
+## **🎯 NEW: Dynamic Blending API Enhancement (2025-08-27)**
+
+### **Enhanced Player Response Format**
+
+**Purpose**: Added transparent dynamic blending fields to all player API endpoints for full visibility into V2.0 Enhanced Formula calculations.
+
+**New Response Fields**:
+```json
+{
+  "blended_ppg": 11.7,
+  "current_season_weight": 0.182,
+  "historical_ppg": 11.0
+}
+```
+
+**Integration Notes**:
+- **`blended_ppg`**: The actual PPG value used in V2.0 True Value calculations
+- **`current_season_weight`**: Shows current season data influence (0-1 scale)
+- **`historical_ppg`**: 2024-25 season baseline for comparison
+- **Adaptation Parameter**: Changed from GW16 to GW12 for faster transition to current season data
+
+**Export CSV Enhancement**:
+The Export CSV endpoint now includes all blending data:
+- `blended_ppg`, `current_season_weight`, `roi`, `xgi_multiplier` columns added
+- Full transparency into V2.0 Enhanced Formula components
+- Fixed endpoint URL from `/api/export/players-csv` to `/api/export`
+
+**Configuration Update**:
+All dynamic blending configuration examples updated to reflect GW12 adaptation:
+```json
+{
+  "dynamic_blending": {
+    "enabled": true,
+    "full_adaptation_gw": 12
+  }
+}
+```
+
+---
+
+**Last Updated**: 2025-08-27 - Dynamic Blending API Enhancement with GW12 adaptation parameter
+
+*This document reflects the current V2.0-only API structure with enhanced dynamic blending transparency. The API serves 647 Premier League players with optimized V2.0 Enhanced Formula calculations including True Value predictions, ROI analysis, dynamic blending (GW12 adaptation), EWMA form calculations, and normalized xGI integration. The trend analysis system enables retrospective analysis using captured raw data snapshots.*
