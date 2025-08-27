@@ -3,7 +3,7 @@ Flask Backend for Fantrax Value Hunter Dashboard
 Provides API endpoints for parameter adjustment and True Value recalculation
 """
 
-from flask import Flask, request, jsonify, render_template
+from flask import Flask, request, jsonify, render_template, send_from_directory
 from flask_cors import CORS
 from flask_caching import Cache
 import psycopg2
@@ -36,9 +36,12 @@ from calculation_engine_v2 import FormulaEngineV2
 # Add trend analysis engine
 from trend_analysis_engine import TrendAnalysisEngine
 
+# Configure Flask to serve React frontend
+frontend_build_dir = os.path.join(os.path.dirname(__file__), '..', 'frontend', 'build')
 app = Flask(__name__, 
             template_folder='../templates',
-            static_folder='../static')
+            static_folder=frontend_build_dir,
+            static_url_path='')
 # Enable CORS with specific configuration
 CORS(app, resources={
     r"/api/*": {
@@ -491,8 +494,8 @@ def recalculate_true_values(gameweek: int = None):
 
 @app.route('/')
 def dashboard():
-    """Main dashboard UI"""
-    return render_template('dashboard.html')
+    """Main dashboard UI - Serve React frontend"""
+    return send_from_directory(frontend_build_dir, 'index.html')
 
 def make_cache_key():
     """Generate cache key based on all query parameters"""
@@ -4209,6 +4212,23 @@ def validation_history_endpoint():
 def validation_dashboard():
     """Render validation dashboard page"""
     return render_template('validation_dashboard.html')
+
+# Catch-all route to serve React app for client-side routing
+@app.route('/<path:path>')
+def serve_react_app(path):
+    """Serve React app for all non-API routes"""
+    if path.startswith('api/'):
+        return {'error': 'API endpoint not found'}, 404
+    
+    # Check if it's a static file
+    if '.' in path:
+        try:
+            return send_from_directory(frontend_build_dir, path)
+        except FileNotFoundError:
+            pass
+    
+    # For all other routes, serve the React app
+    return send_from_directory(frontend_build_dir, 'index.html')
 
 
 if __name__ == '__main__':
