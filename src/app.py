@@ -5,6 +5,7 @@ Provides API endpoints for parameter adjustment and True Value recalculation
 
 from flask import Flask, request, jsonify, render_template
 from flask_cors import CORS
+from flask_caching import Cache
 import psycopg2
 import psycopg2.extras
 import json
@@ -38,7 +39,20 @@ from trend_analysis_engine import TrendAnalysisEngine
 app = Flask(__name__, 
             template_folder='../templates',
             static_folder='../static')
-CORS(app)
+# Enable CORS with specific configuration
+CORS(app, resources={
+    r"/api/*": {
+        "origins": ["http://localhost:3000", "http://127.0.0.1:3000", "http://localhost:3001", "http://127.0.0.1:3001"],
+        "methods": ["GET", "POST", "PUT", "DELETE", "OPTIONS"],
+        "allow_headers": ["Content-Type", "Authorization", "Accept"],
+        "supports_credentials": True
+    }
+})
+
+# Configure caching for performance optimization
+app.config['CACHE_TYPE'] = 'simple'  # Simple in-memory cache
+app.config['CACHE_DEFAULT_TIMEOUT'] = 60  # Cache for 60 seconds
+cache = Cache(app)
 
 # Database configuration - supports both local and production environments
 DB_CONFIG = {
@@ -92,6 +106,77 @@ def save_system_parameters(parameters: Dict):
     except Exception as e:
         print(f"Error saving system parameters: {e}")
         return False
+
+def get_data_freshness_info(gameweek: int) -> Dict:
+    """Get detailed data freshness information for monitoring"""
+    conn = get_db_connection()
+    try:
+        cursor = conn.cursor(cursor_factory=psycopg2.extras.RealDictCursor)
+        
+        freshness_info = {
+            'gameweek': gameweek,
+            'last_updated': {},
+            'record_counts': {},
+            'data_completeness': {}
+        }
+        
+        # Check player_metrics freshness
+        cursor.execute("""
+            SELECT 
+                MAX(last_updated) as latest_update,
+                COUNT(*) as record_count
+            FROM player_metrics 
+            WHERE gameweek = %s
+        """, (gameweek,))
+        metrics_data = cursor.fetchone()
+        
+        if metrics_data:
+            freshness_info['last_updated']['player_metrics'] = metrics_data['latest_update'].isoformat() if metrics_data['latest_update'] else None
+            freshness_info['record_counts']['player_metrics'] = metrics_data['record_count']
+        
+        # Check player_form freshness
+        cursor.execute("""
+            SELECT 
+                MAX(last_updated) as latest_update,
+                COUNT(*) as record_count
+            FROM player_form 
+            WHERE gameweek = %s
+        """, (gameweek,))
+        form_data = cursor.fetchone()
+        
+        if form_data:
+            freshness_info['last_updated']['player_form'] = form_data['latest_update'].isoformat() if form_data['latest_update'] else None
+            freshness_info['record_counts']['player_form'] = form_data['record_count']
+        
+        # Check raw_player_snapshots freshness
+        cursor.execute("""
+            SELECT 
+                MAX(created_at) as latest_update,
+                COUNT(*) as record_count
+            FROM raw_player_snapshots 
+            WHERE gameweek = %s
+        """, (gameweek,))
+        raw_data = cursor.fetchone()
+        
+        if raw_data:
+            freshness_info['last_updated']['raw_snapshots'] = raw_data['latest_update'].isoformat() if raw_data['latest_update'] else None
+            freshness_info['record_counts']['raw_snapshots'] = raw_data['record_count']
+        
+        # Calculate data completeness percentages
+        expected_player_count = 647  # Premier League players
+        for table, count in freshness_info['record_counts'].items():
+            if count:
+                freshness_info['data_completeness'][table] = round((count / expected_player_count) * 100, 1)
+        
+        return freshness_info
+        
+    except Exception as e:
+        return {
+            'error': f'Failed to get data freshness info: {str(e)}',
+            'gameweek': gameweek
+        }
+    finally:
+        conn.close()
 
 def calculate_form_multiplier(player_id: str, current_gameweek: int, lookback_period: int = 3):
     """
@@ -246,13 +331,19 @@ def calculate_fixture_difficulty_multiplier_cached(team_code: str, position: str
     final_multiplier = 1.0 - multiplier_adjustment
     return max(0.5, min(1.5, final_multiplier))
 
-def recalculate_true_values(gameweek: int = 1):
+def recalculate_true_values(gameweek: int = None):
     """
     Recalculate True Value for all players using v2.0 Enhanced Formula
     TrueValue = Blended_PPG × Form × Fixture × Starter × xGI
     ROI = TrueValue ÷ Price
     """
     start_time = time.time()
+    
+    # Use GameweekManager if no gameweek specified
+    if gameweek is None:
+        from src.gameweek_manager import GameweekManager
+        gw_manager = GameweekManager()
+        gameweek = gw_manager.get_current_gameweek()
     
     params = load_system_parameters()
     
@@ -271,7 +362,13 @@ def recalculate_true_values(gameweek: int = 1):
         cursor.execute("""
             SELECT 
                 p.id as player_id, p.name, p.team, p.position,
-                pm.price, pm.ppg, 
+                pm.price, 
+                COALESCE(pf.total_points, 0) as total_fpts,
+                CASE 
+                    WHEN COALESCE(pgd.games_played_current, 0) > 0 
+                    THEN COALESCE(pf.total_points, 0) / pgd.games_played_current
+                    ELSE 0 
+                END as ppg, 
                 pm.form_multiplier, pm.fixture_multiplier, pm.starter_multiplier,
                 p.xgi90, p.baseline_xgi,
                 pgd.total_points_historical, pgd.games_played_historical,
@@ -279,7 +376,21 @@ def recalculate_true_values(gameweek: int = 1):
                 tf.difficulty_score as fixture_difficulty
             FROM players p
             JOIN player_metrics pm ON p.id = pm.player_id
-            LEFT JOIN player_games_data pgd ON p.id = pgd.player_id
+            LEFT JOIN (
+                SELECT player_id, 
+                       SUM(games_played) as games_played_current,
+                       MAX(games_played_historical) as games_played_historical,
+                       MAX(total_points_historical) as total_points_historical,
+                       SUM(total_points) as total_points_current,
+                       MAX(data_source) as data_source
+                FROM player_games_data 
+                GROUP BY player_id
+            ) pgd ON p.id = pgd.player_id
+            LEFT JOIN (
+                SELECT player_id, MAX(points) as total_points
+                FROM player_form
+                GROUP BY player_id
+            ) pf ON p.id = pf.player_id
             LEFT JOIN team_fixtures tf ON p.team = tf.team_code AND tf.gameweek = %s
             WHERE pm.gameweek = %s
         """, [gameweek, gameweek])
@@ -322,6 +433,7 @@ def recalculate_true_values(gameweek: int = 1):
                 v2_result['true_value'],
                 v2_result['roi'],
                 v2_result.get('blended_ppg', player_data['ppg']),
+                v2_result.get('current_season_weight', 0.0),
                 v2_result['multipliers']['form'],
                 v2_result['multipliers']['fixture'],
                 v2_result['multipliers']['xgi'],
@@ -330,18 +442,17 @@ def recalculate_true_values(gameweek: int = 1):
             ))
             updated_count += 1
         
-        # Batch update all players
+        # Batch update player_metrics table (ROI is stored in players table)
         cursor.executemany("""
             UPDATE player_metrics 
             SET 
                 true_value = %s,
-                roi = %s,
                 value_score = %s,
                 form_multiplier = %s,
                 fixture_multiplier = %s,
                 xgi_multiplier = %s
             WHERE player_id = %s AND gameweek = %s
-        """, [(u[0], u[1], u[1], u[2], u[3], u[4], u[5], u[6]) for u in batch_updates])
+        """, [(u[0], u[1], u[4], u[5], u[6], u[7], u[8]) for u in batch_updates])
         
         # Also update players table with v2.0 columns
         cursor.executemany("""
@@ -349,14 +460,15 @@ def recalculate_true_values(gameweek: int = 1):
             SET 
                 true_value = %s,
                 roi = %s,
-                blended_ppg = %s
+                blended_ppg = %s,
+                current_season_weight = %s
             WHERE id = %s
-        """, [(u[0], u[1], u[2], u[6]) for u in batch_updates])
+        """, [(u[0], u[1], u[2], u[3], u[7]) for u in batch_updates])
         
         conn.commit()
         elapsed_time = time.time() - start_time
         
-        print(f"✅ v2.0 Enhanced: Updated {updated_count} players in {elapsed_time:.2f}s")
+        print(f"SUCCESS v2.0 Enhanced: Updated {updated_count} players in {elapsed_time:.2f}s")
         
         return {
             'success': True,
@@ -368,7 +480,7 @@ def recalculate_true_values(gameweek: int = 1):
     except Exception as e:
         if 'conn' in locals():
             conn.rollback()
-        print(f"❌ v2.0 calculation error: {e}")
+        print(f"ERROR v2.0 calculation error: {e}")
         return {
             'success': False,
             'error': str(e)
@@ -382,7 +494,25 @@ def dashboard():
     """Main dashboard UI"""
     return render_template('dashboard.html')
 
+def make_cache_key():
+    """Generate cache key based on all query parameters"""
+    args = request.args
+    # Include all parameters that affect the result
+    key_parts = [
+        args.get('position', ''),
+        str(args.get('min_price', '')),
+        str(args.get('max_price', '')),
+        args.get('team', ''),
+        args.get('search', ''),
+        str(args.get('limit', 100)),
+        str(args.get('offset', 0)),
+        args.get('sort_by', 'true_value'),
+        args.get('sort_direction', 'desc')
+    ]
+    return 'players:' + ':'.join(key_parts)
+
 @app.route('/api/players', methods=['GET'])
+@cache.cached(timeout=60, query_string=True)
 def get_players():
     """
     Get all 633 players with filtering and sorting options
@@ -399,7 +529,13 @@ def get_players():
     max_price = request.args.get('max_price', type=float)
     team = request.args.get('team')
     search = request.args.get('search', '').strip()
-    gameweek = request.args.get('gameweek', 1, type=int)
+    include_test = request.args.get('include_test', 'false').lower() == 'true'
+    
+    # Use GameweekManager for unified detection instead of hardcoded default
+    from src.gameweek_manager import GameweekManager
+    gw_manager = GameweekManager()
+    gameweek = gw_manager.get_current_gameweek()  # Main dashboard always shows current data
+    
     limit = request.args.get('limit', 100, type=int)
     offset = request.args.get('offset', 0, type=int)
     sort_by = request.args.get('sort_by', 'true_value')
@@ -411,7 +547,8 @@ def get_players():
         'team': 'p.team', 
         'position': 'p.position',
         'price': 'pm.price',
-        'ppg': 'pm.ppg',
+        'total_fpts': 'COALESCE(pf.total_points, 0)',
+        'ppg': 'CASE WHEN COALESCE(pgd.games_played, 0) > 0 THEN COALESCE(pf.total_points, 0) / pgd.games_played ELSE 0 END',
         'value_score': 'pm.value_score',
         'true_value': 'pm.true_value',
         'roi': 'p.roi',
@@ -443,8 +580,16 @@ def get_players():
             SELECT 
                 p.id, p.name, p.team, p.position,
                 p.minutes, p.xg90, p.xa90, p.xgi90, p.baseline_xgi,
-                pm.price, pm.ppg, pm.value_score, pm.true_value,
+                pm.price, 
+                COALESCE(pf.total_points, 0) as total_fpts,
+                CASE 
+                    WHEN COALESCE(pgd.games_played, 0) > 0 
+                    THEN COALESCE(pf.total_points, 0) / pgd.games_played
+                    ELSE 0 
+                END as ppg,
+                pm.value_score, pm.true_value,
                 p.roi,
+                p.blended_ppg, p.current_season_weight,
                 pm.form_multiplier, pm.fixture_multiplier, pm.starter_multiplier, pm.xgi_multiplier,
                 pm.last_updated,
                 COALESCE(pgd.games_played, 0) as games_played,
@@ -459,13 +604,33 @@ def get_players():
                 COALESCE(tf.difficulty_score, 0) as fixture_difficulty
             FROM players p
             JOIN player_metrics pm ON p.id = pm.player_id
-            LEFT JOIN player_games_data pgd ON p.id = pgd.player_id AND pm.gameweek = pgd.gameweek
+            LEFT JOIN (
+                SELECT player_id, 
+                       SUM(games_played) as games_played,
+                       MAX(games_played_historical) as games_played_historical,
+                       MAX(total_points_historical) as total_points_historical,
+                       SUM(total_points) as total_points_current,
+                       MAX(data_source) as data_source
+                FROM player_games_data 
+                GROUP BY player_id
+            ) pgd ON p.id = pgd.player_id
+            LEFT JOIN (
+                SELECT player_id, MAX(points) as total_points
+                FROM player_form
+                GROUP BY player_id
+            ) pf ON p.id = pf.player_id
             LEFT JOIN team_fixtures tf ON p.team = tf.team_code AND tf.gameweek = %s
             WHERE pm.gameweek = %s
+              AND (COALESCE(pgd.games_played, 0) > 0 
+                   OR COALESCE(pgd.games_played_historical, 0) > 0)
         """
         
         params = [gameweek, gameweek]
         conditions = []
+        
+        # Filter out test players by default (unless include_test=true)
+        if not include_test:
+            conditions.append("p.team != 'TST'")
         
         # Add filters
         if position:
@@ -522,81 +687,32 @@ def get_players():
             if player_dict.get('last_updated'):
                 player_dict['last_updated'] = player_dict['last_updated'].isoformat()
             
-            # Format games display based on gameweek and data availability
+            # Send games data separately for frontend to handle display
             games_current = player_dict.get('games_played', 0)
             games_historical = player_dict.get('games_played_historical', 0)
             
-            # Get configurable thresholds for games display
-            games_config = parameters.get('games_display', {})
-            baseline_switchover = games_config.get('baseline_switchover_gameweek', 10)
-            transition_end = games_config.get('transition_period_end', 15)
-            show_historical = games_config.get('show_historical_data', True)
-            
-            if gameweek <= baseline_switchover:  # Early season - show blended format if current games exist
-                if games_current > 0:
-                    games_display = f"{games_historical}+{games_current}"
-                elif games_historical > 0 and show_historical:
-                    games_display = f"{games_historical} (24-25)"
-                else:
-                    games_display = "0"
-            elif gameweek <= transition_end:  # Transition period - blend data
-                if games_historical > 0 and games_current > 0:
-                    games_display = f"{games_historical}+{games_current}"
-                elif games_historical > 0 and show_historical:
-                    games_display = f"{games_historical} (24-25)"
-                else:
-                    games_display = str(games_current)
-            else:  # Late season - use current data
-                if games_current > 0:
-                    games_display = str(games_current)
-                elif games_historical > 0 and show_historical:
-                    games_display = f"{games_historical} (24-25)"
-                else:
-                    games_display = "0"
-            
-            player_dict['games_display'] = games_display
-            # Add numeric value for sorting (total games for reliable sorting)
-            player_dict['games_total'] = games_historical + games_current
+            # Ensure games data is properly typed and handle None values
+            player_dict['games_current'] = int(games_current) if games_current is not None else 0
+            player_dict['games_historical'] = int(games_historical) if games_historical is not None else 0
+            player_dict['games_total'] = player_dict['games_current'] + player_dict['games_historical']
             players_list.append(player_dict)
         
-        # Apply V2 enhanced calculations (always enabled)
-        v2_enabled = True
-        if v2_enabled:
-            try:
-                # Import V2 engine
-                from calculation_engine_v2 import FormulaEngineV2
-                
-                # Initialize V2 engine with current parameters
-                v2_engine = FormulaEngineV2(DB_CONFIG, parameters)
-                
-                # Calculate complete V2 values for each player (not just xGI)
-                for player_dict in players_list:
-                    try:
-                        # Calculate full V2 player value using independent calculations
-                        v2_calculation = v2_engine.calculate_player_value(player_dict)
-                        
-                        # Override ALL multipliers with V2 independent calculations
-                        v2_multipliers = v2_calculation.get('multipliers', {})
-                        player_dict['form_multiplier'] = v2_multipliers.get('form', player_dict.get('form_multiplier', 1.0))
-                        player_dict['fixture_multiplier'] = v2_multipliers.get('fixture', player_dict.get('fixture_multiplier', 1.0))
-                        player_dict['starter_multiplier'] = v2_multipliers.get('starter', player_dict.get('starter_multiplier', 1.0))
-                        player_dict['xgi_multiplier'] = v2_multipliers.get('xgi', player_dict.get('xgi_multiplier', 1.0))
-                        
-                        # Override True Value with V2 calculation (this is what shows in the True Value column)
-                        player_dict['true_value'] = v2_calculation.get('true_value', player_dict.get('value_score', 0) * player_dict.get('price', 1))
-                        
-                        # Add V2 metadata for debugging
-                        player_dict['v2_calculation'] = True
-                        player_dict['blended_ppg'] = v2_calculation.get('base_ppg', player_dict.get('ppg', 0))
-                        
-                    except Exception as player_error:
-                        # If V2 calculation fails for this player, keep V1 values
-                        print(f"Warning: V2 calculation failed for {player_dict.get('name', 'unknown')}: {player_error}")
-                        player_dict['v2_calculation'] = False
-                        
-            except Exception as e:
-                # Log error but don't break the API - fall back to V1 values
-                print(f"Warning: V2 xGI calculation failed: {e}")
+        # V2.0 calculations are pre-calculated in database - no need for live calculation
+        # Mark all players as using V2.0 calculations since they're pre-populated
+        for player_dict in players_list:
+            player_dict['v2_calculation'] = True
+            # Convert string numbers to floats for proper JSON serialization
+            if 'total_fpts' in player_dict and player_dict['total_fpts'] is not None:
+                player_dict['total_fpts'] = float(player_dict['total_fpts'])
+            if 'ppg' in player_dict and player_dict['ppg'] is not None:
+                player_dict['ppg'] = float(player_dict['ppg'])
+            # ROI and true_value are already loaded from database
+            # All multipliers are already loaded from database
+        
+        # DEBUG: Check final state before JSON response
+        semenyo_player = next((p for p in players_list if 'semenyo' in p.get('name', '').lower()), None)
+        if semenyo_player:
+            print(f"FINAL DEBUG Semenyo before JSON: games_played={semenyo_player.get('games_played')}")
         
         elapsed_time = time.time() - start_time
         
@@ -616,11 +732,19 @@ def get_players():
                 'max_price': max_price,
                 'team': team,
                 'search': search,
-                'gameweek': gameweek
+                'gameweek': gameweek,
+                'include_test': include_test
             },
             'sort_applied': {
                 'sort_by': sort_by,
                 'sort_direction': sort_direction
+            },
+            'gameweek_info': {
+                'current_gameweek': gameweek,
+                'detection_method': 'GameweekManager',
+                'data_source': 'unified_detection',
+                'emergency_protection_active': gw_manager.get_system_status()['emergency_protection_active'],
+                'data_freshness': get_data_freshness_info(gameweek)
             }
         })
         
@@ -638,6 +762,18 @@ def get_config():
             'success': True,
             'parameters': parameters
         })
+    except Exception as e:
+        return jsonify({
+            'success': False,
+            'error': str(e)
+        }), 500
+
+@app.route('/api/system/config', methods=['GET'])
+def get_system_config():
+    """Get current system parameters - React API path"""
+    try:
+        parameters = load_system_parameters()
+        return jsonify(parameters)
     except Exception as e:
         return jsonify({
             'success': False,
@@ -688,8 +824,12 @@ def update_parameters():
         if not save_system_parameters(current_params):
             return jsonify({'error': 'Failed to save parameters'}), 500
         
-        # Trigger True Value recalculation
-        gameweek = data.get('gameweek', 1)
+        # Trigger True Value recalculation using GameweekManager for default
+        gameweek = data.get('gameweek')
+        if gameweek is None:
+            from src.gameweek_manager import GameweekManager
+            gw_manager = GameweekManager()
+            gameweek = gw_manager.get_current_gameweek()
         recalc_result = recalculate_true_values(gameweek)
         
         if not recalc_result['success']:
@@ -711,6 +851,64 @@ def update_parameters():
             'error': str(e)
         }), 500
 
+@app.route('/api/system/update-parameters', methods=['POST'])
+def update_system_parameters():
+    """Update system parameters - React API path"""
+    try:
+        data = request.get_json()
+        if not data:
+            return jsonify({'error': 'No data provided'}), 400
+        
+        # Load current parameters
+        current_params = load_system_parameters()
+        
+        # Check if configuration loaded successfully
+        if not current_params:
+            return jsonify({'error': 'Failed to load current system configuration'}), 500
+        
+        # Update parameters with deep merge for v2.0 structure
+        if 'formula_optimization_v2' in data:
+            if 'formula_optimization_v2' not in current_params:
+                current_params['formula_optimization_v2'] = {}
+            
+            # Deep merge for v2.0 parameters
+            v2_data = data['formula_optimization_v2']
+            v2_current = current_params['formula_optimization_v2']
+            
+            # Update nested configurations
+            for key, value in v2_data.items():
+                if isinstance(value, dict) and key in v2_current:
+                    v2_current[key].update(value)
+                else:
+                    v2_current[key] = value
+        
+        if 'starter_prediction' in data:
+            if 'starter_prediction' not in current_params:
+                current_params['starter_prediction'] = {}
+            current_params['starter_prediction'].update(data['starter_prediction'])
+        
+        # Save updated parameters
+        if not save_system_parameters(current_params):
+            return jsonify({'error': 'Failed to save parameters'}), 500
+        
+        # Trigger recalculation
+        from src.gameweek_manager import GameweekManager
+        gw_manager = GameweekManager()
+        gameweek = gw_manager.get_current_gameweek()
+        recalc_result = recalculate_true_values(gameweek)
+        
+        return jsonify({
+            'success': True,
+            'message': 'Parameters updated successfully',
+            'updated_config': current_params
+        })
+        
+    except Exception as e:
+        return jsonify({
+            'success': False,
+            'error': str(e)
+        }), 500
+
 @app.route('/api/manual-override', methods=['POST'])
 def manual_override():
     """Apply manual starter override immediately for a specific player"""
@@ -722,35 +920,35 @@ def manual_override():
         player_id = data.get('player_id')
         override_type = data.get('override_type')  # 'starter', 'bench', 'out', 'auto'
         
-        # Get current gameweek from database (latest gameweek with data)
-        conn_temp = get_db_connection()
-        cursor_temp = conn_temp.cursor()
-        cursor_temp.execute('SELECT MAX(gameweek) FROM player_metrics WHERE gameweek IS NOT NULL')
-        current_gameweek = cursor_temp.fetchone()[0] or 1
-        cursor_temp.close()
-        conn_temp.close()
-        
-        gameweek = current_gameweek
+        # Get current gameweek using GameweekManager for consistency
+        from src.gameweek_manager import GameweekManager
+        gw_manager = GameweekManager()
+        gameweek = gw_manager.get_current_gameweek()
         
         if not player_id or not override_type:
             return jsonify({'error': 'player_id and override_type required'}), 400
         
-        # Load current system parameters to get bench penalty
+        # Load current system parameters to get penalties
         params = load_system_parameters()
-        bench_penalty = params.get('starter_prediction', {}).get('force_bench_penalty', 0.6)
+        starter_config = params.get('starter_prediction', {})
+        rotation_penalty = starter_config.get('auto_rotation_penalty', 0.75)
+        bench_penalty = starter_config.get('force_bench_penalty', 0.6)
+        out_penalty = starter_config.get('force_out_penalty', 0.0)
         
         # Calculate multiplier based on override type
         if override_type == 'starter':
             multiplier = 1.0
+        elif override_type == 'rotation':
+            multiplier = rotation_penalty
         elif override_type == 'bench':
             multiplier = bench_penalty
         elif override_type == 'out':
-            multiplier = 0.0
+            multiplier = out_penalty
         elif override_type == 'auto':
             # Remove override - will use default CSV prediction or rotation penalty
             multiplier = None  # Will be calculated based on CSV data
         else:
-            return jsonify({'error': 'Invalid override_type'}), 400
+            return jsonify({'error': 'Invalid override_type. Valid types: starter, rotation, bench, out, auto'}), 400
         
         # Update database immediately
         conn = get_db_connection()
@@ -817,6 +1015,122 @@ def manual_override():
     except Exception as e:
         return jsonify({'error': str(e)}), 500
 
+@app.route('/api/verify-starter-status', methods=['GET'])
+def verify_starter_status():
+    """Validate starter status consistency and identify potential issues"""
+    try:
+        conn = get_db_connection()
+        cursor = conn.cursor()
+        
+        # Get current gameweek using GameweekManager for consistency
+        from src.gameweek_manager import GameweekManager
+        gw_manager = GameweekManager()
+        current_gameweek = gw_manager.get_current_gameweek()
+        
+        # Analyze starter multiplier distribution
+        cursor.execute("""
+            SELECT 
+                starter_multiplier,
+                COUNT(*) as player_count,
+                ARRAY_AGG(player_name ORDER BY player_name) as players
+            FROM players 
+            WHERE starter_multiplier IS NOT NULL
+            GROUP BY starter_multiplier
+            ORDER BY starter_multiplier DESC
+        """)
+        
+        multiplier_distribution = []
+        for row in cursor.fetchall():
+            multiplier, count, players = row
+            multiplier_distribution.append({
+                'multiplier': float(multiplier),
+                'count': count,
+                'players': players[:10]  # Limit to first 10 for readability
+            })
+        
+        # Check for unusual multiplier values (not in standard set)
+        standard_multipliers = {1.0, 0.65, 0.6, 0.0}
+        cursor.execute("""
+            SELECT player_name, starter_multiplier, team, position
+            FROM players 
+            WHERE starter_multiplier IS NOT NULL 
+              AND starter_multiplier NOT IN (1.0, 0.65, 0.6, 0.0)
+            ORDER BY starter_multiplier DESC, player_name
+        """)
+        
+        unusual_multipliers = []
+        for row in cursor.fetchall():
+            name, multiplier, team, position = row
+            unusual_multipliers.append({
+                'player_name': name,
+                'multiplier': float(multiplier),
+                'team': team,
+                'position': position
+            })
+        
+        # Check for players with missing starter data
+        cursor.execute("""
+            SELECT COUNT(*) as missing_count
+            FROM players 
+            WHERE starter_multiplier IS NULL
+        """)
+        missing_count = cursor.fetchone()[0]
+        
+        # Get manual override statistics
+        cursor.execute("""
+            SELECT COUNT(*) as total_players,
+                   COUNT(CASE WHEN starter_multiplier = 1.0 THEN 1 END) as starters,
+                   COUNT(CASE WHEN starter_multiplier = 0.65 THEN 1 END) as rotation_risks,
+                   COUNT(CASE WHEN starter_multiplier = 0.6 THEN 1 END) as bench_players,
+                   COUNT(CASE WHEN starter_multiplier = 0.0 THEN 1 END) as out_players
+            FROM players 
+            WHERE starter_multiplier IS NOT NULL
+        """)
+        
+        stats_row = cursor.fetchone()
+        statistics = {
+            'total_players': stats_row[0],
+            'starters': stats_row[1],
+            'rotation_risks': stats_row[2], 
+            'bench_players': stats_row[3],
+            'out_players': stats_row[4],
+            'missing_data': missing_count
+        }
+        
+        # Determine overall health status
+        health_status = "HEALTHY"
+        issues = []
+        
+        if unusual_multipliers:
+            health_status = "WARNING"
+            issues.append(f"{len(unusual_multipliers)} players have non-standard multipliers")
+        
+        if missing_count > 50:  # More than 50 players missing data
+            health_status = "CRITICAL"
+            issues.append(f"{missing_count} players missing starter multiplier data")
+        elif missing_count > 0:
+            health_status = "WARNING" if health_status == "HEALTHY" else health_status
+            issues.append(f"{missing_count} players missing starter multiplier data")
+        
+        conn.close()
+        
+        return jsonify({
+            'success': True,
+            'gameweek': current_gameweek,
+            'health_status': health_status,
+            'issues': issues,
+            'statistics': statistics,
+            'multiplier_distribution': multiplier_distribution,
+            'unusual_multipliers': unusual_multipliers,
+            'validation_timestamp': datetime.now().isoformat()
+        })
+        
+    except Exception as e:
+        return jsonify({
+            'success': False,
+            'error': f'Validation failed: {str(e)}'
+        }), 500
+
 @app.route('/api/teams', methods=['GET'])
 def get_teams():
     """Get list of all teams"""
@@ -868,6 +1182,147 @@ def get_players_by_team():
         
     except Exception as e:
         return jsonify({'error': str(e)}), 500
+
+@app.route('/api/gameweek-status', methods=['GET'])
+def get_gameweek_status():
+    """Get current gameweek status for smart upload system"""
+    try:
+        from src.gameweek_manager import GameweekManager
+        gw_manager = GameweekManager()
+        
+        current_gw = gw_manager.get_current_gameweek()
+        next_gw = gw_manager.get_next_gameweek()
+        
+        # Get detailed status for current gameweek
+        current_status = gw_manager.get_gameweek_status(current_gw)
+        
+        return jsonify({
+            'success': True,
+            'current_gameweek': current_gw,
+            'next_gameweek': next_gw,
+            'current_status': current_status,
+            'system_message': f'System currently at GW{current_gw}. Upload GW{current_gw} to update or GW{next_gw} for new data.'
+        })
+        
+    except Exception as e:
+        return jsonify({
+            'success': False,
+            'error': str(e),
+            'fallback_message': 'Could not determine current gameweek. System will validate your choice during upload.'
+        }), 500
+
+@app.route('/api/gameweek-consistency', methods=['GET'])
+def check_gameweek_consistency():
+    """Comprehensive gameweek consistency monitoring across all tables"""
+    try:
+        from src.gameweek_manager import GameweekManager
+        gw_manager = GameweekManager()
+        
+        conn = get_db_connection()
+        cursor = conn.cursor(cursor_factory=psycopg2.extras.RealDictCursor)
+        
+        consistency_report = {
+            'timestamp': datetime.now().isoformat(),
+            'gameweek_manager_detection': gw_manager.get_current_gameweek(),
+            'table_analysis': {},
+            'consistency_issues': [],
+            'overall_status': 'HEALTHY'
+        }
+        
+        # Check each table's gameweek data
+        tables_to_check = [
+            ('player_metrics', 'gameweek'),
+            ('player_form', 'gameweek'), 
+            ('raw_player_snapshots', 'gameweek'),
+            ('player_games_data', 'gameweek'),
+            ('team_fixtures', 'gameweek')
+        ]
+        
+        for table_name, gw_column in tables_to_check:
+            try:
+                # Get gameweek distribution
+                cursor.execute(f"""
+                    SELECT 
+                        {gw_column},
+                        COUNT(*) as record_count,
+                        MAX(COALESCE(last_updated, created_at, now())) as latest_update
+                    FROM {table_name}
+                    WHERE {gw_column} IS NOT NULL
+                    GROUP BY {gw_column}
+                    ORDER BY {gw_column} DESC
+                    LIMIT 5
+                """)
+                
+                gameweek_data = cursor.fetchall()
+                
+                if gameweek_data:
+                    latest_gw = gameweek_data[0]['gameweek']
+                    latest_count = gameweek_data[0]['record_count']
+                    
+                    consistency_report['table_analysis'][table_name] = {
+                        'latest_gameweek': latest_gw,
+                        'latest_record_count': latest_count,
+                        'latest_update': gameweek_data[0]['latest_update'].isoformat() if gameweek_data[0]['latest_update'] else None,
+                        'gameweek_distribution': [
+                            {'gameweek': row['gameweek'], 'count': row['record_count']} 
+                            for row in gameweek_data
+                        ]
+                    }
+                    
+                    # Check for consistency issues
+                    gm_detection = consistency_report['gameweek_manager_detection']
+                    if latest_gw != gm_detection:
+                        consistency_report['consistency_issues'].append({
+                            'table': table_name,
+                            'issue': f'Table shows GW{latest_gw} but GameweekManager detects GW{gm_detection}',
+                            'severity': 'HIGH' if abs(latest_gw - gm_detection) > 1 else 'MEDIUM'
+                        })
+                    
+                    # Check for anomalous record counts (< 5% of expected)
+                    if latest_count < 32:  # Less than 5% of 647 players
+                        consistency_report['consistency_issues'].append({
+                            'table': table_name,
+                            'issue': f'Anomalous record count: {latest_count} records in GW{latest_gw} (expected >32)',
+                            'severity': 'HIGH'
+                        })
+                        
+                else:
+                    consistency_report['table_analysis'][table_name] = {
+                        'status': 'NO_DATA',
+                        'issue': 'No gameweek data found'
+                    }
+                    
+            except Exception as e:
+                consistency_report['table_analysis'][table_name] = {
+                    'status': 'ERROR',
+                    'error': str(e)
+                }
+        
+        # Determine overall status
+        high_severity_issues = [i for i in consistency_report['consistency_issues'] if i.get('severity') == 'HIGH']
+        if high_severity_issues:
+            consistency_report['overall_status'] = 'CRITICAL'
+        elif consistency_report['consistency_issues']:
+            consistency_report['overall_status'] = 'WARNING'
+        
+        # Add summary
+        consistency_report['summary'] = {
+            'total_issues': len(consistency_report['consistency_issues']),
+            'high_severity': len(high_severity_issues),
+            'tables_checked': len(tables_to_check),
+            'healthy_tables': len([t for t, data in consistency_report['table_analysis'].items() 
+                                 if data.get('status') != 'ERROR' and data.get('status') != 'NO_DATA'])
+        }
+        
+        conn.close()
+        return jsonify(consistency_report)
+        
+    except Exception as e:
+        return jsonify({
+            'error': f'Consistency check failed: {str(e)}',
+            'overall_status': 'ERROR',
+            'timestamp': datetime.now().isoformat()
+        }), 500
 
 @app.route('/api/health', methods=['GET'])
 def health_check():
@@ -1058,8 +1513,10 @@ def import_lineups():
                 
                 unmatched_players.append(unmatched_info)
         
-        # Update starter_multiplier in database
-        gameweek = 1  # Default gameweek
+        # Update starter_multiplier in database using GameweekManager
+        from src.gameweek_manager import GameweekManager
+        gw_manager = GameweekManager()
+        gameweek = gw_manager.get_current_gameweek()  # Use current gameweek for lineup updates
         updated_count = 0
         
         # Get manual overrides from system parameters to preserve them
@@ -1101,15 +1558,21 @@ def import_lineups():
             print(f"Set {len(starter_ids)} matched players to starter (1.0x)")
             
             # STEP 3: Re-apply any existing manual overrides
-            bench_penalty = params.get('starter_prediction', {}).get('force_bench_penalty', 0.6)
+            starter_config = params.get('starter_prediction', {})
+            rotation_penalty = starter_config.get('auto_rotation_penalty', 0.75)
+            bench_penalty = starter_config.get('force_bench_penalty', 0.6)
+            out_penalty = starter_config.get('force_out_penalty', 0.0)
+            
             for player_id, override in manual_overrides.items():
                 override_type = override.get('type')
                 if override_type == 'starter':
                     multiplier = 1.0
+                elif override_type == 'rotation':
+                    multiplier = rotation_penalty
                 elif override_type == 'bench':
                     multiplier = bench_penalty
                 elif override_type == 'out':
-                    multiplier = 0.0
+                    multiplier = out_penalty
                 else:
                     continue  # Skip 'auto' - already handled above
                 
@@ -1185,7 +1648,10 @@ def export_players():
         max_price = request.args.get('max_price', type=float)
         team = request.args.get('team')
         search = request.args.get('search', '').strip()
-        gameweek = request.args.get('gameweek', 1, type=int)
+        # Use GameweekManager for unified gameweek detection
+        from src.gameweek_manager import GameweekManager
+        gw_manager = GameweekManager()
+        gameweek = gw_manager.get_current_gameweek()
         
         conn = get_db_connection()
         cursor = conn.cursor(cursor_factory=psycopg2.extras.RealDictCursor)
@@ -1194,8 +1660,11 @@ def export_players():
         base_query = """
             SELECT 
                 p.name, p.team, p.position,
-                pm.price, pm.ppg, pm.value_score, pm.true_value,
-                pm.form_multiplier, pm.fixture_multiplier, pm.starter_multiplier
+                pm.price, pm.ppg, p.blended_ppg, pm.value_score, pm.true_value, p.roi,
+                pm.form_multiplier, pm.fixture_multiplier, pm.starter_multiplier, pm.xgi_multiplier,
+                p.current_season_weight,
+                p.minutes, p.xg90, p.xa90, p.xgi90,
+                (COALESCE(p.xg90, 0) + COALESCE(p.xa90, 0)) as xgi
             FROM players p
             JOIN player_metrics pm ON p.id = pm.player_id
             WHERE pm.gameweek = %s
@@ -1238,12 +1707,19 @@ def export_players():
         cursor.execute(final_query, params)
         players = cursor.fetchall()
         
-        # Generate CSV content
+        # Generate CSV content with gameweek metadata
         csv_lines = []
-        csv_lines.append("Name,Team,Position,Price,PPG,Value Score,True Value,Form Multiplier,Fixture Multiplier,Starter Multiplier")
+        csv_lines.append(f"# Fantrax Value Hunter Export - Gameweek {gameweek} - Generated: {datetime.now().strftime('%Y-%m-%d %H:%M:%S')}")
+        csv_lines.append("Name,Team,Position,Price,PPG,Blended PPG,Value Score,True Value,ROI,Form Multiplier,Fixture Multiplier,Starter Multiplier,xGI Multiplier,Current Season Weight,Minutes,xG90,xA90,xGI90,xGI")
         
         for player in players:
-            csv_lines.append(f"{player['name']},{player['team']},{player['position']},{player['price']},{player['ppg']},{player['value_score']:.3f},{player['true_value']:.3f},{player['form_multiplier']:.2f},{player['fixture_multiplier']:.2f},{player['starter_multiplier']:.2f}")
+            current_weight = float(player['current_season_weight']) if player['current_season_weight'] else 0.0
+            minutes = player['minutes'] if player['minutes'] else 0
+            xg90 = float(player['xg90']) if player['xg90'] else 0.0
+            xa90 = float(player['xa90']) if player['xa90'] else 0.0
+            xgi90 = float(player['xgi90']) if player['xgi90'] else 0.0
+            xgi = float(player['xgi']) if player['xgi'] else 0.0
+            csv_lines.append(f"{player['name']},{player['team']},{player['position']},{player['price']},{player['ppg']},{player['blended_ppg']:.2f},{player['value_score']:.3f},{player['true_value']:.3f},{player['roi']:.3f},{player['form_multiplier']:.2f},{player['fixture_multiplier']:.2f},{player['starter_multiplier']:.2f},{player['xgi_multiplier']:.2f},{current_weight:.3f},{minutes},{xg90:.3f},{xa90:.3f},{xgi90:.3f},{xgi:.3f}")
         
         csv_content = '\n'.join(csv_lines)
         
@@ -1642,20 +2118,40 @@ def import_form_data():
     Extracts player ID and FPts for storage in player_form table
     """
     try:
-        # Get parameters
-        gameweek = request.form.get('gameweek')
-        if not gameweek:
-            return jsonify({
-                'success': False,
-                'error': 'Gameweek number is required'
-            }), 400
+        # GameweekManager integration with intelligent validation
+        from src.gameweek_manager import GameweekManager
+        gw_manager = GameweekManager()
+        
+        gameweek_input = request.form.get('gameweek')
+        if gameweek_input:
+            try:
+                gameweek_input = int(gameweek_input)
+            except ValueError:
+                return jsonify({
+                    'success': False,
+                    'error': 'Gameweek must be a number'
+                }), 400
             
-        try:
-            gameweek = int(gameweek)
-        except ValueError:
+            # Validate gameweek for upload using GameweekManager
+            validation_result = gw_manager.validate_gameweek_for_upload(gameweek_input)
+            if not validation_result['valid']:
+                return jsonify({
+                    'success': False,
+                    'error': validation_result['message'],
+                    'suggested_gameweek': validation_result.get('suggested_gameweek'),
+                    'current_gameweek': gw_manager.get_current_gameweek()
+                }), 400
+                
+            gameweek = gameweek_input
+        else:
+            # If no gameweek provided, use next gameweek for new uploads
+            gameweek = gw_manager.get_next_gameweek()
+            
+        # Legacy emergency protection (redundant but keeping for extra safety)
+        if gameweek == 1:
             return jsonify({
                 'success': False,
-                'error': 'Gameweek must be a number'
+                'error': 'GW1 data is protected during gameweek unification system upgrade. Contact admin if overwrite needed.'
             }), 400
         
         # Check for uploaded file
@@ -1750,8 +2246,25 @@ def import_form_data():
                     DO UPDATE SET price = EXCLUDED.price, last_updated = NOW()
                 """, [player_id, gameweek, salary])
                 
-                # Update games_played count in player_games_data (only if player actually played)
-                games_played = 1 if fpts != 0 else 0
+                # Update games_played count using minutes-based logic
+                # Compare current total minutes vs first game minutes to detect if player played this gameweek
+                
+                # Get current total minutes from players table (updated by Understat sync)
+                cursor.execute("SELECT COALESCE(minutes, 0) FROM players WHERE id = %s", [player_id])
+                current_total_minutes = cursor.fetchone()[0] or 0
+                
+                # Get previous gameweek minutes from raw_player_snapshots for rolling comparison
+                previous_gameweek = gameweek - 1
+                cursor.execute("""
+                    SELECT COALESCE(minutes_played, 0) 
+                    FROM raw_player_snapshots 
+                    WHERE player_id = %s AND gameweek = %s
+                """, [player_id, previous_gameweek])
+                previous_gameweek_result = cursor.fetchone()
+                previous_gameweek_minutes = previous_gameweek_result[0] if previous_gameweek_result else 0
+                
+                # Player played this gameweek if total minutes > previous gameweek minutes
+                games_played = 1 if current_total_minutes > previous_gameweek_minutes else 0
                 cursor.execute("""
                     INSERT INTO player_games_data (player_id, gameweek, games_played, last_updated)
                     VALUES (%s, %s, %s, NOW())
@@ -1803,16 +2316,99 @@ def import_form_data():
         cursor.execute("""
             UPDATE player_metrics pm
             SET ppg = (
-                SELECT AVG(pf.points)
-                FROM player_form pf
-                WHERE pf.player_id = pm.player_id
-                AND pf.gameweek <= %s
+                SELECT 
+                    CASE 
+                        WHEN COALESCE(pgd.games_played_current, 0) > 0 
+                        THEN COALESCE(pf_max.total_points, 0) / pgd.games_played_current
+                        ELSE 0 
+                    END
+                FROM (
+                    SELECT player_id, MAX(points) as total_points
+                    FROM player_form
+                    WHERE player_id = pm.player_id
+                    GROUP BY player_id
+                ) pf_max
+                LEFT JOIN (
+                    SELECT player_id, SUM(games_played) as games_played_current
+                    FROM player_games_data 
+                    WHERE player_id = pm.player_id
+                    GROUP BY player_id
+                ) pgd ON pf_max.player_id = pgd.player_id
+                LIMIT 1
             )
             WHERE pm.gameweek = %s
-        """, [gameweek, gameweek])
+        """, [gameweek])
         print(f"PPG recalculation completed.")
         
-        # Commit all changes
+        # Auto-trigger V2.0 recalculation with fresh PPG data
+        print(f"Triggering V2.0 True Value recalculation...")
+        try:
+            # Import at function level to avoid circular imports
+            from calculation_engine_v2 import FormulaEngineV2
+            
+            parameters = load_system_parameters()
+            engine = FormulaEngineV2(DB_CONFIG, parameters)
+            
+            # Get fresh player data with corrected PPG using same logic as V2.0 API
+            cursor.execute("""
+                SELECT 
+                    p.id as player_id, p.name, p.team, p.position,
+                    p.xgi90, p.baseline_xgi, pm.price,
+                    -- Calculate fresh PPG using same logic as form import
+                    CASE 
+                        WHEN COALESCE(pgd.games_played, 0) > 0 
+                        THEN COALESCE(pf_max.total_points, 0) / pgd.games_played
+                        ELSE 0 
+                    END as ppg,
+                    pm.form_multiplier, pm.fixture_multiplier, 
+                    pm.starter_multiplier, pm.xgi_multiplier,
+                    tf.difficulty_score as fixture_difficulty,
+                    COALESCE(pgd.games_played, 0) as games_played,
+                    COALESCE(pgd.games_played_historical, 0) as games_played_historical,
+                    CASE 
+                        WHEN COALESCE(pgd.games_played_historical, 0) > 0 
+                        THEN COALESCE(pgd.total_points_historical, 0) / pgd.games_played_historical 
+                        ELSE NULL 
+                    END as historical_ppg
+                FROM players p
+                JOIN player_metrics pm ON p.id = pm.player_id
+                LEFT JOIN (
+                    SELECT player_id, MAX(points) as total_points
+                    FROM player_form
+                    GROUP BY player_id
+                ) pf_max ON p.id = pf_max.player_id
+                LEFT JOIN team_fixtures tf ON p.team = tf.team_code AND tf.gameweek = %s
+                LEFT JOIN player_games_data pgd ON p.id = pgd.player_id AND pgd.gameweek = %s
+                WHERE pm.gameweek = %s
+                  AND p.team != 'TST'  -- Exclude test players
+                ORDER BY p.name
+            """, [gameweek, gameweek, gameweek])
+            
+            players = cursor.fetchall()
+            updated = 0
+            
+            for player in players:
+                calc = engine.calculate_player_value(dict(player))
+                cursor.execute("""
+                    UPDATE player_metrics 
+                    SET true_value = %s, value_score = %s, last_updated = NOW()
+                    WHERE player_id = %s AND gameweek = %s
+                """, [calc['true_value'], calc['roi'], player['player_id'], gameweek])
+                
+                cursor.execute("""
+                    UPDATE players 
+                    SET true_value = %s, roi = %s, blended_ppg = %s
+                    WHERE id = %s
+                """, [calc['true_value'], calc['roi'], calc.get('base_ppg', 0), player['player_id']])
+                
+                updated += 1
+            
+            print(f"V2.0 recalculation completed for {updated} players")
+        except Exception as e:
+            print(f"Warning: V2.0 recalculation failed: {e}")
+            # Don't fail the entire import if V2.0 recalc fails
+        
+        # Commit all changes (including V2.0 updates)
         conn.commit()
         conn.close()
         
@@ -1848,6 +2444,10 @@ def import_odds():
     Expected format: Date, Time, Home Team, Away Team, Home Odds, Draw Odds, Away Odds
     """
     try:
+        # Import GameweekManager for validation
+        from src.gameweek_manager import GameweekManager
+        gw_manager = GameweekManager()
+        
         # Check if file was uploaded
         if 'file' not in request.files:
             return jsonify({'success': False, 'error': 'No file uploaded'}), 400
@@ -1856,10 +2456,30 @@ def import_odds():
         if file.filename == '':
             return jsonify({'success': False, 'error': 'No file selected'}), 400
             
-        # Get gameweek from form
-        gameweek = request.form.get('gameweek', type=int)
-        if not gameweek or gameweek < 1:
-            return jsonify({'success': False, 'error': 'Valid gameweek number required'}), 400
+        # Get gameweek from form with GameweekManager validation
+        gameweek_input = request.form.get('gameweek', type=int)
+        
+        # First validation: basic input check
+        if not gameweek_input or gameweek_input < 1:
+            return jsonify({
+                'success': False, 
+                'error': 'Valid gameweek number required',
+                'suggested_gameweek': gw_manager.get_current_gameweek()
+            }), 400
+        
+        # Second validation: GameweekManager smart validation
+        validation_result = gw_manager.validate_gameweek_for_upload(gameweek_input)
+        if not validation_result['valid']:
+            return jsonify({
+                'success': False,
+                'error': validation_result['message'],
+                'suggestion': validation_result['recommendation'],
+                'suggested_gameweek': validation_result.get('suggested_gameweek'),
+                'current_gameweek': gw_manager.get_current_gameweek()
+            }), 400
+        
+        # Use validated gameweek
+        gameweek = gameweek_input
             
         # Team name mapping dictionary
         ODDS_TO_FANTRAX = {
@@ -2238,14 +2858,7 @@ def get_monitoring_metrics():
                     WHEN confidence_score >= 50 THEN '50-69%'
                     ELSE '<50%'
                 END
-            ORDER BY 
-                CASE 
-                    WHEN confidence_score >= 95 THEN 1
-                    WHEN confidence_score >= 85 THEN 2
-                    WHEN confidence_score >= 70 THEN 3
-                    WHEN confidence_score >= 50 THEN 4
-                    ELSE 5
-                END
+            ORDER BY count DESC
         """)
         confidence_distribution = [dict(row) for row in cursor.fetchall()]
         
@@ -2442,14 +3055,25 @@ def sync_understat_data():
         system_params['xgi_integration']['unmatched_players'] = len(unmatched_players)
         save_system_parameters(system_params)
         
-        return jsonify({
+        response_data = {
             'success': True,
             'total_understat_players': total_players,
             'successfully_matched': len(matched_players),
             'unmatched_players': len(unmatched_players),
             'match_rate': match_rate,
             'players_updated': updated_count
-        })
+        }
+        
+        # Add verification redirect if there are unmatched players
+        if len(unmatched_players) > 0:
+            response_data['verification_needed'] = True
+            response_data['verification_url'] = '/import-validation?source=understat'
+            response_data['message'] = f'Sync completed. {len(unmatched_players)} players need manual verification.'
+        else:
+            response_data['verification_needed'] = False
+            response_data['message'] = 'Sync completed successfully. All players matched.'
+        
+        return jsonify(response_data)
         
     except Exception as e:
         return jsonify({'error': str(e)}), 500
@@ -3123,9 +3747,14 @@ def calculate_values_v2():
     Supports both v2.0 and legacy v1.0 for comparison
     """
     try:
+        from src.gameweek_manager import GameweekManager
+        gw_manager = GameweekManager()
+        
         data = request.get_json() or {}
         formula_version = data.get('formula_version', 'v2.0')
-        gameweek = data.get('gameweek', 1)
+        
+        # Use GameweekManager for consistent gameweek detection
+        gameweek = data.get('gameweek', gw_manager.get_current_gameweek())
         compare_versions = data.get('compare_versions', False)
         
         # Load current parameters
@@ -3138,7 +3767,7 @@ def calculate_values_v2():
         conn = get_db_connection()
         cursor = conn.cursor(cursor_factory=psycopg2.extras.RealDictCursor)
         
-        # Enhanced query to get all necessary data including historical PPG
+        # Enhanced query to get all necessary data including fresh PPG calculation
         cursor.execute("""
             SELECT 
                 p.id as player_id,
@@ -3148,7 +3777,12 @@ def calculate_values_v2():
                 p.xgi90,
                 p.baseline_xgi,
                 pm.price,
-                pm.ppg,
+                -- Calculate fresh PPG using same logic as form import
+                CASE 
+                    WHEN COALESCE(pgd.games_played, 0) > 0 
+                    THEN COALESCE(pf_max.total_points, 0) / pgd.games_played
+                    ELSE 0 
+                END as ppg,
                 pm.form_multiplier,
                 pm.fixture_multiplier,
                 pm.starter_multiplier,
@@ -3163,6 +3797,11 @@ def calculate_values_v2():
                 END as historical_ppg
             FROM players p
             JOIN player_metrics pm ON p.id = pm.player_id
+            LEFT JOIN (
+                SELECT player_id, MAX(points) as total_points
+                FROM player_form
+                GROUP BY player_id
+            ) pf_max ON p.id = pf_max.player_id
             LEFT JOIN team_fixtures tf ON p.team = tf.team_code AND tf.gameweek = %s
             LEFT JOIN player_games_data pgd ON p.id = pgd.player_id AND pm.gameweek = pgd.gameweek
             WHERE pm.gameweek = %s
@@ -3183,7 +3822,7 @@ def calculate_values_v2():
         
         # Store calculations in database
         if results:
-            store_v2_calculations(results, formula_version)
+            store_v2_calculations(results, formula_version, gameweek)
         
         return jsonify({
             'success': True,
@@ -3210,9 +3849,15 @@ def calculate_values_v2():
 
 
 
-def store_v2_calculations(calculations: List[Dict], version: str):
+def store_v2_calculations(calculations: List[Dict], version: str, gameweek: int = None):
     """Store v2.0 calculation results in database"""
     try:
+        # Use GameweekManager if no gameweek specified
+        if gameweek is None:
+            from src.gameweek_manager import GameweekManager
+            gw_manager = GameweekManager()
+            gameweek = gw_manager.get_current_gameweek()
+            
         conn = get_db_connection()
         cursor = conn.cursor()
         
@@ -3222,12 +3867,24 @@ def store_v2_calculations(calculations: List[Dict], version: str):
                 UPDATE player_metrics 
                 SET 
                     true_value = %s,
-                    value_score = %s
-                WHERE player_id = %s AND gameweek = 1
+                    value_score = %s,
+                    ppg = %s,
+                    form_multiplier = %s,
+                    fixture_multiplier = %s,
+                    starter_multiplier = %s,
+                    xgi_multiplier = %s,
+                    last_updated = NOW()
+                WHERE player_id = %s AND gameweek = %s
             """, [
                 calc['true_value'],
                 calc['roi'],  # In v2.0, value_score becomes ROI
-                calc['player_id']
+                calc.get('base_ppg', 0),  # Store the blended PPG from calculation
+                calc['multipliers']['form'],
+                calc['multipliers']['fixture'],
+                calc['multipliers']['starter'],
+                calc['multipliers']['xgi'],
+                calc['player_id'],
+                gameweek
             ])
             
             # Store in players table (new v2.0 columns)
@@ -3256,6 +3913,70 @@ def store_v2_calculations(calculations: List[Dict], version: str):
         if conn:
             conn.rollback()
             conn.close()
+
+
+@app.route('/api/verify-ppg', methods=['GET'])
+def verify_ppg():
+    """Verify PPG calculations are consistent between stored and calculated values"""
+    try:
+        conn = get_db_connection()
+        cursor = conn.cursor(cursor_factory=psycopg2.extras.RealDictCursor)
+        
+        # Get current gameweek
+        from src.gameweek_manager import GameweekManager
+        gw_manager = GameweekManager()
+        gameweek = gw_manager.get_current_gameweek()
+        
+        cursor.execute("""
+            SELECT 
+                p.name,
+                p.team,
+                pm.ppg as stored_ppg,
+                CASE 
+                    WHEN COALESCE(pgd.games_played, 0) > 0 
+                    THEN COALESCE(pf.total_points, 0) / pgd.games_played
+                    ELSE 0 
+                END as calculated_ppg,
+                ROUND(ABS(pm.ppg - COALESCE(pf.total_points / NULLIF(pgd.games_played, 0), 0)), 2) as difference,
+                pf.total_points,
+                pgd.games_played,
+                pm.true_value,
+                p.roi
+            FROM players p
+            JOIN player_metrics pm ON p.id = pm.player_id
+            LEFT JOIN (
+                SELECT player_id, MAX(points) as total_points 
+                FROM player_form GROUP BY player_id
+            ) pf ON p.id = pf.player_id
+            LEFT JOIN player_games_data pgd ON p.id = pgd.player_id AND pgd.gameweek = %s
+            WHERE pm.gameweek = %s
+              AND p.team != 'TST'  -- Exclude test players
+              AND COALESCE(pgd.games_played, 0) > 0  -- Only players with games played
+            ORDER BY ABS(pm.ppg - COALESCE(pf.total_points / NULLIF(pgd.games_played, 0), 0)) DESC
+            LIMIT 50
+        """, [gameweek, gameweek])
+        
+        results = cursor.fetchall()
+        
+        # Calculate summary statistics
+        total_players = len(results)
+        discrepancies = len([r for r in results if r['difference'] > 0.1])
+        
+        conn.close()
+        
+        return jsonify({
+            'gameweek': gameweek,
+            'summary': {
+                'total_players_checked': total_players,
+                'players_with_discrepancies': discrepancies,
+                'accuracy_rate': round((total_players - discrepancies) / total_players * 100, 1) if total_players > 0 else 100
+            },
+            'top_discrepancies': results[:20],  # Show top 20 discrepancies
+            'message': f'PPG verification completed for gameweek {gameweek}'
+        })
+        
+    except Exception as e:
+        return jsonify({'error': str(e)}), 500
 
 
 # ================================
@@ -3357,7 +4078,18 @@ def optimize_parameters_endpoint():
     try:
         data = request.get_json() or {}
         
-        gameweek_range = tuple(data.get('gameweek_range', [1, 10]))
+        # Use GameweekManager to provide intelligent default range
+        if 'gameweek_range' not in data:
+            from src.gameweek_manager import GameweekManager
+            gw_manager = GameweekManager()
+            current_gw = gw_manager.get_current_gameweek()
+            # Default to analyzing from GW1 to current gameweek (minimum 3 gameweeks for analysis)
+            end_gw = max(3, current_gw)
+            default_range = [1, end_gw]
+        else:
+            default_range = [1, 10]
+            
+        gameweek_range = tuple(data.get('gameweek_range', default_range))
         season = data.get('season', '2024/25')
         
         # Import validation engine  
@@ -3398,7 +4130,19 @@ def benchmark_versions_endpoint():
     """
     try:
         data = request.get_json() or {}
-        gameweek_range = tuple(data.get('gameweek_range', [1, 10]))
+        
+        # Use GameweekManager to provide intelligent default range
+        if 'gameweek_range' not in data:
+            from src.gameweek_manager import GameweekManager
+            gw_manager = GameweekManager()
+            current_gw = gw_manager.get_current_gameweek()
+            # Default to analyzing from GW1 to current gameweek (minimum 3 gameweeks for analysis)
+            end_gw = max(3, current_gw)
+            default_range = [1, end_gw]
+        else:
+            default_range = [1, 10]
+            
+        gameweek_range = tuple(data.get('gameweek_range', default_range))
         
         # Import validation engine
         sys.path.append(os.path.dirname(os.path.dirname(__file__)))
@@ -3488,4 +4232,9 @@ if __name__ == '__main__':
     # Production-ready configuration
     port = int(os.getenv('PORT', 5001))  # Use 5001 to avoid conflict
     debug = os.getenv('FLASK_ENV') == 'development'
-    app.run(debug=debug, host='0.0.0.0', port=port)
+    
+    # DEVELOPMENT: Enable auto-reload for code changes
+    # Set debug=True to auto-restart server when Python files change
+    development_mode = True  # Change to False for production
+    
+    app.run(debug=development_mode, host='0.0.0.0', port=port, use_reloader=development_mode)
