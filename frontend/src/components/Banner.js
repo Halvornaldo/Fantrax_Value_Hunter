@@ -42,6 +42,16 @@ const Banner = () => {
         }}
       >
         <Chip
+          label="Analyzing for: Gameweek 3"
+          color="secondary"
+          size="small"
+          sx={{
+            fontWeight: 600,
+            backgroundColor: 'rgba(76, 175, 80, 0.9)',
+            color: 'white',
+          }}
+        />
+        <Chip
           label="V2.0 Enhanced"
           color="primary"
           size="small"
@@ -60,6 +70,24 @@ const Banner = () => {
             color: 'white',
           }}
         />
+      </Box>
+      
+      {/* Gameweek explanation subtitle */}
+      <Box
+        sx={{
+          position: 'absolute',
+          bottom: 16,
+          left: 16,
+          color: 'rgba(255,255,255,0.9)',
+          backgroundColor: 'rgba(0,0,0,0.6)',
+          padding: '8px 16px',
+          borderRadius: 2,
+          backdropFilter: 'blur(10px)',
+        }}
+      >
+        <Typography variant="body2" sx={{ fontWeight: 600 }}>
+          Data current through GW2 completion
+        </Typography>
       </Box>
     </Box>
   );

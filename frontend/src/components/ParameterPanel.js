@@ -44,7 +44,7 @@ const ParameterPanel = ({ systemConfig, onParametersUpdate, playersCount }) => {
     xgiCap: 2.5,
     globalCap: 3.0,
     // Formula toggles
-    formEnabled: true,
+    formEnabled: false,
     fixtureEnabled: true,
     starterEnabled: true,
     // Starter penalties
@@ -72,7 +72,7 @@ const ParameterPanel = ({ systemConfig, onParametersUpdate, playersCount }) => {
         xgiCap: v2Config.multiplier_caps?.xgi || 2.5,
         globalCap: v2Config.multiplier_caps?.global || 3.0,
         // Formula toggles
-        formEnabled: v2Config.formula_toggles?.form_enabled ?? true,
+        formEnabled: v2Config.formula_toggles?.form_enabled ?? false,
         fixtureEnabled: v2Config.formula_toggles?.fixture_enabled ?? true,
         starterEnabled: v2Config.formula_toggles?.starter_enabled ?? true,
         // Starter penalties

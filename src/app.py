@@ -2995,9 +2995,14 @@ def sync_understat_data():
         
         updated_count = 0
         for player in matched_players:
+            # Calculate games played from minutes (estimate: 90 minutes per full game)
+            minutes_played = player.get('minutes', 0)
+            games_estimate = max(1, round(minutes_played / 90)) if minutes_played > 0 else 0
+            
             cursor.execute("""
                 UPDATE players 
                 SET minutes = %s, xg90 = %s, xa90 = %s, xgi90 = %s,
+                    games_current_season = %s,
                     last_understat_update = CURRENT_TIMESTAMP
                 WHERE id = %s
             """, [
@@ -3005,6 +3010,7 @@ def sync_understat_data():
                 round(player['xG90'], 3),
                 round(player['xA90'], 3), 
                 round(player['xGI90'], 3),
+                games_estimate,
                 player['fantrax_id']
             ])
             
@@ -3012,6 +3018,7 @@ def sync_understat_data():
             cursor.execute("""
                 UPDATE raw_player_snapshots 
                 SET minutes_played = %s, xg90 = %s, xa90 = %s, xgi90 = %s, 
+                    games_current_season = %s,
                     understat_import = TRUE, import_timestamp = NOW()
                 WHERE player_id = %s
             """, [
@@ -3019,6 +3026,7 @@ def sync_understat_data():
                 round(player['xG90'], 3),
                 round(player['xA90'], 3),
                 round(player['xGI90'], 3),
+                games_estimate,
                 player['fantrax_id']
             ])
             
@@ -4210,6 +4218,182 @@ def validation_dashboard():
     """Render validation dashboard page"""
     return render_template('validation_dashboard.html')
 
+# ===============================
+# Weekly Archive System
+# ===============================
+
+@app.route('/api/archive-week', methods=['POST'])
+def archive_current_week():
+    """
+    Archive the current gameweek analysis data
+    This prepares the system for the next gameweek by storing current data
+    """
+    try:
+        # Use fixed gameweek 3 for simple weekly archive system
+        current_gameweek = 3
+        
+        conn = get_db_connection()
+        cursor = conn.cursor()
+        
+        print(f"Archiving Gameweek {current_gameweek} analysis data...")
+        
+        # 1. Collect player analysis data
+        cursor.execute("""
+            SELECT 
+                pm.player_id, pm.gameweek, pm.price, pm.ppg, pm.value_score,
+                pm.form_multiplier, pm.fixture_multiplier, pm.starter_multiplier,
+                p.name, p.team, p.position, p.games_current_season
+            FROM player_metrics pm
+            JOIN players p ON pm.player_id = p.id  
+            WHERE pm.gameweek = %s
+            ORDER BY pm.value_score DESC
+        """, [current_gameweek])
+        
+        player_data = []
+        for row in cursor.fetchall():
+            player_data.append({
+                'player_id': row[0],
+                'gameweek': row[1], 
+                'price': float(row[2]) if row[2] else 0,
+                'ppg': float(row[3]) if row[3] else 0,
+                'value_score': float(row[4]) if row[4] else 0,
+                'form_multiplier': float(row[5]) if row[5] else 1.0,
+                'fixture_multiplier': float(row[6]) if row[6] else 1.0,
+                'starter_multiplier': float(row[7]) if row[7] else 1.0,
+                'name': row[8],
+                'team': row[9],
+                'position': row[10],
+                'games_played': row[11] if row[11] else 0
+            })
+        
+        # 2. Collect form data used for this gameweek
+        cursor.execute("""
+            SELECT player_id, gameweek, points 
+            FROM player_form 
+            WHERE gameweek < %s
+            ORDER BY player_id, gameweek
+        """, [current_gameweek])
+        
+        form_data = []
+        for row in cursor.fetchall():
+            form_data.append({
+                'player_id': row[0],
+                'gameweek': row[1],
+                'points': float(row[2]) if row[2] else 0
+            })
+        
+        # 3. Collect fixture data for this gameweek
+        cursor.execute("""
+            SELECT gameweek, team_code, opponent_code, is_home, difficulty_score
+            FROM team_fixtures
+            WHERE gameweek = %s
+            ORDER BY team_code
+        """, [current_gameweek])
+        
+        fixture_data = []
+        for row in cursor.fetchall():
+            fixture_data.append({
+                'gameweek': row[0],
+                'team': row[1],
+                'opponent': row[2],
+                'is_home': row[3],
+                'difficulty': float(row[4]) if row[4] else 0
+            })
+        
+        # 4. Get top value players for summary
+        top_players = sorted(player_data, key=lambda x: x['value_score'], reverse=True)[:20]
+        
+        # 5. Get current system parameters
+        parameters = load_system_parameters()
+        
+        # 6. Store archive
+        cursor.execute("""
+            INSERT INTO gameweek_archives (
+                gameweek, total_players, analysis_purpose,
+                player_data, form_data, fixture_data, 
+                parameters_snapshot, top_value_players
+            ) VALUES (%s, %s, %s, %s, %s, %s, %s, %s)
+            ON CONFLICT (gameweek) DO UPDATE SET
+                archived_at = NOW(),
+                total_players = EXCLUDED.total_players,
+                player_data = EXCLUDED.player_data,
+                form_data = EXCLUDED.form_data, 
+                fixture_data = EXCLUDED.fixture_data,
+                parameters_snapshot = EXCLUDED.parameters_snapshot,
+                top_value_players = EXCLUDED.top_value_players
+        """, [
+            current_gameweek,
+            len(player_data),
+            f"Analysis for Gameweek {current_gameweek}",
+            json.dumps(player_data),
+            json.dumps(form_data),
+            json.dumps(fixture_data),
+            json.dumps(parameters),
+            json.dumps(top_players)
+        ])
+        
+        conn.commit()
+        
+        print(f"Archived {len(player_data)} players for GW{current_gameweek}")
+        print(f"Archived {len(form_data)} form records")
+        print(f"Archived {len(fixture_data)} fixture records")
+        
+        # 7. Return summary
+        return jsonify({
+            'success': True,
+            'gameweek': current_gameweek,
+            'archived_data': {
+                'players': len(player_data),
+                'form_records': len(form_data), 
+                'fixtures': len(fixture_data),
+                'top_player': top_players[0]['name'] if top_players else 'None'
+            },
+            'message': f'Gameweek {current_gameweek} analysis archived successfully',
+            'next_steps': f'Ready to analyze Gameweek {current_gameweek + 1}'
+        })
+        
+    except Exception as e:
+        if 'conn' in locals():
+            conn.rollback()
+        return jsonify({
+            'error': f'Archive failed: {str(e)}',
+            'success': False
+        }), 500
+    finally:
+        if 'conn' in locals():
+            conn.close()
+
+@app.route('/api/archives', methods=['GET'])
+def get_archived_gameweeks():
+    """Get list of archived gameweeks"""
+    try:
+        conn = get_db_connection()
+        cursor = conn.cursor()
+        
+        cursor.execute("""
+            SELECT gameweek, archived_at, total_players, analysis_purpose
+            FROM gameweek_archives 
+            ORDER BY gameweek DESC
+        """)
+        
+        archives = []
+        for row in cursor.fetchall():
+            archives.append({
+                'gameweek': row[0],
+                'archived_at': row[1].isoformat() if row[1] else None,
+                'total_players': row[2],
+                'purpose': row[3]
+            })
+        
+        conn.close()
+        
+        return jsonify({
+            'archives': archives,
+            'count': len(archives)
+        })
+        
+    except Exception as e:
+        return jsonify({'error': str(e)}), 500
 
 if __name__ == '__main__':
     print("Starting Fantrax Value Hunter Flask Backend...")

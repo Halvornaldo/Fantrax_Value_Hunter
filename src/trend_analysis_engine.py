@@ -458,7 +458,12 @@ class TrendAnalysisEngine:
         """Apply multiplier caps from parameters"""
         if multiplier_type in caps_config:
             cap = caps_config[multiplier_type]
-            return min(multiplier, cap)
+            if multiplier_type == 'form':
+                # Apply form-specific range: 0.9 minimum, cap maximum
+                return max(0.9, min(cap, multiplier))
+            else:
+                # Other multipliers use standard cap only
+                return min(multiplier, cap)
         return multiplier
     
     def _load_current_parameters(self) -> Dict:

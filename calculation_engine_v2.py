@@ -58,10 +58,13 @@ class FormulaEngineV2:
             base_ppg, current_weight = self._calculate_blended_ppg(player_data)
             
             # Step 2: Calculate all multipliers with v2.0 improvements
-            form_mult = self._calculate_form_multiplier(player_data)
-            fixture_mult = self._calculate_exponential_fixture_multiplier(player_data)
-            starter_mult = player_data.get('starter_multiplier', 1.0)
-            xgi_mult = self._calculate_xgi_multiplier(player_data)
+            # Apply formula toggles - if disabled, use 1.0x (no effect)
+            formula_toggles = self.v2_config.get('formula_toggles', {})
+            
+            form_mult = self._calculate_form_multiplier(player_data) if formula_toggles.get('form_enabled', False) else 1.0
+            fixture_mult = self._calculate_exponential_fixture_multiplier(player_data) if formula_toggles.get('fixture_enabled', True) else 1.0
+            starter_mult = player_data.get('starter_multiplier', 1.0) if formula_toggles.get('starter_enabled', True) else 1.0
+            xgi_mult = self._calculate_xgi_multiplier(player_data) if formula_toggles.get('xgi_enabled', True) else 1.0
             
             # Ensure all multipliers are floats and handle None
             if starter_mult is None:
@@ -120,12 +123,12 @@ class FormulaEngineV2:
                     'blending_info': {  # SPRINT 2: Blending metadata
                         'current_weight': round(current_weight, 3),
                         'historical_weight': round(1.0 - current_weight, 3),
-                        'adaptation_gw': self.v2_config.get('dynamic_blending', {}).get('full_adaptation_gw', 16)
+                        'adaptation_gw': self.v2_config.get('dynamic_blending', {}).get('full_adaptation_gw', 12)
                     },
                     'caps_applied': {
-                        'form': form_mult != self._calculate_form_multiplier(player_data),
-                        'fixture': fixture_mult != self._calculate_exponential_fixture_multiplier_raw(player_data),
-                        'xgi': xgi_mult != self._calculate_xgi_multiplier_raw(player_data),
+                        'form': form_mult != self._calculate_form_multiplier(player_data) if formula_toggles.get('form_enabled', False) else False,
+                        'fixture': fixture_mult != self._calculate_exponential_fixture_multiplier_raw(player_data) if formula_toggles.get('fixture_enabled', True) else False,
+                        'xgi': xgi_mult != self._calculate_xgi_multiplier_raw(player_data) if formula_toggles.get('xgi_enabled', True) else False,
                         'global': true_value == max_allowed
                     },
                     'feature_flags': {  # SPRINT 2: Feature status
@@ -213,8 +216,8 @@ class FormulaEngineV2:
             else:
                 form_multiplier = 1.0
                 
-            # Apply Sprint 2 bounds (wider than v1.0 for more sensitivity)
-            return max(0.5, min(2.0, form_multiplier))
+            # Apply early season bounds (narrow range for start of season)
+            return max(0.9, min(1.1, form_multiplier))
             
         except Exception as e:
             logger.warning(f"Error calculating exponential form multiplier: {e}")
@@ -390,7 +393,11 @@ class FormulaEngineV2:
         caps = self.v2_config.get('multiplier_caps', {})
         cap = caps.get(multiplier_type, 2.0)
         
-        return max(0.5, min(cap, value))
+        # Apply early season minimum for form, keep original for others
+        if multiplier_type == 'form':
+            return max(0.9, min(cap, value))
+        else:
+            return max(0.5, min(cap, value))
     
     def _calculate_blended_ppg(self, player_data: Dict[str, Any]) -> Tuple[float, float]:
         """
@@ -413,7 +420,7 @@ class FormulaEngineV2:
             w_current = 1.0
         else:
             # Get dynamic blending parameters
-            K = self.v2_config.get('dynamic_blending', {}).get('full_adaptation_gw', 16)
+            K = self.v2_config.get('dynamic_blending', {}).get('full_adaptation_gw', 12)
             
             # Calculate current weight using smooth transition formula
             if self.current_gameweek <= 1:
@@ -464,10 +471,35 @@ class FormulaEngineV2:
 
 
 def load_system_parameters(config_path: str = 'config/system_parameters.json') -> Dict[str, Any]:
-    """Load system parameters from JSON file"""
+    """Load system parameters from JSON file with validation and fallback handling"""
     try:
         with open(config_path, 'r', encoding='utf-8') as f:
-            return json.load(f)
+            params = json.load(f)
+            
+        # Validate critical parameters
+        v2_config = params.get('formula_optimization_v2', {})
+        
+        # Log warnings if configuration is falling back to defaults
+        if not v2_config.get('formula_toggles', {}).get('form_enabled', True):
+            logger.info("Form calculation is disabled in configuration")
+        
+        adaptation_gw = v2_config.get('dynamic_blending', {}).get('full_adaptation_gw')
+        if adaptation_gw != 12:
+            logger.warning(f"Configuration full_adaptation_gw is {adaptation_gw}, expected 12")
+            
+        form_cap = v2_config.get('multiplier_caps', {}).get('form')
+        if form_cap != 1.1:
+            logger.warning(f"Configuration form cap is {form_cap}, expected 1.1 for early season")
+            
+        logger.info("System parameters loaded successfully with validation")
+        return params
+        
+    except FileNotFoundError:
+        logger.error(f"Configuration file not found: {config_path}")
+        return {}
+    except json.JSONDecodeError as e:
+        logger.error(f"Invalid JSON in configuration file: {e}")
+        return {}
     except Exception as e:
         logger.error(f"Error loading system parameters: {e}")
         return {}
