@@ -93,7 +93,7 @@ yarn-debug.log*
 yarn-error.log*
 package-lock.json
 yarn.lock
-frontend/build/
+# frontend/build/ - temporarily including build files for Railway deployment
 
 # Temporary Files
 *.tmp
