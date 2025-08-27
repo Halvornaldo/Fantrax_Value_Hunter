@@ -1,0 +1,97 @@
+{
+  "timestamp": "2025-08-23T12:04:17.646456",
+  "purpose": "Pre-upload testing backup",
+  "tables": {
+    "players": {
+      "record_count": 647
+    },
+    "player_metrics": {
+      "record_count": 1280
+    },
+    "player_form": {
+      "record_count": 622
+    },
+    "team_fixtures": {
+      "record_count": 36
+    },
+    "fixture_odds": {
+      "record_count": 20
+    },
+    "name_mappings": {
+      "record_count": 592
+    }
+  },
+  "current_gameweek": 2,
+  "sample_player_metrics": [
+    {
+      "player_id": "04fk6",
+      "gameweek": 2,
+      "ppg": 5.06,
+      "true_value": 1.38,
+      "starter_multiplier": 1.0
+    },
+    {
+      "player_id": "04rha",
+      "gameweek": 2,
+      "ppg": 9.0,
+      "true_value": 1.277,
+      "starter_multiplier": 0.7
+    },
+    {
+      "player_id": "05tqx",
+      "gameweek": 2,
+      "ppg": 6.13,
+      "true_value": 1.167,
+      "starter_multiplier": 1.0
+    },
+    {
+      "player_id": "04vy4",
+      "gameweek": 2,
+      "ppg": 8.0,
+      "true_value": 1.105,
+      "starter_multiplier": 0.7
+    },
+    {
+      "player_id": "04mr4",
+      "gameweek": 2,
+      "ppg": 7.5,
+      "true_value": 1.075,
+      "starter_multiplier": 0.7
+    },
+    {
+      "player_id": "045ob",
+      "gameweek": 2,
+      "ppg": 7.8,
+      "true_value": 1.037,
+      "starter_multiplier": 1.0
+    },
+    {
+      "player_id": "06cm1",
+      "gameweek": 2,
+      "ppg": 6.57,
+      "true_value": 1.013,
+      "starter_multiplier": 0.7
+    },
+    {
+      "player_id": "04yme",
+      "gameweek": 2,
+      "ppg": 5.91,
+      "true_value": 1.008,
+      "starter_multiplier": 1.0
+    },
+    {
+      "player_id": "04f6h",
+      "gameweek": 2,
+      "ppg": 6.13,
+      "true_value": 1.002,
+      "starter_multiplier": 1.0
+    },
+    {
+      "player_id": "063zi",
+      "gameweek": 2,
+      "ppg": 4.27,
+      "true_value": 1.002,
+      "starter_multiplier": 1.0
+    }
+  ]
+}

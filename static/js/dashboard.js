@@ -33,6 +33,9 @@ let v2Parameters = {
 document.addEventListener('DOMContentLoaded', function() {
     console.log('🚀 Fantrax Value Hunter V2.0 Enhanced Dashboard Loading...');
     
+    // Set initial body class for v2.0
+    document.body.className = 'v2-enabled';
+    
     // Initialize V2.0 controls
     initializeV2Controls();
     
@@ -47,32 +50,62 @@ document.addEventListener('DOMContentLoaded', function() {
 });
 
 function initializeV2Controls() {
+    // Formula Version Toggle
+    const v1Toggle = document.getElementById('v1Toggle');
+    const v2Toggle = document.getElementById('v2Toggle');
+    
+    if (v1Toggle && v2Toggle) {
+        v1Toggle.addEventListener('change', handleFormulaVersionChange);
+        v2Toggle.addEventListener('change', handleFormulaVersionChange);
+    }
+    
     // EWMA Alpha slider
     const alphaSlider = document.getElementById('ewmaAlpha');
     const alphaValue = document.getElementById('ewmaAlphaValue');
     const halfLife = document.getElementById('halfLife');
+    const recentWeight = document.getElementById('recentWeight');
     
     if (alphaSlider && alphaValue) {
         alphaSlider.addEventListener('input', function() {
-            alphaValue.textContent = this.value;
+            const alpha = parseFloat(this.value);
+            alphaValue.textContent = alpha;
+            
             // Calculate half-life: log(0.5) / log(alpha)
-            const halfLifeValue = Math.log(0.5) / Math.log(this.value);
-            halfLife.textContent = `~${halfLifeValue.toFixed(1)} games`;
+            const halfLifeValue = Math.log(0.5) / Math.log(alpha);
+            if (halfLife) halfLife.textContent = `~${halfLifeValue.toFixed(1)} games`;
+            
+            // Show recent game weight
+            if (recentWeight) recentWeight.textContent = `${Math.round(alpha * 100)}%`;
+            
             handleParameterChange();
         });
-        alphaValue.textContent = alphaSlider.value;
+        
+        // Initialize display
+        const initialAlpha = parseFloat(alphaSlider.value);
+        alphaValue.textContent = initialAlpha;
+        if (halfLife) {
+            const halfLifeValue = Math.log(0.5) / Math.log(initialAlpha);
+            halfLife.textContent = `~${halfLifeValue.toFixed(1)} games`;
+        }
+        if (recentWeight) recentWeight.textContent = `${Math.round(initialAlpha * 100)}%`;
     }
     
-    // Adaptation Gameweek slider
+    // Adaptation Gameweek slider with blending visualization
     const adaptationSlider = document.getElementById('adaptationGameweek');
     const adaptationValue = document.getElementById('adaptationGameweekValue');
     
     if (adaptationSlider && adaptationValue) {
         adaptationSlider.addEventListener('input', function() {
-            adaptationValue.textContent = this.value;
+            const k = parseInt(this.value);
+            adaptationValue.textContent = k;
+            updateBlendingVisualization(k);
             handleParameterChange();
         });
-        adaptationValue.textContent = adaptationSlider.value;
+        
+        // Initialize
+        const initialK = parseInt(adaptationSlider.value);
+        adaptationValue.textContent = initialK;
+        updateBlendingVisualization(initialK);
     }
     
     // xGI Enable toggle
@@ -107,11 +140,84 @@ function initializeV2Controls() {
         if (slider && value) {
             slider.addEventListener('input', function() {
                 value.textContent = this.value;
+                updateAppliedCapsDisplay();
                 handleParameterChange();
             });
             value.textContent = slider.value;
         }
     });
+    
+    // Initialize applied caps display
+    updateAppliedCapsDisplay();
+}
+
+function handleFormulaVersionChange() {
+    const v2Toggle = document.getElementById('v2Toggle');
+    const isV2 = v2Toggle && v2Toggle.checked;
+    
+    // Update body class for styling
+    document.body.className = isV2 ? 'v2-enabled' : 'v1-enabled';
+    
+    // Update version toggles visual state
+    document.querySelectorAll('.version-toggle').forEach(toggle => {
+        toggle.classList.remove('active');
+    });
+    
+    if (isV2) {
+        document.querySelector('label[for="v2Toggle"]').classList.add('active');
+    } else {
+        document.querySelector('label[for="v1Toggle"]').classList.add('active');
+    }
+    
+    console.log(`🔄 Formula version changed to: ${isV2 ? 'v2.0 Enhanced' : 'v1.0 Legacy'}`);
+    handleParameterChange();
+}
+
+function updateBlendingVisualization(adaptationGameweek) {
+    // Simulate current gameweek (you might want to get this from API)
+    const currentGameweek = 8; // This should come from your gameweek data
+    
+    // Calculate blend weights using the formula: w_current = min(1, (N-1)/(K-1))
+    const currentWeight = Math.min(1, (currentGameweek - 1) / (adaptationGameweek - 1));
+    const historicalWeight = 1 - currentWeight;
+    
+    // Update the visualization bars
+    const historicalPortion = document.getElementById('historicalPortion');
+    const currentPortion = document.getElementById('currentPortion');
+    
+    if (historicalPortion && currentPortion) {
+        const historicalPercent = historicalWeight * 100;
+        const currentPercent = currentWeight * 100;
+        
+        historicalPortion.style.width = `${historicalPercent}%`;
+        currentPortion.style.width = `${currentPercent}%`;
+        
+        // Update labels
+        const historicalGames = 38;
+        const currentGames = currentGameweek;
+        historicalPortion.querySelector('.portion-label').textContent = 
+            `Historical ${historicalGames}+${currentGames}`;
+        currentPortion.querySelector('.portion-label').textContent = 
+            `Current ${currentGames}`;
+    }
+    
+    // Update formula display
+    const blendFormula = document.getElementById('blendFormula');
+    if (blendFormula) {
+        blendFormula.textContent = `w = min(1, (${currentGameweek}-1)/(${adaptationGameweek}-1)) = ${currentWeight.toFixed(2)}`;
+    }
+}
+
+function updateAppliedCapsDisplay() {
+    const appliedCaps = document.getElementById('appliedCaps');
+    if (!appliedCaps) return;
+    
+    const formCap = document.getElementById('formCap')?.value || '2.0';
+    const fixtureCap = document.getElementById('fixtureCap')?.value || '1.8';
+    const xgiCap = document.getElementById('xgiCap')?.value || '2.5';
+    const globalCap = document.getElementById('globalCap')?.value || '3.0';
+    
+    appliedCaps.textContent = `Form: ${formCap}x | Fixture: ${fixtureCap}x | xGI: ${xgiCap}x | Global: ${globalCap}x`;
 }
 
 function setupV2EventListeners() {
@@ -193,8 +299,7 @@ function buildV2ParameterChanges() {
     const v2Config = {
         enabled: true,
         exponential_form: {
-            enabled: true,
-            alpha: parseFloat(document.getElementById('ewmaAlpha')?.value || 0.87)
+            enabled: true
         },
         dynamic_blending: {
             adaptation_gameweek: parseInt(document.getElementById('adaptationGameweek')?.value || 16)
@@ -375,6 +480,10 @@ function loadPlayersData() {
     .then(data => {
         if (data.players && Array.isArray(data.players)) {
             playersData = data.players;
+            
+            // Update gameweek status indicator
+            updateGameweekStatus(data.gameweek_info);
+            
             populateTeamFilter();
             updatePlayerTable();
             console.log(`✅ Loaded ${playersData.length} players with V2.0 calculations`);
@@ -384,7 +493,44 @@ function loadPlayersData() {
     })
     .catch(error => {
         console.error('❌ Player data load error:', error);
+        updateGameweekStatus({ error: 'Failed to load gameweek data' });
     });
+}
+
+function updateGameweekStatus(gameweekInfo) {
+    const statusElement = document.getElementById('gameweekStatus');
+    const statusText = statusElement.querySelector('.status-text');
+    const freshnessText = statusElement.querySelector('.freshness-text');
+    
+    if (gameweekInfo && gameweekInfo.current_gameweek) {
+        // Update status badge
+        statusText.textContent = `Currently viewing: Gameweek ${gameweekInfo.current_gameweek}`;
+        
+        // Update freshness indicator
+        const now = new Date();
+        const timeString = now.toLocaleString('en-GB', {
+            day: '2-digit',
+            month: 'short', 
+            hour: '2-digit',
+            minute: '2-digit'
+        });
+        
+        const detectionInfo = gameweekInfo.detection_method === 'GameweekManager' 
+            ? 'Auto-detected' 
+            : gameweekInfo.data_source;
+            
+        freshnessText.textContent = `${detectionInfo} | Updated: ${timeString}`;
+        
+        // Add protection indicator if active
+        if (gameweekInfo.emergency_protection_active) {
+            statusText.innerHTML += ' <span style="color: #28a745; font-size: 12px;">🛡️ GW1 Protected</span>';
+        }
+        
+        console.log(`🎯 Gameweek status updated: GW${gameweekInfo.current_gameweek}`);
+    } else {
+        statusText.textContent = 'Gameweek detection failed';
+        freshnessText.textContent = 'Unable to determine data status';
+    }
 }
 
 function updatePlayerTable() {

@@ -3,6 +3,10 @@
 Check current database structure to avoid duplicate data imports
 """
 import psycopg2
+import sys
+import os
+sys.path.append(os.path.dirname(os.path.join(os.path.dirname(__file__), 'src')))
+from src.gameweek_manager import GameweekManager
 
 def check_database_structure():
     try:
@@ -72,16 +76,20 @@ def check_database_structure():
             print("No historical data columns found")
             
         print("\n=== SAMPLE PLAYER DATA ===")
+        # Get current gameweek using GameweekManager
+        gw_manager = GameweekManager()
+        current_gameweek = gw_manager.get_current_gameweek()
+        
         cursor.execute("""
             SELECT name, ppg, price, value_score, gameweek
             FROM players p
             JOIN player_metrics pm ON p.id = pm.player_id
-            WHERE gameweek = 1
+            WHERE gameweek = %s
             ORDER BY value_score DESC
             LIMIT 5
-        """)
+        """, (current_gameweek,))
         
-        print("Top 5 players by PP$ (value_score):")
+        print(f"Top 5 players by PP$ (value_score) - Gameweek {current_gameweek}:")
         for row in cursor.fetchall():
             print(f"  {row[0]:<20} PPG:{row[1]:<6} Price:{row[2]:<6} PP$:{row[3]:<6} GW:{row[4]}")
         

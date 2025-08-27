@@ -1,0 +1,11 @@
+{
+  "permissions": {
+    "allow": [
+      "Bash(python:*)",
+      "Bash(find:*)"
+    ],
+    "additionalDirectories": [
+      "C:\\c\\Users\\halvo\\.claude\\Fantrax_Value_Hunter"
+    ]
+  }
+}

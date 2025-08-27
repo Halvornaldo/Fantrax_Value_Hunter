@@ -58,10 +58,13 @@ class FormulaEngineV2:
             base_ppg, current_weight = self._calculate_blended_ppg(player_data)
             
             # Step 2: Calculate all multipliers with v2.0 improvements
-            form_mult = self._calculate_form_multiplier(player_data)
-            fixture_mult = self._calculate_exponential_fixture_multiplier(player_data)
-            starter_mult = player_data.get('starter_multiplier', 1.0)
-            xgi_mult = self._calculate_xgi_multiplier(player_data)
+            # Apply formula toggles - if disabled, use 1.0x (no effect)
+            formula_toggles = self.v2_config.get('formula_toggles', {})
+            
+            form_mult = self._calculate_form_multiplier(player_data) if formula_toggles.get('form_enabled', True) else 1.0
+            fixture_mult = self._calculate_exponential_fixture_multiplier(player_data) if formula_toggles.get('fixture_enabled', True) else 1.0
+            starter_mult = player_data.get('starter_multiplier', 1.0) if formula_toggles.get('starter_enabled', True) else 1.0
+            xgi_mult = self._calculate_xgi_multiplier(player_data) if formula_toggles.get('xgi_enabled', True) else 1.0
             
             # Ensure all multipliers are floats and handle None
             if starter_mult is None:
@@ -123,9 +126,9 @@ class FormulaEngineV2:
                         'adaptation_gw': self.v2_config.get('dynamic_blending', {}).get('full_adaptation_gw', 16)
                     },
                     'caps_applied': {
-                        'form': form_mult != self._calculate_form_multiplier(player_data),
-                        'fixture': fixture_mult != self._calculate_exponential_fixture_multiplier_raw(player_data),
-                        'xgi': xgi_mult != self._calculate_xgi_multiplier_raw(player_data),
+                        'form': form_mult != self._calculate_form_multiplier(player_data) if formula_toggles.get('form_enabled', True) else False,
+                        'fixture': fixture_mult != self._calculate_exponential_fixture_multiplier_raw(player_data) if formula_toggles.get('fixture_enabled', True) else False,
+                        'xgi': xgi_mult != self._calculate_xgi_multiplier_raw(player_data) if formula_toggles.get('xgi_enabled', True) else False,
                         'global': true_value == max_allowed
                     },
                     'feature_flags': {  # SPRINT 2: Feature status
@@ -168,7 +171,7 @@ class FormulaEngineV2:
         Algorithm: More recent games have exponentially higher weights (α=0.87)
         """
         try:
-            alpha = self.v2_config.get('exponential_form', {}).get('alpha', 0.87)
+            alpha = self.v2_config.get('ewma_form', {}).get('alpha', 0.87)
             
             # Get recent points from database if not provided
             recent_games = player_data.get('recent_points', [])
@@ -319,7 +322,12 @@ class FormulaEngineV2:
         """
         Calculate xGI multiplier using Sprint 2 normalized ratio calculation
         """
-        # Check if xGI integration is enabled (use main xgi_integration config)
+        # CRITICAL FIX: Check V2 normalized_xgi setting first - this controls calculation
+        v2_xgi_enabled = self.v2_config.get('normalized_xgi', {}).get('enabled', False)
+        if not v2_xgi_enabled:
+            return 1.0
+        
+        # Also check if xGI integration data is available
         xgi_config = self.params.get('xgi_integration', {})
         if not xgi_config.get('enabled', False):
             return 1.0
@@ -430,18 +438,15 @@ class FormulaEngineV2:
         return max(0.1, blended_ppg), w_current
     
     def _get_current_gameweek(self) -> int:
-        """Get current gameweek from database"""
+        """Get current gameweek using unified GameweekManager"""
         try:
-            import psycopg2
-            conn = psycopg2.connect(**self.db_config)
-            cursor = conn.cursor()
-            cursor.execute('SELECT MAX(gameweek) FROM player_metrics WHERE gameweek IS NOT NULL')
-            current_gameweek = cursor.fetchone()[0] or 1
-            cursor.close()
-            conn.close()
+            from src.gameweek_manager import GameweekManager
+            gw_manager = GameweekManager(self.db_config)
+            current_gameweek = gw_manager.get_current_gameweek()
+            logger.info(f"V2.0 Engine using GameweekManager detected gameweek: GW{current_gameweek}")
             return current_gameweek
         except Exception as e:
-            logger.warning(f"Failed to get current gameweek from database: {e}")
+            logger.warning(f"Failed to get current gameweek from GameweekManager: {e}")
             return 1  # Fallback to GW1
     
     def _get_error_result(self, player_id: str, error_msg: str) -> Dict[str, Any]:

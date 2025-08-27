@@ -1,0 +1,199 @@
+Team,Player Name,Position,Predicted Status
+ARS,Raya Martin,G,Starter
+ARS,White,D,Starter
+ARS,Gabriel,D,Starter
+ARS,Saliba,D,Starter
+ARS,Lewis-Skelly,M,Starter
+ARS,Odegaard,M,Starter
+ARS,Zubimendi,M,Starter
+ARS,Rice,M,Starter
+ARS,Saka,F,Starter
+ARS,Gyokeres,F,Starter
+ARS,Martinelli,F,Starter
+AVL,Bizot,G,Starter
+AVL,Cash,D,Starter
+AVL,Konsa Ngoyo,D,Starter
+AVL,Torres,D,Starter
+AVL,Maatsen,M,Starter
+AVL,Rogers,M,Starter
+AVL,Kamara,M,Starter
+AVL,Mvom Onana,M,Starter
+AVL,McGinn,F,Starter
+AVL,Tielemans,F,Starter
+AVL,Watkins,F,Starter
+BOU,Petrovic,G,Starter
+BOU,Araujo,D,Starter
+BOU,Hill,D,Starter
+BOU,Senesi,D,Starter
+BOU,Truffert,M,Starter
+BOU,Tavernier,M,Starter
+BOU,Adams,M,Starter
+BOU,Brooks,M,Starter
+BOU,Scott,F,Starter
+BOU,Semenyo,F,Starter
+BOU,Evanilson,F,Starter
+BRE,Kelleher,G,Starter
+BRE,Kayode,D,Starter
+BRE,Collins,D,Starter
+BRE,van den Berg,D,Starter
+BRE,Henry,M,Starter
+BRE,Henderson,M,Starter
+BRE,Yarmolyuk,M,Starter
+BRE,Carvalho,M,Starter
+BRE,Damsgaard,F,Starter
+BRE,Lewis-Potter,F,Starter
+BRE,Thiago,F,Starter
+BHA,Verbruggen,G,Starter
+BHA,Wieffer,D,Starter
+BHA,van Hecke,D,Starter
+BHA,Dunk,D,Starter
+BHA,De Cuyper,M,Starter
+BHA,Gómez,M,Starter
+BHA,Ayari,M,Starter
+BHA,Minteh,M,Starter
+BHA,O’Riley,F,Starter
+BHA,Mitoma,F,Starter
+BHA,Rutter,F,Starter
+BUR,Weiß,G,Starter
+BUR,Sonne,D,Starter
+BUR,Walker,D,Starter
+BUR,Ekdal,D,Starter
+BUR,Esteve,M,Starter
+BUR,Hartman,M,Starter
+BUR,Mejbri,M,Starter
+BUR,Cullen,M,Starter
+BUR,Ugochukwu,F,Starter
+BUR,Anthony,F,Starter
+BUR,Foster,F,Starter
+CHE,Sanchez,G,Starter
+CHE,James,D,Starter
+CHE,Chalobah,D,Starter
+CHE,Tosin,D,Starter
+CHE,Cucurella,M,Starter
+CHE,Moises Caicedo,M,Starter
+CHE,Fernández,M,Starter
+CHE,Neto,M,Starter
+CHE,Palmer,F,Starter
+CHE,Gittens,F,Starter
+CHE,João Pedro,F,Starter
+CRY,Henderson,G,Starter
+CRY,Richards,D,Starter
+CRY,Lacroix,D,Starter
+CRY,Marc Guehi,D,Starter
+CRY,Muñoz,M,Starter
+CRY,Hughes,M,Starter
+CRY,Wharton,M,Starter
+CRY,Mitchell,M,Starter
+CRY,Ismaila Sarr,F,Starter
+CRY,Eze,F,Starter
+CRY,Mateta,F,Starter
+EVE,Pickford,G,Starter
+EVE,O'Brien,D,Starter
+EVE,Tarkowski,D,Starter
+EVE,Keane,D,Starter
+EVE,Aznou,M,Starter
+EVE,Dewsbury-Hall,M,Starter
+EVE,Garner,M,Starter
+EVE,Gueye,M,Starter
+EVE,Alcaraz,F,Starter
+EVE,Beto,F,Starter
+EVE,Ndiaye,F,Starter
+FUL,Leno,G,Starter
+FUL,Tete,D,Starter
+FUL,Andersen,D,Starter
+FUL,Bassey,D,Starter
+FUL,Sessegnon (Ryan),M,Starter
+FUL,Berge,M,Starter
+FUL,Lukic,M,Starter
+FUL,Wilson,M,Starter
+FUL,King,F,Starter
+FUL,Iwobi,F,Starter
+FUL,Raúl Jiménez,F,Starter
+LIV,Alisson,G,Starter
+LIV,Frimpong,D,Starter
+LIV,Konaté,D,Starter
+LIV,van Dijk,D,Starter
+LIV,Kerkez,M,Starter
+LIV,Szoboszlai,M,Starter
+LIV,Mac Allister,M,Starter
+LIV,Salah,M,Starter
+LIV,Wirtz,F,Starter
+LIV,Gakpo,F,Starter
+LIV,Ekitiké,F,Starter
+MCI,Ederson,G,Starter
+MCI,Matheus Nunes,D,Starter
+MCI,Akanji,D,Starter
+MCI,Rúben Dias,D,Starter
+MCI,Ait Nouri,M,Starter
+MCI,Reijnders,M,Starter
+MCI,Gundogan,M,Starter
+MCI,Bernardo Silva,M,Starter
+MCI,Cherki,F,Starter
+MCI,Doku,F,Starter
+MCI,Haaland,F,Starter
+MUN,Onana,G,Starter
+MUN,Yoro,D,Starter
+MUN,de Ligt,D,Starter
+MUN,Shaw,D,Starter
+MUN,Amad Diallo,M,Starter
+MUN,Ugarte,M,Starter
+MUN,Casemiro,M,Starter
+MUN,Dorgu,M,Starter
+MUN,Mbeumo,F,Starter
+MUN,Bruno Fernandes,F,Starter
+MUN,Matheus Cunha,F,Starter
+NEW,Pope,G,Starter
+NEW,Trippier,D,Starter
+NEW,Schär,D,Starter
+NEW,Burn,D,Starter
+NEW,Livramento,M,Starter
+NEW,Bruno Guimarães,M,Starter
+NEW,Tonali,M,Starter
+NEW,Joelinton,M,Starter
+NEW,Murphy (Jacob),F,Starter
+NEW,Gordon,F,Starter
+NEW,Barnes,F,Starter
+NFO,Sels,G,Starter
+NFO,Aina,D,Starter
+NFO,Milenkovic,D,Starter
+NFO,Murillo,D,Starter
+NFO,Williams,M,Starter
+NFO,Sangaré,M,Starter
+NFO,Anderson,M,Starter
+NFO,Ndoye,M,Starter
+NFO,Gibbs-White,F,Starter
+NFO,Hudson-Odoi,F,Starter
+NFO,Wood,F,Starter
+TOT,Vicario,G,Starter
+TOT,Porro,D,Starter
+TOT,Romero,D,Starter
+TOT,van de Ven,D,Starter
+TOT,Spence,M,Starter
+TOT,João Palhinha,M,Starter
+TOT,Bentancur,M,Starter
+TOT,Kudus,M,Starter
+TOT,Sarr,F,Starter
+TOT,Odobert,F,Starter
+TOT,Richarlison,F,Starter
+WHU,Areola,G,Starter
+WHU,Todibo,D,Starter
+WHU,Aguerd,D,Starter
+WHU,Kilman,D,Starter
+WHU,Wan-Bissaka,M,Starter
+WHU,Ward-Prowse,M,Starter
+WHU,Potts,M,Starter
+WHU,Lucas Paquetá,M,Starter
+WHU,Diouf,F,Starter
+WHU,Füllkrug,F,Starter
+WHU,Bowen,F,Starter
+WOL,José Sá,G,Starter
+WOL,Doherty,D,Starter
+WOL,Agbadou,D,Starter
+WOL,Toti,D,Starter
+WOL,Hoever,M,Starter
+WOL,João Gomes,M,Starter
+WOL,André,M,Starter
+WOL,Møller Wolfe,M,Starter
+WOL,Arias,F,Starter
+WOL,Fernando López,F,Starter
+WOL,Strand Larsen,F,Starter

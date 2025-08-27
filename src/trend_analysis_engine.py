@@ -529,7 +529,9 @@ def calculate_player_trends(db_config: Dict,
                           parameters: Dict = None) -> List[Dict]:
     """Calculate trends for a specific player"""
     if gameweek_end is None:
-        # Get current gameweek from database
+        # Get latest gameweek with raw snapshot data
+        # Note: Uses MAX from raw_player_snapshots (not GameweekManager) because
+        # trend analysis operates on raw snapshot data independently
         with psycopg2.connect(**db_config) as conn:
             cursor = conn.cursor()
             cursor.execute("SELECT MAX(gameweek) FROM raw_player_snapshots")

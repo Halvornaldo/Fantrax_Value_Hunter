@@ -242,8 +242,11 @@
                 
                 <div class="form-group">
                     <label for="gameweek">Gameweek Number:</label>
-                    <input type="number" id="gameweek" name="gameweek" min="1" max="38" required placeholder="e.g. 1">
-                    <small style="color: #6c757d;">Premier League gameweek (1-38)</small>
+                    <input type="number" id="gameweek" name="gameweek" min="1" max="38" required placeholder="Loading...">
+                    <div id="gameweekSuggestion" style="margin-top: 8px; padding: 10px; border-radius: 4px; display: none;">
+                        <!-- Dynamic gameweek suggestion will appear here -->
+                    </div>
+                    <small style="color: #6c757d;">System will suggest the correct gameweek based on current data</small>
                 </div>
                 
                 <button type="submit" class="upload-btn">
@@ -328,10 +331,34 @@
                     `;
                 } else {
                     result.className = 'result error';
-                    result.innerHTML = `
+                    let errorHtml = `
                         <h3>❌ Upload Failed</h3>
                         <p><strong>Error:</strong> ${data.error}</p>
                     `;
+                    
+                    // Show suggestions for GameweekManager validation errors
+                    if (data.suggestion) {
+                        errorHtml += `<p><strong>Suggestion:</strong> ${data.suggestion}</p>`;
+                    }
+                    
+                    if (data.suggested_gameweek) {
+                        errorHtml += `
+                            <div style="margin-top: 15px; padding: 15px; background: #fff3cd; border-radius: 6px; border: 1px solid #ffc107;">
+                                <strong>💡 Recommended Action:</strong><br>
+                                Try uploading as <strong>GW${data.suggested_gameweek}</strong> instead.<br>
+                                <button onclick="document.getElementById('gameweek').value = ${data.suggested_gameweek}; document.getElementById('result').style.display = 'none';" 
+                                        style="margin-top: 8px; padding: 6px 12px; background: #ffc107; border: none; border-radius: 4px; cursor: pointer;">
+                                    Use GW${data.suggested_gameweek}
+                                </button>
+                            </div>
+                        `;
+                    }
+                    
+                    if (data.current_gameweek) {
+                        errorHtml += `<p><small>Current system gameweek: GW${data.current_gameweek}</small></p>`;
+                    }
+                    
+                    result.innerHTML = errorHtml;
                 }
                 
                 result.style.display = 'block';
@@ -359,6 +386,106 @@
                 this.value = '';
             }
         });
+        
+        // Smart Upload System - Load current gameweek and provide suggestions
+        async function initializeSmartUpload() {
+            try {
+                const response = await fetch('/api/gameweek-status');
+                const data = await response.json();
+                
+                const gameweekInput = document.getElementById('gameweek');
+                const suggestion = document.getElementById('gameweekSuggestion');
+                
+                if (data.success) {
+                    const currentGW = data.current_gameweek;
+                    const nextGW = data.next_gameweek;
+                    
+                    // Set suggested gameweek as current
+                    gameweekInput.value = currentGW;
+                    gameweekInput.placeholder = `Current: GW${currentGW}`;
+                    
+                    // Show smart suggestion
+                    suggestion.style.display = 'block';
+                    suggestion.style.background = '#e3f2fd';
+                    suggestion.style.border = '1px solid #2196f3';
+                    suggestion.style.color = '#1565c0';
+                    suggestion.innerHTML = `
+                        <strong>💡 Smart Upload Suggestion:</strong><br>
+                        Current system gameweek: <strong>GW${currentGW}</strong><br>
+                        • Upload GW${currentGW} to update current data<br>
+                        • Upload GW${nextGW} for new gameweek data<br>
+                        <small style="opacity: 0.8;">System will validate your choice before upload</small>
+                    `;
+                } else {
+                    gameweekInput.placeholder = "Enter gameweek";
+                    suggestion.style.display = 'block';
+                    suggestion.style.background = '#fff3cd';
+                    suggestion.style.border = '1px solid #ffc107';
+                    suggestion.style.color = '#856404';
+                    suggestion.innerHTML = `
+                        <strong>⚠️ Could not load gameweek info</strong><br>
+                        System will validate your gameweek choice when uploading.
+                    `;
+                }
+            } catch (error) {
+                console.warn('Failed to load gameweek status:', error);
+                const suggestion = document.getElementById('gameweekSuggestion');
+                suggestion.style.display = 'block';
+                suggestion.style.background = '#f8d7da';
+                suggestion.style.border = '1px solid #f5c6cb';
+                suggestion.style.color = '#721c24';
+                suggestion.innerHTML = `
+                    <strong>⚠️ Connection issue</strong><br>
+                    System will validate gameweek when you upload.
+                `;
+            }
+        }
+        
+        // Gameweek input validation and smart suggestions
+        document.getElementById('gameweek').addEventListener('input', function(e) {
+            const value = parseInt(e.target.value);
+            const suggestion = document.getElementById('gameweekSuggestion');
+            
+            if (!value || value < 1 || value > 38) {
+                return;
+            }
+            
+            // Show confirmation for common upload scenarios
+            if (value === 1) {
+                suggestion.style.display = 'block';
+                suggestion.style.background = '#f8d7da';
+                suggestion.style.border = '1px solid #f5c6cb';
+                suggestion.style.color = '#721c24';
+                suggestion.innerHTML = `
+                    <strong>🚨 GW1 Upload Warning</strong><br>
+                    GW1 is protected during system upgrade. Upload may be blocked.<br>
+                    <small>Contact admin if you need to override this protection.</small>
+                `;
+            } else if (value > 20) {
+                suggestion.style.display = 'block';
+                suggestion.style.background = '#fff3cd';
+                suggestion.style.border = '1px solid #ffc107';
+                suggestion.style.color = '#856404';
+                suggestion.innerHTML = `
+                    <strong>⚠️ High Gameweek Number</strong><br>
+                    GW${value} seems high. Make sure this is correct.<br>
+                    <small>System will validate before processing.</small>
+                `;
+            } else {
+                // Show normal confirmation for reasonable gameweeks
+                suggestion.style.display = 'block';
+                suggestion.style.background = '#d4edda';
+                suggestion.style.border = '1px solid #c3e6cb';
+                suggestion.style.color = '#155724';
+                suggestion.innerHTML = `
+                    <strong>✅ Ready to Upload</strong><br>
+                    GW${value} looks reasonable. System will validate before processing.
+                `;
+            }
+        });
+        
+        // Initialize smart upload system when page loads
+        document.addEventListener('DOMContentLoaded', initializeSmartUpload);
     </script>
 </body>
 </html>

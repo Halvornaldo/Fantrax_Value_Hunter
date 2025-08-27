@@ -16,15 +16,25 @@
             <!-- Header -->
             <div class="panel-header">
                 <h2>Parameter Controls</h2>
-                <div class="formula-version-badge v2-enhanced">
-                    <span class="version-indicator">V2.0</span>
-                    <span class="formula-label">Enhanced</span>
-                </div>
             </div>
 
-            <!-- V2.0 Features List -->
-            <div class="parameter-group v2-features">
-                <div class="feature-list">
+            <!-- Formula Version Selection -->
+            <div class="parameter-group formula-version-section">
+                <div class="group-header">
+                    <span class="version-badge">V2.0</span>
+                    <h3>Formula Version</h3>
+                </div>
+                <div class="version-toggles">
+                    <label class="version-toggle">
+                        <input type="radio" name="formula-version" value="v1" id="v1Toggle">
+                        <span class="toggle-btn">v1.0 Legacy</span>
+                    </label>
+                    <label class="version-toggle active">
+                        <input type="radio" name="formula-version" value="v2" id="v2Toggle" checked>
+                        <span class="toggle-btn">v2.0 Enhanced</span>
+                    </label>
+                </div>
+                <div class="version-features">
                     <div class="feature-item enabled">
                         <span class="checkmark">✓</span>
                         <span>Separated True Value & ROI</span>
@@ -46,7 +56,7 @@
                         <span>Exponential Fixtures</span>
                     </div>
                 </div>
-                <div class="v2-description">
+                <div class="version-description">
                     <em>v2.0 provides research-validated calculations with 10-15% better accuracy</em>
                 </div>
             </div>
@@ -54,66 +64,104 @@
             <!-- Model Validation Status -->
             <div class="parameter-group model-validation">
                 <div class="group-header">
-                    <span class="status-indicator not-available">●</span>
+                    <span class="status-indicator not-available" id="validationStatus">Not Available</span>
                     <h3>Model Validation Status</h3>
                 </div>
-                <div class="validation-grid">
-                    <div class="metric-item">
+                <div class="validation-metrics">
+                    <div class="metric-box">
                         <div class="metric-label">RMSE:</div>
                         <div class="metric-value" id="rmse-value">--</div>
+                        <div class="metric-status" id="rmse-status">📊</div>
                     </div>
-                    <div class="metric-item">
+                    <div class="metric-box">
                         <div class="metric-label">Correlation:</div>
                         <div class="metric-value" id="correlation-value">--</div>
+                        <div class="metric-status" id="correlation-status">📊</div>
                     </div>
-                    <div class="metric-item">
+                    <div class="metric-box">
                         <div class="metric-label">Precision@20:</div>
                         <div class="metric-value" id="precision-value">--</div>
+                        <div class="metric-status" id="precision-status">📊</div>
                     </div>
                 </div>
-                <div class="validation-buttons">
-                    <button id="runValidation" class="btn btn-primary btn-small">🏃 Run Validation</button>
-                    <button id="viewResults" class="btn btn-secondary btn-small">📊 View Results</button>
+                <div class="validation-actions">
+                    <button id="runValidation" class="btn btn-primary btn-full">🏃 Run Validation</button>
+                    <button id="viewResults" class="btn btn-secondary btn-full">📊 View Results</button>
                 </div>
-                <div class="validation-note">
-                    <small>Last validation: Not run<br>
-                    <em>Run validation to assess model quality and performance metrics.</em></small>
+                <div class="validation-info">
+                    <div class="last-validation">Last validation: <span id="lastValidation">Not run</span></div>
+                    <div class="validation-help">Run validation to assess model quality and performance metrics.</div>
                 </div>
             </div>
 
             <!-- EWMA Form Calculation -->
-            <div class="parameter-group">
+            <div class="parameter-group ewma-section">
                 <div class="group-header">
                     <h3>EWMA Form Calculation</h3>
                 </div>
                 <div class="parameter-content">
                     <div class="slider-container">
                         <label for="ewmaAlpha">EWMA Alpha (α):</label>
-                        <input type="range" id="ewmaAlpha" min="0.1" max="1.0" step="0.01" value="0.87">
-                        <span class="slider-value" id="ewmaAlphaValue">0.87</span>
+                        <div class="slider-wrapper">
+                            <input type="range" id="ewmaAlpha" min="0.1" max="1.0" step="0.01" value="0.87">
+                            <span class="slider-value" id="ewmaAlphaValue">0.87</span>
+                        </div>
                     </div>
-                    <div class="half-life-display">
-                        <small>Half-life: <span id="halfLife">~0.3 games</span></small>
+                    <div class="ewma-info">
+                        <div class="info-row">
+                            <span class="info-label">Half-life:</span>
+                            <span class="info-value" id="halfLife">~0.3 games</span>
+                        </div>
+                        <div class="info-row">
+                            <span class="info-label">Recent Game Weight:</span>
+                            <span class="info-value" id="recentWeight">87%</span>
+                        </div>
+                    </div>
+                    <div class="ewma-help">
+                        <small>v2.5 Enhancement: Exponential weighting gives more importance to recent performances, with α=0.87 meaning recent games carry 87% weight vs. older games.</small>
                     </div>
                 </div>
             </div>
 
             <!-- Dynamic Blending -->
-            <div class="parameter-group">
+            <div class="parameter-group blending-section">
                 <div class="group-header">
                     <h3>Dynamic Blending</h3>
                 </div>
                 <div class="parameter-content">
                     <div class="slider-container">
                         <label for="adaptationGameweek">Adaptation Gameweek (K):</label>
-                        <input type="range" id="adaptationGameweek" min="8" max="20" step="1" value="16">
-                        <span class="slider-value" id="adaptationGameweekValue">16</span>
+                        <div class="slider-wrapper">
+                            <input type="range" id="adaptationGameweek" min="8" max="20" step="1" value="16">
+                            <span class="slider-value" id="adaptationGameweekValue">16</span>
+                        </div>
+                    </div>
+                    <div class="blending-visualization">
+                        <div class="blend-display">
+                            <div class="blend-bar">
+                                <div class="historical-portion" id="historicalPortion" style="width: 80%">
+                                    <span class="portion-label">Historical 38+2</span>
+                                </div>
+                                <div class="current-portion" id="currentPortion" style="width: 20%">
+                                    <span class="portion-label">Current 8</span>
+                                </div>
+                            </div>
+                        </div>
+                        <div class="blend-info">
+                            <div class="info-row">
+                                <span class="info-label">Current formula:</span>
+                                <span class="info-value" id="blendFormula">w = min(1, (N-1)/(K-1))</span>
+                            </div>
+                        </div>
+                    </div>
+                    <div class="blending-help">
+                        <small>v2.5 Enhancement: Exponential blending from historical (38+X) games to current season data, ensuring smooth transition as season progresses.</small>
                     </div>
                 </div>
             </div>
 
             <!-- Normalized xGI -->
-            <div class="parameter-group">
+            <div class="parameter-group xgi-section">
                 <div class="group-header">
                     <h3>Normalized xGI</h3>
                 </div>
@@ -128,41 +176,72 @@
                     <div class="xgi-controls" id="xgiControls" style="display: none;">
                         <div class="slider-container">
                             <label for="xgiStrength">Normalization Strength:</label>
-                            <input type="range" id="xgiStrength" min="0.5" max="2.0" step="0.1" value="1.0">
-                            <span class="slider-value" id="xgiStrengthValue">1.0</span>
+                            <div class="slider-wrapper">
+                                <input type="range" id="xgiStrength" min="0.5" max="2.0" step="0.1" value="1.0">
+                                <span class="slider-value" id="xgiStrengthValue">1.0</span>
+                            </div>
                         </div>
+                        <div class="xgi-info">
+                            <div class="info-row">
+                                <span class="info-label">Position Adjustments:</span>
+                                <span class="info-value">Defenders, Midfielders, Forwards</span>
+                            </div>
+                        </div>
+                    </div>
+                    <div class="xgi-help">
+                        <small>v2.5 Enhancement: Normalized Expected Goals Involvement using 2024-25 baseline data for position-specific comparisons.</small>
                     </div>
                 </div>
             </div>
 
             <!-- Multiplier Caps -->
-            <div class="parameter-group">
+            <div class="parameter-group caps-section">
                 <div class="group-header">
                     <h3>Multiplier Caps</h3>
                 </div>
                 <div class="parameter-content">
-                    <div class="slider-container">
-                        <label for="formCap">Form Cap:</label>
-                        <input type="range" id="formCap" min="1.5" max="3.0" step="0.1" value="2.0">
-                        <span class="slider-value" id="formCapValue">2.0</span>
+                    <div class="caps-grid">
+                        <div class="cap-item">
+                            <label for="formCap">Form Cap:</label>
+                            <div class="slider-wrapper">
+                                <input type="range" id="formCap" min="1.5" max="3.0" step="0.1" value="2.0">
+                                <span class="slider-value" id="formCapValue">2.0</span>
+                            </div>
+                        </div>
+                        <div class="cap-item">
+                            <label for="fixtureCap">Fixture Cap:</label>
+                            <div class="slider-wrapper">
+                                <input type="range" id="fixtureCap" min="1.3" max="2.5" step="0.1" value="1.8">
+                                <span class="slider-value" id="fixtureCapValue">1.8</span>
+                            </div>
+                        </div>
+                        <div class="cap-item">
+                            <label for="xgiCap">xGI Cap:</label>
+                            <div class="slider-wrapper">
+                                <input type="range" id="xgiCap" min="2.0" max="4.0" step="0.1" value="2.5">
+                                <span class="slider-value" id="xgiCapValue">2.5</span>
+                            </div>
+                        </div>
+                        <div class="cap-item">
+                            <label for="globalCap">Global Cap:</label>
+                            <div class="slider-wrapper">
+                                <input type="range" id="globalCap" min="2.5" max="5.0" step="0.1" value="3.0">
+                                <span class="slider-value" id="globalCapValue">3.0</span>
+                            </div>
+                        </div>
                     </div>
-                    <div class="slider-container">
-                        <label for="fixtureCap">Fixture Cap:</label>
-                        <input type="range" id="fixtureCap" min="1.3" max="2.5" step="0.1" value="1.8">
-                        <span class="slider-value" id="fixtureCapValue">1.8</span>
+                    <div class="caps-info">
+                        <div class="info-row">
+                            <span class="info-label">Applied Caps:</span>
+                            <span class="info-value" id="appliedCaps">Form: 2.0x | Fixture: 1.8x | xGI: 2.5x | Global: 3.0x</span>
+                        </div>
                     </div>
-                    <div class="slider-container">
-                        <label for="xgiCap">xGI Cap:</label>
-                        <input type="range" id="xgiCap" min="2.0" max="4.0" step="0.1" value="2.5">
-                        <span class="slider-value" id="xgiCapValue">2.5</span>
-                    </div>
-                    <div class="slider-container">
-                        <label for="globalCap">Global Cap:</label>
-                        <input type="range" id="globalCap" min="2.5" max="5.0" step="0.1" value="3.0">
-                        <span class="slider-value" id="globalCapValue">3.0</span>
+                    <div class="caps-help">
+                        <small>v2.5 Enhancement: Individual and global multiplier caps prevent extreme outliers while maintaining meaningful differentiation.</small>
                     </div>
                 </div>
             </div>
+
 
             <!-- Action Buttons -->
             <div class="action-buttons">
@@ -181,6 +260,16 @@
             <!-- Header -->
             <div class="panel-header">
                 <h2>All 633 Premier League Players</h2>
+                <!-- Gameweek Status Indicator -->
+                <div class="gameweek-status" id="gameweekStatus">
+                    <div class="status-badge">
+                        <span class="status-icon">🎯</span>
+                        <span class="status-text">Loading gameweek...</span>
+                    </div>
+                    <div class="data-freshness">
+                        <span class="freshness-text">Last updated: Loading...</span>
+                    </div>
+                </div>
             </div>
 
             <!-- Filters and Controls -->

@@ -1,0 +1,55 @@
+{
+  "discovery_timestamp": "2025-08-21T03:01:07.449817",
+  "england": {
+    "country": "England",
+    "country_code": "ENG",
+    "governing_body": "UEFA",
+    "#_clubs": 45,
+    "#_players": 1250,
+    "national_teams": [
+      "M",
+      "F"
+    ]
+  },
+  "premier_league": {
+    "league_id": 9,
+    "competition_name": "Premier League",
+    "gender": "M",
+    "first_season": "1992-1993",
+    "last_season": "2024-2025",
+    "tier": "1st"
+  },
+  "current_season": {
+    "season_id": "2024-2025",
+    "competition_name": "Premier League",
+    "#_squads": 20,
+    "champion": "TBD",
+    "top_scorer": {
+      "player": "TBD",
+      "goals_scored": 0
+    }
+  },
+  "league_details": {
+    "lg_id": 9,
+    "season_id": "2024-2025",
+    "league_start": "2024-08-17",
+    "league_end": "2025-05-25",
+    "league_type": "league",
+    "has_adv_stats": "yes",
+    "rounds": [
+      "Matchweek 1",
+      "Matchweek 2",
+      "Matchweek 3"
+    ]
+  },
+  "summary": {
+    "country_code": "ENG",
+    "league_id": 9,
+    "league_name": "Premier League",
+    "season_id": "2024-2025",
+    "num_teams": 20,
+    "has_advanced_stats": "yes",
+    "season_start": "2024-08-17",
+    "season_end": "2025-05-25"
+  }
+}
