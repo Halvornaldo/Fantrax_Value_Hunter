@@ -28,6 +28,14 @@
 
 **✅ Safe Production System**: Complete V2.0 consolidation with comprehensive documentation
 
+### Recent Major Features (2025-08-28)
+- **Weekly Archive System**: Manual archive button in React dashboard for flexible weekly analysis workflow
+- **Gameweek System Simplification**: Removed rigid gameweek constraints that blocked data access during transitions  
+- **Archive Workflow Integration**: Complete analysis state preservation without gameweek lockouts
+- **Missing Module Fix**: Created `gameweek_manager.py` to resolve Flask server crashes during archive operations
+- **Live Analysis Continuity**: System maintains player data accessibility regardless of gameweek status
+- **Documentation Updates**: Complete archive system documentation across API_REFERENCE, FEATURE_GUIDE, and DEVELOPMENT_SETUP
+
 ### Recent Major Features (2025-08-23)
 - **Raw Data Snapshot System**: Complete trend analysis architecture for retrospective "apples-to-apples" analysis
 - **Current Season Analytics**: Simplified trend engine using current-season-only baselines for immediate Week 1 capture

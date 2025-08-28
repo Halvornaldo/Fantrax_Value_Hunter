@@ -16,7 +16,7 @@
     "manual_overrides": {},
     "auto_rotation_penalty": 0.75,
     "force_bench_penalty": 0.6,
-    "force_out_penalty": 0.0,
+    "force_out_penalty": 0,
     "description": "Starter prediction system with manual overrides and penalty settings"
   },
   "formula_optimization_v2": {
@@ -25,10 +25,11 @@
       "form_enabled": false,
       "fixture_enabled": true,
       "starter_enabled": true,
-      "xgi_enabled": true
+      "xgi_enabled": false
     },
     "exponential_form": {
-      "enabled": true
+      "enabled": true,
+      "alpha": 0.87
     },
     "dynamic_blending": {
       "enabled": true,
@@ -36,7 +37,12 @@
     },
     "normalized_xgi": {
       "enabled": false,
-      "normalization_strength": 1.0
+      "normalization_strength": 1,
+      "position_adjustments": {
+        "defenders": true,
+        "midfielders": true,
+        "forwards": true
+      }
     },
     "exponential_fixture": {
       "enabled": true,
@@ -52,7 +58,7 @@
       "form": 1.1,
       "fixture": 1.8,
       "xgi": 2.5,
-      "global": 3.0
+      "global": 3
     },
     "ewma_form": {
       "alpha": 0.87

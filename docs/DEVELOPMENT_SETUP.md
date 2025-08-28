@@ -220,6 +220,49 @@ curl "http://localhost:5001/api/players?limit=10&sort_by=true_value"
 - Manual override system works with V2.0 recalculation
 - Import workflows accessible at `/form-upload` and `/odds-upload`
 
+**Archive System Testing** ✅ *Added 2025-08-28*:
+```bash
+# Test archive endpoint functionality
+curl -X POST "http://localhost:5001/api/archive-week"
+
+# Expected successful response:
+{
+  "success": true,
+  "gameweek": 3,
+  "archived_data": {
+    "players": 634,
+    "form_records": 622,
+    "fixtures": 0,
+    "top_player": "Mohamed Salah"
+  },
+  "message": "Gameweek 3 analysis archived successfully",
+  "next_steps": "Ready to analyze Gameweek 4"
+}
+
+# Test archive listing
+curl "http://localhost:5001/api/archives"
+
+# Expected response:
+{
+  "archives": [
+    {
+      "gameweek": 3,
+      "archived_at": "2025-08-28T01:20:26.460413",
+      "purpose": "Analysis for Gameweek 3",  
+      "total_players": 634
+    }
+  ],
+  "count": 1
+}
+```
+
+**Archive Workflow Validation**:
+- Archive button appears in React dashboard
+- Archive operation preserves complete analysis state
+- Player data remains accessible after archive (no gameweek lockouts)
+- System ready for fresh data imports after archive
+- Error handling for archive failures displays appropriate messages
+
 ### **V2.0 Feature Validation**
 
 **Dynamic Blending System Testing**:

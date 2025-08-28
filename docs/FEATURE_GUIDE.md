@@ -78,6 +78,73 @@ The V2.0 Enhanced system includes a comprehensive trend analysis system that cap
 
 ---
 
+## **Weekly Archive System - Analysis State Management** ✅ *Added 2025-08-28*
+
+### **Overview: Weekly Analysis Workflow**
+The V2.0 Enhanced system includes a streamlined weekly analysis workflow that preserves complete analysis states for historical reference and trend comparison.
+
+**Key Innovation**: Manual archive button in React dashboard for flexible weekly workflow management without rigid gameweek constraints.
+
+### **Archive Workflow Integration**
+
+**1. Complete Weekly Analysis**
+- Upload new gameweek data (Fantrax CSV, Understat sync, odds data)
+- Run calculations and parameter optimizations  
+- Review True Value and ROI rankings
+- Optimize lineup selections and strategy
+
+**2. Archive Analysis State** 
+- Click **"Archive Week"** button in React dashboard
+- System preserves complete analysis snapshot:
+  - All player True Values and ROI calculations
+  - Current system parameters and multiplier settings
+  - Form data and fixture assessments  
+  - Top performer analysis and rankings
+
+**3. Prepare for Next Week**
+- System ready for fresh data imports
+- Previous analysis safely archived for comparison
+- Historical trend analysis available through archived states
+
+### **Archive System Benefits**
+
+**Workflow Flexibility**: 
+- No rigid gameweek lockouts or data access restrictions
+- Archive when analysis is complete, not on fixed schedule
+- Maintain live analysis capability during gameweek transitions
+
+**Data Continuity**: 
+- Complete preservation of analysis decisions and reasoning
+- Historical comparison of parameter effectiveness
+- Season-long performance tracking and validation
+
+**Error Recovery**: 
+- Safe rollback point if data imports encounter issues
+- Protection against accidental overwrites during busy periods
+- Backup of successful analysis states for reference
+
+### **Dashboard Archive Controls**
+
+**Archive Week Button**: 
+- Location: React dashboard main interface
+- Function: Creates comprehensive analysis snapshot
+- Feedback: Displays archived player count and success confirmation
+- Timing: Use after completing weekly analysis, before importing new data
+
+**Archive Status Display**:
+- Shows last archived gameweek information
+- Displays archived player count and timestamp  
+- Provides quick verification of archive completion
+- Links to historical archive management (future development)
+
+**Integration with Data Imports**:
+- Suggested workflow: Archive → Import → Analyze → Archive
+- Seamless transition between weekly analysis cycles
+- Protection against data loss during import operations
+- Maintains analysis consistency across gameweeks
+
+---
+
 ## **V2.0 Enhanced Parameter Controls Panel**
 
 All V2.0 features are configured through the Parameter Controls panel with enhanced controls and real-time feedback.

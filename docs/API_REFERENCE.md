@@ -541,6 +541,89 @@ WHERE ...
 
 ---
 
+## **Data Management API - V2.0 Enhanced** ✅ *Added 2025-08-28*
+
+### **`POST /api/archive-week`** - Weekly Analysis Archive
+**Description**: Archive current week's complete analysis state for historical reference and trend analysis
+
+**Purpose**: Preserve complete gameweek analysis before importing fresh data. Creates comprehensive snapshot of current player valuations, form calculations, fixture assessments, and system parameters for historical comparison.
+
+**Workflow Integration**: Use before importing new gameweek data to maintain analysis continuity. Enables retrospective analysis and parameter validation across different weeks.
+
+**Request**: No body required
+```bash
+curl -X POST "http://localhost:5001/api/archive-week"
+```
+
+**Response**:
+```json
+{
+  "success": true,
+  "gameweek": 3,
+  "archived_data": {
+    "players": 634,
+    "form_records": 622,
+    "fixtures": 0,
+    "top_player": "Mohamed Salah"
+  },
+  "message": "Gameweek 3 analysis archived successfully",
+  "next_steps": "Ready to analyze Gameweek 4"
+}
+```
+
+**Response Fields**:
+- `success`: Archive operation status
+- `gameweek`: Gameweek number that was archived
+- `archived_data.players`: Number of player records archived
+- `archived_data.form_records`: Historical form data entries archived
+- `archived_data.fixtures`: Fixture data entries archived
+- `archived_data.top_player`: Best performing player in archived analysis
+- `message`: Human-readable success message
+- `next_steps`: Suggested next action
+
+**Error Response**:
+```json
+{
+  "error": "Archive failed: [error details]",
+  "success": false
+}
+```
+
+**Status Code**: 
+- `200`: Archive successful
+- `500`: Archive failed (database error, calculation error)
+
+### **`GET /api/archives`** - List Archived Analysis States
+**Description**: Retrieve list of previously archived gameweek analysis sessions
+
+**Request**:
+```bash
+curl "http://localhost:5001/api/archives"
+```
+
+**Response**:
+```json
+{
+  "archives": [
+    {
+      "gameweek": 3,
+      "archived_at": "2025-08-28T01:20:26.460413",
+      "purpose": "Analysis for Gameweek 3",
+      "total_players": 634
+    }
+  ],
+  "count": 1
+}
+```
+
+**Use Cases**:
+- Weekly analysis workflow management  
+- Historical trend analysis preparation
+- Data recovery and state restoration
+- Analysis consistency validation
+
+---
+
 ## **Player Management API - V2.0 Enhanced**
 
 ### **`POST /api/manual-override`**
