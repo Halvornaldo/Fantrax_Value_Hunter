@@ -27,7 +27,7 @@ import {
 } from '@mui/icons-material';
 import { useTheme as useMuiTheme } from '@mui/material/styles';
 
-import { updateSystemParameters, runModelValidation, syncUnderstatData, importLineupCSV } from '../services/api';
+import { updateSystemParameters, runModelValidation, syncUnderstatData, importLineupCSV, importOddsCSV } from '../services/api';
 
 const ParameterPanel = ({ systemConfig, onParametersUpdate, playersCount }) => {
   const muiTheme = useMuiTheme();

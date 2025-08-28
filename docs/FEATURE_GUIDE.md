@@ -169,25 +169,43 @@ All V2.0 features are configured through the Parameter Controls panel with enhan
 - **Mid Season**: Continues blended format with increasing current weight
 - **Late Season**: Pure current season display
 
-### **Exponential Form Calculation (EWMA)**
-**Purpose**: Advanced form tracking using Exponential Weighted Moving Average for responsive performance analysis
+### **Progressive Form Calculation (EWMA) with Sample-Size Ranges** ✅ *Added 2025-08-28*
+**Purpose**: Advanced form tracking using Exponential Weighted Moving Average with progressive multiplier ranges based on statistical confidence
 
 **V2.0 Enhanced Controls**:
 - **Enable Exponential Form**: Toggle for EWMA calculation (default: enabled)
 - **Alpha Parameter**: Decay rate slider (0.70-0.995, default: 0.87)
+- **Progressive Ranges**: Sample-size-aware multiplier boundaries (default: enabled)
 - **Baseline Comparison**: Form relative to blended PPG instead of fixed baseline
-- **Form Caps**: Enhanced range 0.5-2.0x (more responsive than legacy)
+
+**Progressive Form Ranges System**:
+The system dynamically adjusts Form multiplier boundaries based on games played for statistical confidence:
+
+- **Games 1-2**: ±5% range (0.95-1.05) - Tight early-season control
+- **Games 3-4**: ±15% range (0.85-1.15) - Moderate expansion  
+- **Games 5-6**: ±20% range (0.80-1.20) - Increased differentiation
+- **Games 7-8**: ±25% range (0.75-1.25) - Strong sample confidence
+- **Games 9-10**: ±30% range (0.70-1.30) - Full statistical confidence
+- **Games 11+**: ±30% range maintained - Maximum differentiation allowed
 
 **Technical Implementation**:
 - **Algorithm**: EWMA with exponential decay (α^0, α^1, α^2 for recent games)
 - **5-Game Half-Life**: α=0.87 provides optimal balance of responsiveness and stability
+- **Progressive Boundaries**: `form_multiplier = max(form_min, min(form_max, raw_ewma))`
 - **Baseline Normalization**: Compares to dynamic blended PPG, not static average
 - **Real-time Updates**: Form scores update immediately with new game data
 
+**Early Season Benefits**:
+- **Volatility Control**: 50% reduction in early-season multiplier extremes (±5% vs ±10%)
+- **Statistical Rigor**: Multiplier ranges expand as sample size increases reliability
+- **Performance Balance**: Form impact scales appropriately relative to other multiplier systems
+- **Neutral Defaults**: Similar early-season performance results in ~1.0x multipliers
+
 **Examples**:
-- **Good Form**: Recent games above blended average = >1.0x multiplier
-- **Poor Form**: Recent games below blended average = <1.0x multiplier
-- **Neutral**: Form matches expectation = 1.0x multiplier
+- **Early Season (2 games)**: Raw EWMA 0.85 → Capped at 0.95 (±5% limit)
+- **Mid Season (6 games)**: Raw EWMA 0.85 → Applied as 0.85 (±20% allows full range)
+- **Late Season (15 games)**: Raw EWMA 0.70 → Applied as 0.70 (±30% maximum range)
+- **Neutral Form**: Form matches expectation = 1.0x multiplier regardless of games played
 
 ### **Exponential Fixture Difficulty**
 **Purpose**: Advanced fixture difficulty using exponential scaling for more accurate impact assessment
@@ -235,11 +253,11 @@ All V2.0 features are configured through the Parameter Controls panel with enhan
 - **Activation**: User can enable when confident in current season data (~GW5+)
 - **Examples**: Ben White (0.909x), Calafiori (2.500x capped) show early season volatility
 
-### **V2.0 Multiplier Cap System**
-**Purpose**: Prevents extreme outliers while allowing meaningful differentiation
+### **V2.0 Progressive Multiplier Cap System**
+**Purpose**: Prevents extreme outliers while allowing meaningful differentiation with sample-size awareness
 
 **Enhanced Caps**:
-- **Form Cap**: 0.5-2.0x (expanded from legacy 0.5-1.5x)
+- **Form Cap**: Progressive ranges (0.95-1.05 early → 0.70-1.30 late season) - Sample-size aware boundaries
 - **Fixture Cap**: 0.5-1.8x (maintains reasonable difficulty impact)
 - **xGI Cap**: 0.5-2.5x (allows significant xGI differentiation)
 - **Global Cap**: 3.0x maximum (product of all multipliers)
@@ -262,7 +280,7 @@ All V2.0 features are configured through the Parameter Controls panel with enhan
 - **Games Display**: Shows blending format ("27+1", "38+2", "5")
 
 **V2.0 Multiplier Columns**:
-- **Form**: EWMA exponential form multiplier (enhanced responsiveness)
+- **Form**: Progressive EWMA form multiplier with sample-size aware boundaries (±5% early → ±30% late season)
 - **Fixture**: Exponential difficulty multiplier (base^(-difficulty))
 - **Starter**: Rotation penalty multiplier (manual override capable)
 - **xGI**: Normalized ratio multiplier (with enable/disable control)

@@ -274,6 +274,38 @@ export const importLineupCSV = async (csvFile) => {
   }
 };
 
+// Import fixture odds from CSV
+export const importOddsCSV = async (csvFile, gameweek) => {
+  try {
+    const formData = new FormData();
+    formData.append('file', csvFile);
+    formData.append('gameweek', gameweek.toString());
+
+    const response = await fetch(`${API_BASE_URL}/api/import-odds`, {
+      method: 'POST',
+      body: formData,
+    });
+
+    if (!response.ok) {
+      throw new Error(`Import failed: ${response.status}`);
+    }
+
+    const data = await response.json();
+    return {
+      success: true,
+      processed_matches: data.processed_matches || 0,
+      skipped_matches: data.skipped_matches || 0,
+      gameweek: data.gameweek,
+      message: data.message || 'Odds import completed successfully'
+    };
+  } catch (error) {
+    return {
+      success: false,
+      error: error.message
+    };
+  }
+};
+
 export default {
   fetchPlayersData,
   fetchSystemConfig,
@@ -284,4 +316,5 @@ export default {
   getGameweekConsistency,
   applyStarterOverride,
   importLineupCSV,
+  importOddsCSV,
 };

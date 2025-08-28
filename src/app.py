@@ -391,9 +391,9 @@ def recalculate_true_values(gameweek: int = None):
                 FROM player_form
                 GROUP BY player_id
             ) pf ON p.id = pf.player_id
-            LEFT JOIN team_fixtures tf ON p.team = tf.team_code AND tf.gameweek = %s
-            WHERE pm.gameweek = %s
-        """, [gameweek, gameweek])
+            LEFT JOIN team_fixtures tf ON p.team = tf.team_code
+            WHERE 1=1
+        """)
         
         players = cursor.fetchall()
         updated_count = 0
@@ -437,8 +437,7 @@ def recalculate_true_values(gameweek: int = None):
                 v2_result['multipliers']['form'],
                 v2_result['multipliers']['fixture'],
                 v2_result['multipliers']['xgi'],
-                player['player_id'],
-                gameweek
+                player['player_id']
             ))
             updated_count += 1
         
@@ -451,8 +450,8 @@ def recalculate_true_values(gameweek: int = None):
                 form_multiplier = %s,
                 fixture_multiplier = %s,
                 xgi_multiplier = %s
-            WHERE player_id = %s AND gameweek = %s
-        """, [(u[0], u[1], u[4], u[5], u[6], u[7], u[8]) for u in batch_updates])
+            WHERE player_id = %s
+        """, [(u[0], u[1], u[4], u[5], u[6], u[7]) for u in batch_updates])
         
         # Also update players table with v2.0 columns
         cursor.executemany("""
@@ -2444,10 +2443,6 @@ def import_odds():
     Expected format: Date, Time, Home Team, Away Team, Home Odds, Draw Odds, Away Odds
     """
     try:
-        # Import GameweekManager for validation
-        from src.gameweek_manager import GameweekManager
-        gw_manager = GameweekManager()
-        
         # Check if file was uploaded
         if 'file' not in request.files:
             return jsonify({'success': False, 'error': 'No file uploaded'}), 400
@@ -2456,30 +2451,17 @@ def import_odds():
         if file.filename == '':
             return jsonify({'success': False, 'error': 'No file selected'}), 400
             
-        # Get gameweek from form with GameweekManager validation
-        gameweek_input = request.form.get('gameweek', type=int)
+        # Auto-detect current gameweek from database (live table approach)
+        conn = get_db_connection()
+        cursor = conn.cursor()
         
-        # First validation: basic input check
-        if not gameweek_input or gameweek_input < 1:
-            return jsonify({
-                'success': False, 
-                'error': 'Valid gameweek number required',
-                'suggested_gameweek': gw_manager.get_current_gameweek()
-            }), 400
+        # Get the highest gameweek from existing data, defaulting to 1
+        cursor.execute("SELECT COALESCE(MAX(gameweek), 0) + 1 FROM raw_player_snapshots WHERE gameweek IS NOT NULL")
+        gameweek = cursor.fetchone()[0]
         
-        # Second validation: GameweekManager smart validation
-        validation_result = gw_manager.validate_gameweek_for_upload(gameweek_input)
-        if not validation_result['valid']:
-            return jsonify({
-                'success': False,
-                'error': validation_result['message'],
-                'suggestion': validation_result['recommendation'],
-                'suggested_gameweek': validation_result.get('suggested_gameweek'),
-                'current_gameweek': gw_manager.get_current_gameweek()
-            }), 400
-        
-        # Use validated gameweek
-        gameweek = gameweek_input
+        # Ensure gameweek is at least 1
+        if gameweek < 1:
+            gameweek = 1
             
         # Team name mapping dictionary
         ODDS_TO_FANTRAX = {
@@ -2737,24 +2719,35 @@ def import_odds():
         cursor.close()
         conn.close()
         
+        # Trigger V2.0 recalculation after odds import (same as form data import)
+        print(f"Triggering V2.0 True Value recalculation after odds import...")
+        recalc_result = recalculate_true_values(gameweek)
+        
         # Debug logging
         print(f"\n=== ODDS IMPORT DEBUG (GW{gameweek}) ===")
         print(f"Total valid matches found: {len(all_matches)}")
         print(f"Matches after filtering: {len(filtered_matches)}")
         print(f"Teams processed: {len(teams_processed)}")
         print("Teams in filtered matches:", sorted(teams_processed))
+        print(f"V2.0 Recalculation: {recalc_result.get('updated_count', 0)} players updated")
         
         # Calculate filtering stats
         total_valid_matches = len(all_matches)
         skipped_due_to_filtering = total_valid_matches - len(filtered_matches)
         
-        # Return success response
+        # Return success response with recalculation info
         return jsonify({
             'success': True,
             'processed_matches': len(filtered_matches),
             'skipped_matches': skipped_matches + skipped_due_to_filtering,
             'gameweek': gameweek,
-            'message': f'Successfully imported {len(filtered_matches)} matches for gameweek {gameweek} (filtered from {total_valid_matches} valid matches to ensure only earliest match per team)'
+            'message': f'Successfully imported {len(filtered_matches)} matches for gameweek {gameweek} (filtered from {total_valid_matches} valid matches to ensure only earliest match per team)',
+            'recalculation': {
+                'triggered': True,
+                'updated_players': recalc_result.get('updated_count', 0),
+                'success': recalc_result.get('success', False),
+                'elapsed_time': recalc_result.get('elapsed_time', 0)
+            }
         })
         
     except Exception as e:

@@ -60,8 +60,15 @@ This document describes the complete API for the V2.0 Enhanced Formula system. T
       "enabled": true,
       "lookback_games": 8,
       "ewma_alpha": 0.87,
-      "min_multiplier": 0.5,
-      "max_multiplier": 2.0
+      "progressive_ranges": true,
+      "sample_size_aware_boundaries": {
+        "games_1_2": {"min": 0.95, "max": 1.05},
+        "games_3_4": {"min": 0.85, "max": 1.15},
+        "games_5_6": {"min": 0.80, "max": 1.20},
+        "games_7_8": {"min": 0.75, "max": 1.25},
+        "games_9_10": {"min": 0.70, "max": 1.30},
+        "games_11_plus": {"min": 0.70, "max": 1.30}
+      }
     },
     "exponential_fixture": {
       "enabled": true,
@@ -77,7 +84,7 @@ This document describes the complete API for the V2.0 Enhanced Formula system. T
       "max_multiplier": 2.5
     },
     "multiplier_caps": {
-      "form": 2.0,
+      "form": "progressive_ranges_enabled",
       "fixture": 1.8,
       "xgi": 2.5,
       "global": 3.0
@@ -366,7 +373,8 @@ WHERE ...
     },
     "exponential_form": {
       "enabled": true,
-      "alpha": 0.87
+      "alpha": 0.87,
+      "progressive_ranges": true
     },
     "normalized_xgi": {
       "enabled": true,
@@ -462,7 +470,8 @@ WHERE ...
   "formula_optimization_v2": {
     "exponential_form": {
       "enabled": true,
-      "alpha": 0.87
+      "alpha": 0.87,
+      "progressive_ranges": true
     },
     "dynamic_blending": {
       "enabled": true,
@@ -933,10 +942,12 @@ ROI = True Value ÷ Price
 - **Early Season (GW2)**: 6.7% current + 93.3% historical
 - **Transition**: Smooth progression to current-only by GW16
 
-### **Exponential Form (EWMA)**
+### **Progressive Form (EWMA) with Sample-Size Ranges** ✅ *Added 2025-08-28*
 - **Algorithm**: Exponential Weighted Moving Average
 - **Alpha Parameter**: 0.87 (configurable)
+- **Progressive Boundaries**: Sample-size aware multiplier ranges (±5% early → ±30% late season)
 - **Baseline**: Compared to blended PPG
+- **Statistical Rigor**: Multiplier ranges expand as sample size increases reliability
 
 ### **Normalized xGI System**
 - **Calculation**: `current_xgi90 ÷ baseline_xgi`

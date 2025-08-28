@@ -216,8 +216,36 @@ class FormulaEngineV2:
             else:
                 form_multiplier = 1.0
                 
-            # Apply early season bounds (narrow range for start of season)
-            return max(0.9, min(1.1, form_multiplier))
+            # Apply progressive range based on games played
+            games_played = len(numeric_games)
+            progressive_config = self.v2_config.get('progressive_form_ranges', {})
+            
+            if progressive_config.get('enabled', True):
+                # Find appropriate range based on games played
+                ranges = progressive_config.get('ranges_by_games', [])
+                form_min, form_max = 0.9, 1.1  # Default tight range for safety
+                
+                for range_config in ranges:
+                    if games_played <= range_config['games']:
+                        form_min = range_config['min']
+                        form_max = range_config['max']
+                        break
+                else:
+                    # If more games than any defined range, use the last (most permissive) range
+                    if ranges:
+                        last_range = ranges[-1]
+                        form_min = last_range['min']
+                        form_max = last_range['max']
+                
+                # Apply the progressive bounds
+                form_multiplier = max(form_min, min(form_max, form_multiplier))
+                
+                logger.debug(f"Player form: {games_played} games played, range [{form_min}, {form_max}], multiplier: {form_multiplier:.3f}")
+            else:
+                # Fallback to early season bounds if progressive ranges disabled
+                form_multiplier = max(0.9, min(1.1, form_multiplier))
+                
+            return form_multiplier
             
         except Exception as e:
             logger.warning(f"Error calculating exponential form multiplier: {e}")
@@ -386,6 +414,7 @@ class FormulaEngineV2:
     def _apply_multiplier_cap(self, value: float, multiplier_type: str) -> float:
         """
         NEW v2.0: Apply multiplier caps to prevent extreme outliers
+        Note: Form bounds are now handled by progressive ranges in _calculate_exponential_form_multiplier
         """
         if not self.v2_config.get('multiplier_caps', {}).get('enabled', True):
             return value
@@ -393,11 +422,9 @@ class FormulaEngineV2:
         caps = self.v2_config.get('multiplier_caps', {})
         cap = caps.get(multiplier_type, 2.0)
         
-        # Apply early season minimum for form, keep original for others
-        if multiplier_type == 'form':
-            return max(0.9, min(cap, value))
-        else:
-            return max(0.5, min(cap, value))
+        # Apply consistent bounds for all multipliers
+        # Form bounds are handled separately by progressive ranges
+        return max(0.5, min(cap, value))
     
     def _calculate_blended_ppg(self, player_data: Dict[str, Any]) -> Tuple[float, float]:
         """

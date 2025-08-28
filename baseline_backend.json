@@ -1,0 +1,42 @@
+[
+  {
+    "id": "03aqp",
+    "name": "Mohamed Salah",
+    "position": "M",
+    "price": 20.42,
+    "true_value": 14.3,
+    "roi": 0.7,
+    "blended_ppg": 14.3,
+    "form_multiplier": 1.0
+  },
+  {
+    "id": "061vq",
+    "name": "Erling Haaland",
+    "position": "F",
+    "price": 20.55,
+    "true_value": 11.23,
+    "roi": 0.546,
+    "blended_ppg": 11.23,
+    "form_multiplier": 1.0
+  },
+  {
+    "id": "067yz",
+    "name": "Matheus Cunha",
+    "position": "F",
+    "price": 14.85,
+    "true_value": 11.21,
+    "roi": 0.755,
+    "blended_ppg": 11.21,
+    "form_multiplier": 1.0
+  },
+  {
+    "id": "046c5",
+    "name": "Jarrod Bowen",
+    "position": "M",
+    "price": 15.28,
+    "true_value": 10.57,
+    "roi": 0.692,
+    "blended_ppg": 10.57,
+    "form_multiplier": 1.0
+  }
+]

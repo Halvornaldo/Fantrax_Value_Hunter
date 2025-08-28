@@ -225,11 +225,11 @@
         <div class="info-box">
             <strong>📤 Step 2: Upload Instructions</strong>
             <ul>
-                <li>Upload the CSV file from OddsPortal with the correct gameweek number</li>
-                <li>Safe to re-upload - system will update existing odds if gameweek already exists</li>
+                <li>Upload the CSV file from OddsPortal - gameweek is auto-detected</li>
+                <li>Safe to re-upload - system will update existing odds for current gameweek</li>
                 <li>Expected format: Date, Team A, Team B, Odds A, Draw, Odds B, etc.</li>
                 <li>System calculates difficulty scores automatically from betting odds</li>
-                <li>Will recalculate all 633 player fixture multipliers after import</li>
+                <li>Will recalculate all player fixture multipliers after import</li>
             </ul>
         </div>
         
@@ -241,11 +241,6 @@
                     <small style="color: #6c757d;">Select the CSV file downloaded from OddsPortal</small>
                 </div>
                 
-                <div class="form-group">
-                    <label for="gameweek">Gameweek Number:</label>
-                    <input type="number" id="gameweek" name="gameweek" min="1" max="38" required placeholder="e.g. 2">
-                    <small style="color: #6c757d;">Premier League gameweek (1-38)</small>
-                </div>
                 
                 <button type="submit" class="upload-btn">
                     ⚽ Upload Fixture Odds

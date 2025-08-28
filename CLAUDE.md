@@ -29,6 +29,10 @@
 **✅ Safe Production System**: Complete V2.0 consolidation with comprehensive documentation
 
 ### Recent Major Features (2025-08-28)
+- **Progressive Form Ranges System**: Sample-size aware multiplier boundaries that expand from ±5% (early season) to ±30% (late season)
+- **Early Season Volatility Control**: 50% reduction in Form multiplier extremes through progressive range implementation  
+- **Statistical Rigor Enhancement**: Form multiplier ranges now expand based on games played for improved confidence
+- **Server Restart Requirement Fix**: Resolved configuration caching issue requiring Flask server restart for new ranges
 - **Weekly Archive System**: Manual archive button in React dashboard for flexible weekly analysis workflow
 - **Gameweek System Simplification**: Removed rigid gameweek constraints that blocked data access during transitions  
 - **Archive Workflow Integration**: Complete analysis state preservation without gameweek lockouts
