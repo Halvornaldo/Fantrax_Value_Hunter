@@ -1385,6 +1385,12 @@ def import_lineups():
         
         is_individual_format = header_normalized == expected_individual_normalized
         
+        # Check for enhanced FFP format (6 columns with confidence and multiplier)
+        expected_ffp_headers = ['Team', 'Player Name', 'Position', 'Predicted Status', 'Confidence', 'Multiplier']
+        expected_ffp_normalized = [h.strip().lower().replace(' ', '_') for h in expected_ffp_headers]
+        
+        is_ffp_format = header_normalized == expected_ffp_normalized
+        
         # Check for formation matrix format (FFS scraping)
         first_col_clean = header[0].strip().lower().strip('"')
         
@@ -1407,11 +1413,12 @@ def import_lineups():
         # Debug logging (optional)
         # print(f"CSV format detection: {is_formation_format}, teams will be mapped")
         
-        if not is_individual_format and not is_formation_format:
+        if not is_individual_format and not is_ffp_format and not is_formation_format:
             return jsonify({
                 'error': f'Invalid CSV format. Expected either:\n' +
                         f'1. Individual format: {expected_individual_headers}\n' +
-                        f'2. Formation format: Team + 11 player columns\n' +
+                        f'2. FFP enhanced format: {expected_ffp_headers}\n' +
+                        f'3. Formation format: Team + 11 player columns\n' +
                         f'Got: {header}\n' +
                         f'First column detected as: "{first_col_clean}"'
             }), 400
@@ -1435,6 +1442,9 @@ def import_lineups():
         if is_formation_format:
             # Process formation matrix format (FFS scraping)
             players_to_process = parse_formation_csv(lines[1:], cursor)  # Skip header
+        elif is_ffp_format:
+            # Process FFP enhanced format (confidence-based multipliers)
+            players_to_process = parse_ffp_csv(lines[1:])  # Skip header
         else:
             # Process individual player format (original)
             players_to_process = parse_individual_csv(lines[1:])  # Skip header
@@ -1467,15 +1477,29 @@ def import_lineups():
             
             # Check if we have a good match (fantrax_id exists and high confidence or verified)
             # Use lower threshold for formation imports since names are often shortened
-            confidence_threshold = 80.0 if is_formation_format else 90.0
+            # Lower threshold for FFP format debugging - exact matches should be 100% but let's be safe
+            confidence_threshold = 80.0 if (is_formation_format or is_ffp_format) else 90.0
             if match_result['fantrax_id'] and (not match_result['needs_review'] or match_result['confidence'] >= confidence_threshold):
                 # We have a confident match
-                if status.lower() in ['starter', 'starting', 'start']:
+                
+                # Determine multiplier: use custom_multiplier from FFP format if available, otherwise use traditional logic
+                if 'custom_multiplier' in player_info:
+                    # FFP format with confidence-based multipliers
+                    multiplier = player_info['custom_multiplier']
+                else:
+                    # Traditional format - use binary starter/non-starter logic
+                    if status.lower() in ['starter', 'starting', 'start']:
+                        multiplier = 1.0
+                    else:
+                        multiplier = rotation_penalty
+                
+                # Add to appropriate list (still using status for categorization)
+                if status.lower() in ['starter', 'starting', 'start'] or multiplier >= 0.9:
                     starters.append({
                         'player_id': match_result['fantrax_id'],
                         'name': match_result['fantrax_name'],
                         'team': team,
-                        'multiplier': 1.0,
+                        'multiplier': multiplier,
                         'confidence': match_result['confidence'],
                         'match_type': match_result['match_type']
                     })
@@ -1484,7 +1508,7 @@ def import_lineups():
                         'player_id': match_result['fantrax_id'],
                         'name': match_result['fantrax_name'],
                         'team': team,
-                        'multiplier': rotation_penalty,
+                        'multiplier': multiplier,
                         'confidence': match_result['confidence'],
                         'match_type': match_result['match_type']
                     })
@@ -1529,32 +1553,39 @@ def import_lineups():
             manual_overrides = manual_overrides_section if isinstance(manual_overrides_section, dict) else {}
         
         try:
-            # STEP 1: Set ALL players to rotation penalty EXCEPT those with manual overrides
+            # STEP 1: Set ALL players to lowest category (0.35x bench) - clean slate approach
+            # This aligns with the weekly archive workflow where we start fresh each week
+            lowest_multiplier = 0.35
             cursor.execute("""
                 UPDATE player_metrics 
                 SET starter_multiplier = %s
                 WHERE gameweek = %s
-            """, [rotation_penalty, gameweek])
+            """, [lowest_multiplier, gameweek])
             
             all_players_updated = cursor.rowcount
-            print(f"Set {all_players_updated} players to rotation penalty ({rotation_penalty}x)")
+            print(f"Set {all_players_updated} players to lowest category ({lowest_multiplier}x - bench level)")
             
-            # STEP 2: Set matched CSV players to starter (1.0x) - BUT don't override manual settings
+            # STEP 2: Set matched CSV players with their specific multipliers - BUT don't override manual settings
             starter_ids = []
-            for starter in starters:
+            
+            # Process both starters and non-starters (all matched players)
+            all_matched_players = starters + non_starters
+            
+            for player in all_matched_players:
                 # Check if this player has a manual override - if so, skip CSV update
-                if starter['player_id'] not in manual_overrides:
+                if player['player_id'] not in manual_overrides:
                     cursor.execute("""
                         UPDATE player_metrics 
                         SET starter_multiplier = %s
                         WHERE player_id = %s AND gameweek = %s
-                    """, [1.0, starter['player_id'], gameweek])
-                    starter_ids.append(starter['player_id'])
+                    """, [player['multiplier'], player['player_id'], gameweek])
+                    starter_ids.append(player['player_id'])
                     updated_count += 1
                 else:
-                    print(f"Skipping {starter['name']} - has manual override")
+                    print(f"Skipping {player['name']} - has manual override")
             
-            print(f"Set {len(starter_ids)} matched players to starter (1.0x)")
+            print(f"Updated {len(starter_ids)} CSV players with confidence-based multipliers")
+            print(f"Remaining players stay at lowest category (0.35x) as expected")
             
             # STEP 3: Re-apply any existing manual overrides
             starter_config = params.get('starter_prediction', {})
@@ -3699,6 +3730,54 @@ def parse_individual_csv(lines):
             'status': status,
             'formation_position': None,
             'position_conflict': False
+        }
+        
+        players_to_process.append(player_info)
+    
+    return players_to_process
+
+def parse_ffp_csv(lines):
+    """
+    Parse FFP enhanced CSV format with confidence-based multipliers.
+    Returns list of player dictionaries with custom multipliers.
+    Format: Team, Player Name, Position, Predicted Status, Confidence, Multiplier
+    """
+    import csv
+    from io import StringIO
+    
+    players_to_process = []
+    
+    for line in lines:
+        if not line.strip():
+            continue
+        # Use CSV reader to properly handle quotes
+        csv_reader = csv.reader(StringIO(line))
+        line_data = next(csv_reader)
+        if len(line_data) < 6:
+            continue
+            
+        team = line_data[0].strip()
+        player_name = line_data[1].strip()
+        position = line_data[2].strip()
+        status = line_data[3].strip()
+        confidence = line_data[4].strip()
+        multiplier_str = line_data[5].strip()
+        
+        # Parse multiplier value
+        try:
+            custom_multiplier = float(multiplier_str)
+        except (ValueError, TypeError):
+            custom_multiplier = 1.0  # Default fallback
+        
+        player_info = {
+            'name': player_name,
+            'team': team,
+            'position': position,
+            'status': status,
+            'formation_position': None,
+            'position_conflict': False,
+            'confidence': confidence,
+            'custom_multiplier': custom_multiplier  # Store the FFP-calculated multiplier
         }
         
         players_to_process.append(player_info)
