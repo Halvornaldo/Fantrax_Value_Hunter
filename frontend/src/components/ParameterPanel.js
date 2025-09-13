@@ -158,8 +158,15 @@ const ParameterPanel = ({ systemConfig, onParametersUpdate, playersCount }) => {
   const handleSyncUnderstat = async () => {
     try {
       const response = await syncUnderstatData();
+      console.log('Sync response:', response);
       if (response.success) {
         await onParametersUpdate({});
+        
+        console.log('Checking verification:', {
+          verification_needed: response.verification_needed,
+          unmatched_players: response.unmatched_players,
+          verification_url: response.verification_url
+        });
         
         // Check if verification is needed
         if (response.verification_needed && response.unmatched_players > 0) {
@@ -191,7 +198,25 @@ const ParameterPanel = ({ systemConfig, onParametersUpdate, playersCount }) => {
       
       if (response.success) {
         await onParametersUpdate({});
-        alert(`Import successful!\nStarters: ${response.starters_identified}\nRotation risks: ${response.rotation_risks}`);
+        
+        let alertMessage = `Import successful!\n`;
+        alertMessage += `Matched: ${response.matched_players}/${response.total_players} players (${response.match_rate}%)\n`;
+        alertMessage += `Starters: ${response.starters_identified}\n`;
+        alertMessage += `Rotation risks: ${response.rotation_risks}\n`;
+        
+        if (response.unmatched_players > 0) {
+          alertMessage += `\n⚠️ ${response.unmatched_players} players need validation!\n`;
+          alertMessage += `(May include star players with 0.35x multiplier)\n`;
+          alertMessage += `\nClick OK to go to validation page.`;
+          
+          alert(alertMessage);
+          
+          if (response.verification_needed && response.verification_url) {
+            window.location.href = 'http://localhost:5001' + response.verification_url;
+          }
+        } else {
+          alert(alertMessage);
+        }
       } else {
         throw new Error(response.error || 'Import failed');
       }
@@ -489,11 +514,6 @@ const ParameterPanel = ({ systemConfig, onParametersUpdate, playersCount }) => {
               </IconButton>
             </Tooltip>
             
-            <Tooltip title="Upload Form Data">
-              <IconButton size="small" onClick={() => window.open('http://localhost:5001/form-upload', '_blank')}>
-                <FileUpload />
-              </IconButton>
-            </Tooltip>
             
             <Tooltip title="Import Lineup CSV">
               <IconButton size="small" component="label">

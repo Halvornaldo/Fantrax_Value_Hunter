@@ -382,33 +382,7 @@ SELECT MAX(gameweek) FROM raw_player_snapshots WHERE gameweek IS NOT NULL
 
 ---
 
-## **Name Mapping System**
 
-### **`name_mappings`** - External Data Integration
-**Purpose**: Cross-platform player name resolution for data imports
-
-**Primary Key**: `id` (SERIAL)
-**Unique Constraint**: `(source_system, source_name)`
-**Foreign Key**: `fantrax_id` → `players.id`
-
-**Columns**:
-- `id` (SERIAL PRIMARY KEY)
-- `source_system` (VARCHAR 50) - External source ('understat', 'ffs', etc.)
-- `source_name` (VARCHAR 255) - Original external name
-- `fantrax_id` (VARCHAR 50) - Our canonical player ID
-- `fantrax_name` (VARCHAR 255) - Current Fantrax name
-- `team` (VARCHAR 10) - Team code for validation
-- `position` (VARCHAR 10) - Position for validation
-- `confidence_score` (FLOAT, DEFAULT 0) - Match confidence 0-100
-- `match_type` (VARCHAR 50) - Match type ('exact', 'normalized', 'fuzzy', 'manual')
-- `verified` (BOOLEAN, DEFAULT FALSE) - Human verification status
-- `verification_date` (TIMESTAMP) - When verified
-- `verified_by` (VARCHAR 100) - Who verified
-- `last_used` (TIMESTAMP) - Last usage timestamp
-- `usage_count` (INTEGER, DEFAULT 0) - Usage frequency
-- `notes` (TEXT) - Optional notes
-- `created_at` (TIMESTAMP, DEFAULT CURRENT_TIMESTAMP)
-- `updated_at` (TIMESTAMP, DEFAULT CURRENT_TIMESTAMP)
 
 **Performance Indexes**:
 - `idx_name_mappings_source` - On (source_system, source_name)

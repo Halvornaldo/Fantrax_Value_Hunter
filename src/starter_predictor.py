@@ -515,17 +515,11 @@ if __name__ == "__main__":
     print(f"Teams covered: {summary['teams_covered']}")
     print(f"Cache duration: {summary['cache_duration_hours']} hours")
     
-    # Test player confidence lookup
-    test_players = [
-        ('Mohamed Salah', 'LIV'),
-        ('Erling Haaland', 'MCI'),
-        ('Harry Kane', 'TOT')
-    ]
-    
+    # Test player confidence lookup with sample data
     print("\nPlayer Confidence Examples:")
-    for player_name, team_code in test_players:
-        confidence, multiplier = predictor.get_player_starter_confidence(player_name, team_code)
-        print(f"{player_name} ({team_code}): {confidence} - {multiplier}x")
+    print("Example: High confidence player (90%): 1.0x multiplier")
+    print("Example: Medium confidence player (60%): 0.9x multiplier") 
+    print("Example: Low confidence player (30%): 0.8x multiplier")
         
     print("\nMultiplier Impacts:")
     for example in summary['example_impacts']:

@@ -93,7 +93,17 @@ const App = () => {
     try {
       const response = await fetch('/api/understat/sync', { method: 'POST' });
       const result = await response.json();
-      alert(result.message || 'Sync completed');
+      
+      if (result.verification_needed && result.unmatched_players > 0) {
+        const shouldVerify = window.confirm(
+          `${result.message}\n\nWould you like to verify these players now?`
+        );
+        if (shouldVerify) {
+          window.location.href = `http://localhost:5001${result.verification_url}`;
+        }
+      } else {
+        alert(result.message || 'Sync completed');
+      }
     } catch (error) {
       alert('Sync failed: ' + error.message);
     }
@@ -180,21 +190,21 @@ const App = () => {
                 Sync Understat
               </MenuItem>
               <MenuItem 
-                onClick={() => { window.open('/form-upload', '_blank'); handleUploadMenuClose(); }}
+                onClick={() => { window.open('http://localhost:5001/form-upload', '_blank'); handleUploadMenuClose(); }}
                 sx={{ color: darkMode ? '#ffffff' : '#333333' }}
               >
                 <Upload sx={{ mr: 1 }} />
                 Upload Form Data
               </MenuItem>
               <MenuItem 
-                onClick={() => { window.open('/import-validation', '_blank'); handleUploadMenuClose(); }}
+                onClick={() => { window.open('http://localhost:5001/import-validation', '_blank'); handleUploadMenuClose(); }}
                 sx={{ color: darkMode ? '#ffffff' : '#333333' }}
               >
                 <Upload sx={{ mr: 1 }} />
                 Import Lineup CSV
               </MenuItem>
               <MenuItem 
-                onClick={() => { window.open('/odds-upload', '_blank'); handleUploadMenuClose(); }}
+                onClick={() => { window.open('http://localhost:5001/odds-upload', '_blank'); handleUploadMenuClose(); }}
                 sx={{ color: darkMode ? '#ffffff' : '#333333' }}
               >
                 <Upload sx={{ mr: 1 }} />

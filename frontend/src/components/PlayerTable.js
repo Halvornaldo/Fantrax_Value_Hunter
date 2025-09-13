@@ -248,8 +248,8 @@ const PlayerTable = ({ playersData, gameweekInfo, onDataRefresh }) => {
       },
       starter_multiplier: {
         title: 'Starter Prediction (V2.0)',
-        description: 'Probability-based starting eleven prediction',
-        interpretation: '1.0x: Guaranteed starter • 0.8x: Likely starter • 0.5x: Rotation risk • 0.2x: Unlikely to start'
+        description: 'Confidence-based starting eleven prediction (5 categories)',
+        interpretation: '1.0x: Definite starter (≥90%) • 0.90x: Likely starter (70-89%) • 0.75x: Rotation risk (50-69%) • 0.50x: Unlikely starter (30-49%) • 0.35x: Bench (<30%)'
       },
       xgi_multiplier: {
         title: 'xGI Multiplier (V2.0)',
@@ -723,9 +723,11 @@ const PlayerTable = ({ playersData, gameweekInfo, onDataRefresh }) => {
         const isLoading = processingOverride === playerId;
         
         const overrideOptions = [
-          { value: 'starter', label: 'S', title: 'Starter (1.0x)', color: '#28a745' },
+          { value: 'starter', label: 'S', title: 'Definite Starter (1.0x)', color: '#28a745' },
+          { value: 'likely', label: 'L', title: 'Likely Starter (0.90x)', color: '#20c997' },
           { value: 'rotation', label: 'R', title: 'Rotation Risk (0.75x)', color: '#ff9800' },
-          { value: 'bench', label: 'B', title: 'Bench (0.6x)', color: '#ffc107' },
+          { value: 'unlikely', label: 'U', title: 'Unlikely Starter (0.50x)', color: '#fd7e14' },
+          { value: 'bench', label: 'B', title: 'Bench (0.35x)', color: '#ffc107' },
           { value: 'out', label: 'O', title: 'Out (0.0x)', color: '#dc3545' },
           { value: 'auto', label: 'A', title: 'Auto (CSV)', color: '#6c757d' }
         ];

@@ -151,7 +151,10 @@ export const syncUnderstatData = async () => {
     return {
       success: true,
       message: data.message || 'Data synced successfully',
-      stats: data.stats || {}
+      stats: data.stats || {},
+      verification_needed: data.verification_needed,
+      verification_url: data.verification_url,
+      unmatched_players: data.unmatched_players
     };
   } catch (error) {
     return {
@@ -262,8 +265,13 @@ export const importLineupCSV = async (csvFile) => {
     return {
       success: true,
       starters_identified: data.starters_identified || 0,
-      rotation_risks: data.rotation_risks || 0,
-      unmatched_players: data.unmatched_players || [],
+      rotation_risks: data.rotation_risk || 0,
+      matched_players: data.matched_players || 0,
+      total_players: data.total_players || 0,
+      unmatched_players: data.unmatched_players || 0,
+      match_rate: data.match_rate || 0,
+      verification_needed: data.verification_needed || false,
+      verification_url: data.verification_url || null,
       message: data.message || 'Lineup import completed successfully'
     };
   } catch (error) {

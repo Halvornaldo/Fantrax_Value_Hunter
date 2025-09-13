@@ -64,6 +64,33 @@ TEAM_CODE_ALIASES = {
     "NOT": "NFO",  # Nottingham Forest alternative
 }
 
+# FFP (Fantasy Football Pundit) Team Name Variants
+FFP_TEAM_MAPPINGS = {
+    "Arsenal Predicted Lineup": "ARS",
+    "Aston Villa Predicted Lineup": "AVL", 
+    "Bournemouth Predicted Lineup": "BOU",
+    "Brentford Predicted Lineup": "BRF",  # Database uses BRF, not BRE
+    "Brighton Predicted Lineup": "BHA",
+    "Burnley Predicted Lineup": "BUR",
+    "Chelsea Predicted Lineup": "CHE",
+    "Crystal Palace Predicted Lineup": "CRY",
+    "Everton Predicted Lineup": "EVE",
+    "Fulham Predicted Lineup": "FUL",
+    "Leeds Predicted Lineup": "LEE",
+    "Liverpool Predicted Lineup": "LIV",
+    "Man City Predicted Lineup": "MCI",
+    "Manchester City Predicted Lineup": "MCI",
+    "Man Utd Predicted Lineup": "MUN",
+    "Manchester United Predicted Lineup": "MUN",
+    "Newcastle Predicted Lineup": "NEW",
+    "Nottingham Forest Predicted Lineup": "NOT",  # Database uses NOT, not NFO
+    "Sunderland Predicted Lineup": "SUN",
+    "Tottenham Predicted Lineup": "TOT",
+    "West Ham Predicted Lineup": "WHU",
+    "Wolves Predicted Lineup": "WOL",
+    "Wolverhampton Wanderers Predicted Lineup": "WOL"
+}
+
 # Teams that changed divisions
 DIVISION_CHANGES = {
     # Relegated (remove from 2025-26 predictions)
@@ -118,11 +145,25 @@ def import_2024_25_baseline(self, player_data):
 
 ---
 
+## ⚠️ FFP Import Considerations
+
+**Expected Low Match Rates for FFP Data**:
+- FFP predictions often include **speculative transfers** (e.g., Martin Zubimendi to Arsenal)
+- Many predictions are **fantasy/wishful lineups** rather than actual current squads
+- **Transfer window predictions** may not reflect actual completed deals
+- **Loan players** may be assigned to wrong teams temporarily
+
+**Typical FFP Match Rates**:
+- 6-15% automatic matching is **normal and expected**
+- Most players require manual validation due to speculative nature
+- Use validation UI to verify actual current team assignments
+
 ## ✅ Action Items
 
 1. **Update STARTER_IMPORT_GUIDE.md** with correct team list
 2. **No changes needed** to candidate_pools.json - it's already correct!
 3. **Migration scripts** should handle relegated team players appropriately
 4. **Watch for transfers** - some players from relegated teams may have moved to PL clubs
+5. **FFP validation** - expect heavy manual validation due to speculative predictions
 
 The good news is your candidate analyzer is already pulling the correct current season data with the right teams!

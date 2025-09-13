@@ -308,7 +308,7 @@ class SimpleTrendAnalysisEngine:
         if is_starter is False or rotation_risk == 'benched':
             return starter_config.get('bench_penalty', 0.1)
         elif rotation_risk == 'high':
-            return starter_config.get('high_rotation_penalty', 0.6) 
+            return starter_config.get('high_rotation_penalty', 0.75) 
         elif rotation_risk == 'medium':
             return starter_config.get('medium_rotation_penalty', 0.8)
         else:

@@ -309,6 +309,34 @@
                                 <div class="stat-label">Gameweek</div>
                             </div>
                         </div>
+
+                        ${data.imported_matches && data.imported_matches.length > 0 ? `
+                            <div style="margin-top: 20px; padding: 15px; background: #d4edda; border-radius: 6px; border-left: 4px solid #28a745;">
+                                <h4 style="margin: 0 0 15px 0; color: #155724;">✅ Imported Matches:</h4>
+                                <div style="font-family: monospace; font-size: 14px;">
+                                    ${data.imported_matches.map(match => 
+                                        `<div style="margin-bottom: 8px;">
+                                            <strong>${match.home} vs ${match.away}</strong> (${match.date}) - 
+                                            Odds: ${match.home_odds}/${match.draw_odds}/${match.away_odds}
+                                        </div>`
+                                    ).join('')}
+                                </div>
+                            </div>
+                        ` : ''}
+
+                        ${data.skipped_matches && Array.isArray(data.skipped_matches) && data.skipped_matches.length > 0 ? `
+                            <div style="margin-top: 15px; padding: 15px; background: #fff3cd; border-radius: 6px; border-left: 4px solid #ffc107;">
+                                <h4 style="margin: 0 0 15px 0; color: #856404;">⚠️ Skipped Matches:</h4>
+                                <div style="font-family: monospace; font-size: 14px;">
+                                    ${data.skipped_matches.map(match => 
+                                        `<div style="margin-bottom: 8px;">
+                                            <strong>${match.home} vs ${match.away}</strong> (${match.date}) - 
+                                            Reason: ${match.reason}
+                                        </div>`
+                                    ).join('')}
+                                </div>
+                            </div>
+                        ` : ''}
                         
                         ${data.difficulty_scores ? `
                             <div style="margin-top: 15px; padding: 15px; background: #e3f2fd; border-radius: 6px;">

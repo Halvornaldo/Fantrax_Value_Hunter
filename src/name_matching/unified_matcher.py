@@ -169,7 +169,7 @@ class UnifiedNameMatcher:
                 base_query += " AND p.team = %s"
                 params.append(team)
             
-            if position:
+            if position and position != 'Unknown':
                 base_query += " AND p.position = %s"
                 params.append(position)
             

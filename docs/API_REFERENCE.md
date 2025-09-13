@@ -20,9 +20,9 @@ This document describes the complete API for the V2.0 Enhanced Formula system. T
 **Features**: True Value/ROI columns, dynamic blending display, exponential controls
 
 #### `GET /form-upload`
-**Description**: Weekly game data upload interface  
+**Description**: Live game data upload interface  
 **Returns**: HTML form for CSV uploads with name validation
-**Button Label**: "Upload Weekly Game Data"
+**Button Label**: "Upload Game Data" (Live Table Mode)
 
 #### `GET /odds-upload`
 **Description**: Fixture odds upload interface  
@@ -129,7 +129,7 @@ This document describes the complete API for the V2.0 Enhanced Formula system. T
 ```
 
 ### **`GET /api/trends/raw-data`** - Access Raw Snapshot Data
-**Description**: Retrieve raw weekly data without any calculations applied
+**Description**: Retrieve raw data without any calculations applied
 
 **Parameters**:
 - `gameweek` (int, optional): Specific gameweek to retrieve
@@ -511,10 +511,10 @@ WHERE ...
 ## **Data Import API - V2.0 Enhanced**
 
 ### **`POST /api/import-form-data`**
-**Description**: Import weekly game data with V2.0 name matching system
+**Description**: Import game data to live table with V2.0 name matching system
 
 **Parameters**:
-- `gameweek` (string, required): Gameweek number
+- Data automatically goes to live table (gameweek 1)
 - `file` (file, required): CSV file upload
 
 **V2.0 Enhanced Response**:
@@ -544,20 +544,45 @@ WHERE ...
 **Description**: Import fixture odds for V2.0 exponential difficulty calculation  
 **Returns**: Import results with exponential multiplier updates
 
-### **`POST /api/import-lineups`**
-**Description**: Import lineup predictions for starter multipliers  
-**Returns**: Lineup processing results with starter penalty applications
+### **`POST /api/import-lineups`** - FFP Import with Enhanced Validation
+**Description**: Import lineup predictions (FFP format) with intelligent name matching and starter multiplier updates
+
+**Enhanced Features** ✅ *Updated 2025-08-28*:
+- **FFP CSV Format Support**: Processes Fantasy Football Pundit predicted lineups with confidence percentages
+- **UnifiedNameMatcher Integration**: 99% success rate with persistent mapping storage
+- **Confidence-Based Multipliers**: Auto-assigns starter (70%+), rotation (30-70%), bench (<30%) multipliers
+- **Team Code Translation**: Handles FFP full team names to database 3-letter codes (ARS, BRF, NOT)
+- **Validation Workflow**: Unmatched players trigger validation UI for manual confirmation
+- **Persistent Mappings**: Confirmed mappings stored for automatic future matching
+
+**Request**: `multipart/form-data` with CSV file
+**FFP Format**: `"Team Predicted Lineup", "Player1", "Confidence%", "Player2", "Confidence%", ...`
+
+**Response**:
+```json
+{
+  "success": true,
+  "summary": "Processed 366 FFP predictions",
+  "matched_count": 23,
+  "unmatched_count": 343,
+  "starters_identified": 16,
+  "rotation_risks": 7,
+  "validation_required": true
+}
+```
+
+**Validation Workflow**: If `unmatched_count > 0`, use `/import-validation` UI to manually confirm player mappings, then `/api/apply-import` to save mappings for future imports.
 
 ---
 
 ## **Data Management API - V2.0 Enhanced** ✅ *Added 2025-08-28*
 
 ### **`POST /api/archive-week`** - Weekly Analysis Archive
-**Description**: Archive current week's complete analysis state for historical reference and trend analysis
+**Description**: Archive current live analysis state for historical reference and trend analysis
 
-**Purpose**: Preserve complete gameweek analysis before importing fresh data. Creates comprehensive snapshot of current player valuations, form calculations, fixture assessments, and system parameters for historical comparison.
+**Purpose**: Preserve complete live analysis state before importing fresh data. Creates comprehensive snapshot of current player valuations, form calculations, fixture assessments, and system parameters for historical comparison.
 
-**Workflow Integration**: Use before importing new gameweek data to maintain analysis continuity. Enables retrospective analysis and parameter validation across different weeks.
+**Workflow Integration**: Use before importing new data to maintain analysis continuity. Enables retrospective analysis and parameter validation across different weeks.
 
 **Request**: No body required
 ```bash

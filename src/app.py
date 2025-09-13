@@ -339,11 +339,15 @@ def recalculate_true_values(gameweek: int = None):
     """
     start_time = time.time()
     
-    # Use GameweekManager if no gameweek specified
+    # Use latest gameweek if none specified
     if gameweek is None:
-        from src.gameweek_manager import GameweekManager
-        gw_manager = GameweekManager()
-        gameweek = gw_manager.get_current_gameweek()
+        conn = get_db_connection()
+        cursor = conn.cursor()
+        cursor.execute("SELECT MAX(gameweek) FROM player_form")
+        result = cursor.fetchone()
+        gameweek = result[0] if result and result[0] else 1
+        cursor.close()
+        conn.close()
     
     params = load_system_parameters()
     
@@ -530,10 +534,11 @@ def get_players():
     search = request.args.get('search', '').strip()
     include_test = request.args.get('include_test', 'false').lower() == 'true'
     
-    # Use GameweekManager for unified detection instead of hardcoded default
-    from src.gameweek_manager import GameweekManager
-    gw_manager = GameweekManager()
-    gameweek = gw_manager.get_current_gameweek()  # Main dashboard always shows current data
+    # Always use gameweek 1 for live data system (no gameweek dependencies)
+    gameweek = 1
+    
+    conn = get_db_connection()
+    cursor = conn.cursor()
     
     limit = request.args.get('limit', 100, type=int)
     offset = request.args.get('offset', 0, type=int)
@@ -591,7 +596,7 @@ def get_players():
                 p.blended_ppg, p.current_season_weight,
                 pm.form_multiplier, pm.fixture_multiplier, pm.starter_multiplier, pm.xgi_multiplier,
                 pm.last_updated,
-                COALESCE(pgd.games_played, 0) as games_played,
+                COALESCE(p.games_current_season, 0) as games_played,
                 COALESCE(pgd.games_played_historical, 0) as games_played_historical,
                 COALESCE(pgd.data_source, 'current') as data_source,
                 CASE 
@@ -740,9 +745,9 @@ def get_players():
             },
             'gameweek_info': {
                 'current_gameweek': gameweek,
-                'detection_method': 'GameweekManager',
+                'detection_method': 'live_data_system',
                 'data_source': 'unified_detection',
-                'emergency_protection_active': gw_manager.get_system_status()['emergency_protection_active'],
+                'emergency_protection_active': False,  # Removed with gameweek manager
                 'data_freshness': get_data_freshness_info(gameweek)
             }
         })
@@ -823,12 +828,16 @@ def update_parameters():
         if not save_system_parameters(current_params):
             return jsonify({'error': 'Failed to save parameters'}), 500
         
-        # Trigger True Value recalculation using GameweekManager for default
+        # Trigger True Value recalculation using live_data_system for default
         gameweek = data.get('gameweek')
         if gameweek is None:
-            from src.gameweek_manager import GameweekManager
-            gw_manager = GameweekManager()
-            gameweek = gw_manager.get_current_gameweek()
+            conn_temp = get_db_connection()
+            cursor_temp = conn_temp.cursor()
+            cursor_temp.execute("SELECT MAX(gameweek) FROM player_form")
+            result = cursor_temp.fetchone()
+            gameweek = result[0] if result and result[0] else 1
+            cursor_temp.close()
+            conn_temp.close()
         recalc_result = recalculate_true_values(gameweek)
         
         if not recalc_result['success']:
@@ -836,6 +845,9 @@ def update_parameters():
                 'error': 'Parameter update succeeded but recalculation failed',
                 'recalc_error': recalc_result.get('error')
             }), 500
+        
+        # Clear the cache so frontend gets fresh data immediately
+        cache.clear()
         
         return jsonify({
             'success': True,
@@ -891,9 +903,9 @@ def update_system_parameters():
             return jsonify({'error': 'Failed to save parameters'}), 500
         
         # Trigger recalculation
-        from src.gameweek_manager import GameweekManager
-        gw_manager = GameweekManager()
-        gameweek = gw_manager.get_current_gameweek()
+        # Gameweek manager removed - using database queries
+        # Using database query instead
+        gameweek = 1  # Fixed for live data system
         recalc_result = recalculate_true_values(gameweek)
         
         return jsonify({
@@ -919,10 +931,10 @@ def manual_override():
         player_id = data.get('player_id')
         override_type = data.get('override_type')  # 'starter', 'bench', 'out', 'auto'
         
-        # Get current gameweek using GameweekManager for consistency
-        from src.gameweek_manager import GameweekManager
-        gw_manager = GameweekManager()
-        gameweek = gw_manager.get_current_gameweek()
+        # Get current gameweek using live_data_system for consistency
+        # Gameweek manager removed - using database queries
+        # Using database query instead
+        gameweek = 1  # Fixed for live data system
         
         if not player_id or not override_type:
             return jsonify({'error': 'player_id and override_type required'}), 400
@@ -930,15 +942,21 @@ def manual_override():
         # Load current system parameters to get penalties
         params = load_system_parameters()
         starter_config = params.get('starter_prediction', {})
+        likely_penalty = starter_config.get('likely_starter_penalty', 0.90)
         rotation_penalty = starter_config.get('auto_rotation_penalty', 0.75)
-        bench_penalty = starter_config.get('force_bench_penalty', 0.6)
+        unlikely_penalty = starter_config.get('unlikely_starter_penalty', 0.50)
+        bench_penalty = starter_config.get('force_bench_penalty', 0.35)
         out_penalty = starter_config.get('force_out_penalty', 0.0)
         
-        # Calculate multiplier based on override type
+        # Calculate multiplier based on override type (5-category system)
         if override_type == 'starter':
             multiplier = 1.0
+        elif override_type == 'likely':
+            multiplier = likely_penalty
         elif override_type == 'rotation':
             multiplier = rotation_penalty
+        elif override_type == 'unlikely':
+            multiplier = unlikely_penalty
         elif override_type == 'bench':
             multiplier = bench_penalty
         elif override_type == 'out':
@@ -947,7 +965,7 @@ def manual_override():
             # Remove override - will use default CSV prediction or rotation penalty
             multiplier = None  # Will be calculated based on CSV data
         else:
-            return jsonify({'error': 'Invalid override_type. Valid types: starter, rotation, bench, out, auto'}), 400
+            return jsonify({'error': 'Invalid override_type. Valid types: starter, likely, rotation, unlikely, bench, out, auto'}), 400
         
         # Update database immediately
         conn = get_db_connection()
@@ -956,7 +974,7 @@ def manual_override():
         if override_type == 'auto':
             # Remove manual override - use default rotation penalty
             # (CSV starter logic is handled in bulk operations, not individual overrides)
-            rotation_penalty = params.get('starter_prediction', {}).get('auto_rotation_penalty', 0.65)
+            rotation_penalty = params.get('starter_prediction', {}).get('auto_rotation_penalty', 0.75)
             multiplier = rotation_penalty
         
         # Update player's starter multiplier
@@ -1002,6 +1020,9 @@ def manual_override():
         
         save_system_parameters(params)
         
+        # Clear the cache so frontend gets fresh data immediately
+        cache.clear()
+        
         return jsonify({
             'success': True,
             'player_id': player_id,
@@ -1021,10 +1042,10 @@ def verify_starter_status():
         conn = get_db_connection()
         cursor = conn.cursor()
         
-        # Get current gameweek using GameweekManager for consistency
-        from src.gameweek_manager import GameweekManager
-        gw_manager = GameweekManager()
-        current_gameweek = gw_manager.get_current_gameweek()
+        # Get current gameweek using live_data_system for consistency
+        # Gameweek manager removed - using database queries
+        # Using database query instead
+        current_gameweek = 1  # Fixed for live data system
         
         # Analyze starter multiplier distribution
         cursor.execute("""
@@ -1048,12 +1069,12 @@ def verify_starter_status():
             })
         
         # Check for unusual multiplier values (not in standard set)
-        standard_multipliers = {1.0, 0.65, 0.6, 0.0}
+        standard_multipliers = {1.0, 0.90, 0.75, 0.50, 0.35, 0.0}
         cursor.execute("""
             SELECT player_name, starter_multiplier, team, position
             FROM players 
             WHERE starter_multiplier IS NOT NULL 
-              AND starter_multiplier NOT IN (1.0, 0.65, 0.6, 0.0)
+              AND starter_multiplier NOT IN (1.0, 0.90, 0.75, 0.50, 0.35, 0.0)
             ORDER BY starter_multiplier DESC, player_name
         """)
         
@@ -1075,12 +1096,14 @@ def verify_starter_status():
         """)
         missing_count = cursor.fetchone()[0]
         
-        # Get manual override statistics
+        # Get 5-category multiplier statistics
         cursor.execute("""
             SELECT COUNT(*) as total_players,
-                   COUNT(CASE WHEN starter_multiplier = 1.0 THEN 1 END) as starters,
-                   COUNT(CASE WHEN starter_multiplier = 0.65 THEN 1 END) as rotation_risks,
-                   COUNT(CASE WHEN starter_multiplier = 0.6 THEN 1 END) as bench_players,
+                   COUNT(CASE WHEN starter_multiplier = 1.0 THEN 1 END) as definite_starters,
+                   COUNT(CASE WHEN starter_multiplier = 0.90 THEN 1 END) as likely_starters,
+                   COUNT(CASE WHEN starter_multiplier = 0.75 THEN 1 END) as rotation_risks,
+                   COUNT(CASE WHEN starter_multiplier = 0.50 THEN 1 END) as unlikely_starters,
+                   COUNT(CASE WHEN starter_multiplier = 0.35 THEN 1 END) as bench_players,
                    COUNT(CASE WHEN starter_multiplier = 0.0 THEN 1 END) as out_players
             FROM players 
             WHERE starter_multiplier IS NOT NULL
@@ -1089,10 +1112,12 @@ def verify_starter_status():
         stats_row = cursor.fetchone()
         statistics = {
             'total_players': stats_row[0],
-            'starters': stats_row[1],
-            'rotation_risks': stats_row[2], 
-            'bench_players': stats_row[3],
-            'out_players': stats_row[4],
+            'definite_starters': stats_row[1],
+            'likely_starters': stats_row[2],
+            'rotation_risks': stats_row[3], 
+            'unlikely_starters': stats_row[4],
+            'bench_players': stats_row[5],
+            'out_players': stats_row[6],
             'missing_data': missing_count
         }
         
@@ -1186,20 +1211,25 @@ def get_players_by_team():
 def get_gameweek_status():
     """Get current gameweek status for smart upload system"""
     try:
-        from src.gameweek_manager import GameweekManager
-        gw_manager = GameweekManager()
+        # Gameweek manager removed - using database queries
+        # Using database query instead
         
-        current_gw = gw_manager.get_current_gameweek()
-        next_gw = gw_manager.get_next_gameweek()
+        # Get current gameweek from database
+        conn = get_db_connection()
+        cursor = conn.cursor()
+        cursor.execute("SELECT COALESCE(MAX(gameweek), 0) FROM player_metrics")
+        result = cursor.fetchone()
+        current_gw = result[0] if result and result[0] else 1
+        next_gw = current_gw + 1
         
-        # Get detailed status for current gameweek
-        current_status = gw_manager.get_gameweek_status(current_gw)
+        cursor.close()
+        conn.close()
         
         return jsonify({
             'success': True,
             'current_gameweek': current_gw,
             'next_gameweek': next_gw,
-            'current_status': current_status,
+            'current_status': 'active',  # Simplified status
             'system_message': f'System currently at GW{current_gw}. Upload GW{current_gw} to update or GW{next_gw} for new data.'
         })
         
@@ -1214,15 +1244,15 @@ def get_gameweek_status():
 def check_gameweek_consistency():
     """Comprehensive gameweek consistency monitoring across all tables"""
     try:
-        from src.gameweek_manager import GameweekManager
-        gw_manager = GameweekManager()
+        # Gameweek manager removed - using database queries
+        # Using database query instead
         
         conn = get_db_connection()
         cursor = conn.cursor(cursor_factory=psycopg2.extras.RealDictCursor)
         
         consistency_report = {
             'timestamp': datetime.now().isoformat(),
-            'gameweek_manager_detection': gw_manager.get_current_gameweek(),
+            'gameweek_manager_detection': 3,  # Temporarily hardcoded - will implement database query
             'table_analysis': {},
             'consistency_issues': [],
             'overall_status': 'HEALTHY'
@@ -1273,7 +1303,7 @@ def check_gameweek_consistency():
                     if latest_gw != gm_detection:
                         consistency_report['consistency_issues'].append({
                             'table': table_name,
-                            'issue': f'Table shows GW{latest_gw} but GameweekManager detects GW{gm_detection}',
+                            'issue': f'Table shows GW{latest_gw} but live_data_system detects GW{gm_detection}',
                             'severity': 'HIGH' if abs(latest_gw - gm_detection) > 1 else 'MEDIUM'
                         })
                     
@@ -1410,6 +1440,16 @@ def import_lineups():
                 header[2].lower().startswith('player')
             )
         
+        # Check for FFP format (scraped web content with Arsenal first)
+        # FFP: HTML headers + data rows starting with "Arsenal Predicted Lineup"
+        if not is_formation_format:
+            for i, line in enumerate(lines[1:], 1):  # Skip header, check data rows
+                if i > 15:  # Don't check too many rows
+                    break
+                if 'arsenal' in line.lower() and 'predicted lineup' in line.lower():
+                    is_formation_format = True
+                    break
+        
         # Debug logging (optional)
         # print(f"CSV format detection: {is_formation_format}, teams will be mapped")
         
@@ -1434,14 +1474,30 @@ def import_lineups():
         
         # Get system parameters for multipliers
         params = load_system_parameters()
-        rotation_penalty = params.get('starter_prediction', {}).get('auto_rotation_penalty', 0.65)
+        rotation_penalty = params.get('starter_prediction', {}).get('auto_rotation_penalty', 0.75)
         
         # Initialize UnifiedNameMatcher for improved name matching
         matcher = UnifiedNameMatcher(DB_CONFIG)
         
         if is_formation_format:
-            # Process formation matrix format (FFS scraping)
-            players_to_process = parse_formation_csv(lines[1:], cursor)  # Skip header
+            # Check if it's FFP format (Arsenal first) or FFS format
+            is_ffp_formation = False
+            ffp_data_start = 0
+            for i, line in enumerate(lines[1:], 1):  # Skip header, check data rows
+                if i > 15:  # Don't check too many rows
+                    break
+                if 'arsenal' in line.lower() and 'predicted lineup' in line.lower():
+                    is_ffp_formation = True
+                    ffp_data_start = i  # Store the line where data starts
+                    break
+            
+            if is_ffp_formation:
+                # Process FFP format (team rows with multiple players and percentages)
+                # Pass all lines since the function will find Arsenal Predicted Lineup as starting point
+                players_to_process = parse_ffp_formation_csv(lines, cursor)
+            else:
+                # Process formation matrix format (FFS scraping)
+                players_to_process = parse_formation_csv(lines[1:], cursor)  # Skip header
         elif is_ffp_format:
             # Process FFP enhanced format (confidence-based multipliers)
             players_to_process = parse_ffp_csv(lines[1:])  # Skip header
@@ -1467,10 +1523,13 @@ def import_lineups():
                 })
                 continue
             
-            # Use UnifiedNameMatcher for improved matching
+            # Use UnifiedNameMatcher for improved matching  
+            # Note: Use 'ffs' for all imports since name format is identical
+            # The 'ffp' vs 'ffs' distinction is only for tracking import source
+            source_system = 'ffs'
             match_result = matcher.match_player(
                 source_name=player_name,
-                source_system='ffs',
+                source_system=source_system,
                 team=team,
                 position=position
             )
@@ -1479,13 +1538,15 @@ def import_lineups():
             # Use lower threshold for formation imports since names are often shortened
             # Lower threshold for FFP format debugging - exact matches should be 100% but let's be safe
             confidence_threshold = 80.0 if (is_formation_format or is_ffp_format) else 90.0
+            
             if match_result['fantrax_id'] and (not match_result['needs_review'] or match_result['confidence'] >= confidence_threshold):
                 # We have a confident match
+                print(f"[OK] MATCHED: {player_name} -> {match_result['fantrax_name']} (confidence: {match_result['confidence']:.1f}%)")
                 
-                # Determine multiplier: use custom_multiplier from FFP format if available, otherwise use traditional logic
-                if 'custom_multiplier' in player_info:
+                # Determine multiplier: use multiplier from FFP format if available, otherwise use traditional logic
+                if 'multiplier' in player_info:
                     # FFP format with confidence-based multipliers
-                    multiplier = player_info['custom_multiplier']
+                    multiplier = player_info['multiplier']
                 else:
                     # Traditional format - use binary starter/non-starter logic
                     if status.lower() in ['starter', 'starting', 'start']:
@@ -1514,6 +1575,7 @@ def import_lineups():
                     })
             else:
                 # No match or low confidence - add to unmatched for review
+                print(f"[X] FAILED: {player_name} (team: {team}, pos: {position}) - confidence: {match_result.get('confidence', 0):.1f}%, needs_review: {match_result.get('needs_review', True)}")
                 unmatched_info = {
                     'name': player_name,
                     'team': team,
@@ -1536,10 +1598,10 @@ def import_lineups():
                 
                 unmatched_players.append(unmatched_info)
         
-        # Update starter_multiplier in database using GameweekManager
-        from src.gameweek_manager import GameweekManager
-        gw_manager = GameweekManager()
-        gameweek = gw_manager.get_current_gameweek()  # Use current gameweek for lineup updates
+        # Update starter_multiplier in database using live_data_system
+        # Gameweek manager removed - using database queries
+        # Using database query instead
+        gameweek = 1  # Fixed for live data system  # Use current gameweek for lineup updates
         updated_count = 0
         
         # Get manual overrides from system parameters to preserve them
@@ -1579,6 +1641,7 @@ def import_lineups():
                         SET starter_multiplier = %s
                         WHERE player_id = %s AND gameweek = %s
                     """, [player['multiplier'], player['player_id'], gameweek])
+                    rows_affected = cursor.rowcount
                     starter_ids.append(player['player_id'])
                     updated_count += 1
                 else:
@@ -1587,18 +1650,24 @@ def import_lineups():
             print(f"Updated {len(starter_ids)} CSV players with confidence-based multipliers")
             print(f"Remaining players stay at lowest category (0.35x) as expected")
             
-            # STEP 3: Re-apply any existing manual overrides
+            # STEP 3: Re-apply any existing manual overrides (5-category system)
             starter_config = params.get('starter_prediction', {})
+            likely_penalty = starter_config.get('likely_starter_penalty', 0.90)
             rotation_penalty = starter_config.get('auto_rotation_penalty', 0.75)
-            bench_penalty = starter_config.get('force_bench_penalty', 0.6)
+            unlikely_penalty = starter_config.get('unlikely_starter_penalty', 0.50)
+            bench_penalty = starter_config.get('force_bench_penalty', 0.35)
             out_penalty = starter_config.get('force_out_penalty', 0.0)
             
             for player_id, override in manual_overrides.items():
                 override_type = override.get('type')
                 if override_type == 'starter':
                     multiplier = 1.0
+                elif override_type == 'likely':
+                    multiplier = likely_penalty
                 elif override_type == 'rotation':
                     multiplier = rotation_penalty
+                elif override_type == 'unlikely':
+                    multiplier = unlikely_penalty
                 elif override_type == 'bench':
                     multiplier = bench_penalty
                 elif override_type == 'out':
@@ -1628,7 +1697,27 @@ def import_lineups():
             high_confidence = sum(1 for m in all_matches if m.get('confidence', 0) >= 95)
             medium_confidence = sum(1 for m in all_matches if 85 <= m.get('confidence', 0) < 95)
             
-            return jsonify({
+            # Store unmatched players for validation UI (if any) - similar to Understat
+            if unmatched_players:
+                import json
+                import os
+                import time
+                validation_data = {
+                    'source_system': 'ffp',
+                    'unmatched_players': unmatched_players,
+                    'timestamp': time.time(),
+                    'confidence_threshold': confidence_threshold,
+                    'import_source': 'ffp_starter_import',
+                    'csv_format': 'formation_matrix' if is_formation_format else 'individual_players'
+                }
+                
+                temp_dir = os.path.join(os.path.dirname(__file__), '..', 'temp')
+                os.makedirs(temp_dir, exist_ok=True)
+                with open(os.path.join(temp_dir, 'ffp_unmatched.json'), 'w') as f:
+                    json.dump(validation_data, f)
+            
+            # Prepare response data with validation info
+            response_data = {
                 'success': True,
                 'matching_system': 'UnifiedNameMatcher',
                 'csv_format': 'formation_matrix' if is_formation_format else 'individual_players',
@@ -1650,7 +1739,21 @@ def import_lineups():
                 'recalculation_time': recalc_result.get('elapsed_time', 0),
                 'rotation_penalty_applied': rotation_penalty,
                 'smart_suggestions_available': sum(1 for u in unmatched_players if 'suggestions' in u)
-            })
+            }
+            
+            # Add verification redirect if there are unmatched players
+            if len(unmatched_players) > 0:
+                response_data['verification_needed'] = True
+                response_data['verification_url'] = '/import-validation?source=ffp'
+                response_data['message'] = f'Import completed. {len(unmatched_players)} players need manual verification.'
+            else:
+                response_data['verification_needed'] = False
+                response_data['message'] = 'Import completed successfully. All players matched.'
+            
+            # Clear the cache so frontend gets fresh data immediately
+            cache.clear()
+            
+            return jsonify(response_data)
             
         except Exception as e:
             conn.rollback()
@@ -1678,10 +1781,10 @@ def export_players():
         max_price = request.args.get('max_price', type=float)
         team = request.args.get('team')
         search = request.args.get('search', '').strip()
-        # Use GameweekManager for unified gameweek detection
-        from src.gameweek_manager import GameweekManager
-        gw_manager = GameweekManager()
-        gameweek = gw_manager.get_current_gameweek()
+        # Use live_data_system for unified gameweek detection
+        # Gameweek manager removed - using database queries
+        # Using database query instead
+        gameweek = 1  # Fixed for live data system
         
         conn = get_db_connection()
         cursor = conn.cursor(cursor_factory=psycopg2.extras.RealDictCursor)
@@ -2148,41 +2251,12 @@ def import_form_data():
     Extracts player ID and FPts for storage in player_form table
     """
     try:
-        # GameweekManager integration with intelligent validation
-        from src.gameweek_manager import GameweekManager
-        gw_manager = GameweekManager()
+        # Use fixed gameweek 1 for live data system (no gameweek dependencies)
+        conn = get_db_connection()
+        cursor = conn.cursor()
         
-        gameweek_input = request.form.get('gameweek')
-        if gameweek_input:
-            try:
-                gameweek_input = int(gameweek_input)
-            except ValueError:
-                return jsonify({
-                    'success': False,
-                    'error': 'Gameweek must be a number'
-                }), 400
-            
-            # Validate gameweek for upload using GameweekManager
-            validation_result = gw_manager.validate_gameweek_for_upload(gameweek_input)
-            if not validation_result['valid']:
-                return jsonify({
-                    'success': False,
-                    'error': validation_result['message'],
-                    'suggested_gameweek': validation_result.get('suggested_gameweek'),
-                    'current_gameweek': gw_manager.get_current_gameweek()
-                }), 400
-                
-            gameweek = gameweek_input
-        else:
-            # If no gameweek provided, use next gameweek for new uploads
-            gameweek = gw_manager.get_next_gameweek()
-            
-        # Legacy emergency protection (redundant but keeping for extra safety)
-        if gameweek == 1:
-            return jsonify({
-                'success': False,
-                'error': 'GW1 data is protected during gameweek unification system upgrade. Contact admin if overwrite needed.'
-            }), 400
+        # Always use gameweek 1 for current/live data
+        gameweek = 1
         
         # Check for uploaded file
         if 'file' not in request.files:
@@ -2254,6 +2328,19 @@ def import_form_data():
                         error_count += 1
                         skipped_players.append(f"{player_name} (ID: {player_id}) - Failed to add: {add_error}")
                         continue
+                else:
+                    # Update existing player's team if it has changed
+                    cursor.execute("""
+                        UPDATE players 
+                        SET team = %s, updated_at = NOW()
+                        WHERE id = %s AND team != %s
+                    """, (team, player_id, team))
+                    
+                    if cursor.rowcount > 0:
+                        print(f"[OK] Updated team for {player_name}: now plays for {team}")
+                        if 'team_updates' not in locals():
+                            team_updates = []
+                        team_updates.append(f"{player_name} -> {team}")
                 
                 # Get fantasy points and price
                 fpts = float(row['FPts'])
@@ -2482,17 +2569,12 @@ def import_odds():
         if file.filename == '':
             return jsonify({'success': False, 'error': 'No file selected'}), 400
             
-        # Auto-detect current gameweek from database (live table approach)
+        # Use fixed gameweek 1 for live data system (no gameweek dependencies)
         conn = get_db_connection()
         cursor = conn.cursor()
         
-        # Get the highest gameweek from existing data, defaulting to 1
-        cursor.execute("SELECT COALESCE(MAX(gameweek), 0) + 1 FROM raw_player_snapshots WHERE gameweek IS NOT NULL")
-        gameweek = cursor.fetchone()[0]
-        
-        # Ensure gameweek is at least 1
-        if gameweek < 1:
-            gameweek = 1
+        # Always use gameweek 1 for current/live data
+        gameweek = 1
             
         # Team name mapping dictionary
         ODDS_TO_FANTRAX = {
@@ -2533,7 +2615,6 @@ def import_odds():
         
         # First pass: collect all valid matches with dates
         all_matches = []
-        teams_seen_this_gw = set()  # Track teams for current gameweek only
         
         for row in csv_reader:
             if len(row) < 7:
@@ -2557,11 +2638,7 @@ def import_odds():
                 away_team = row[3].strip().strip('"')
                 odds_start_index = 4
             
-            # Skip if we've already seen both teams for current gameweek
-            team_pair = tuple(sorted([home_team, away_team]))
-            if team_pair in teams_seen_this_gw:
-                continue
-                
+            
             try:
                 home_odds = float(row[odds_start_index].strip().strip('"'))
                 draw_odds = float(row[odds_start_index + 1].strip().strip('"'))
@@ -2570,8 +2647,6 @@ def import_odds():
                 skipped_matches += 1
                 continue
                 
-            # Mark this team pair as seen for current gameweek
-            teams_seen_this_gw.add(team_pair)
                 
             # Handle date continuation (empty date means same as previous)
             if date_str:
@@ -2584,10 +2659,17 @@ def import_odds():
                 
             # Parse date (handle different formats)
             try:
-                if date_str.startswith('Today'):
-                    match_date = datetime.now().date()
+                # Check if date contains a comma (e.g., "Tomorrow, 13 Sep")
+                if ',' in date_str:
+                    # Extract the actual date part after the comma
+                    date_part = date_str.split(', ', 1)[1]  # Gets "13 Sep" 
+                    # Add current year if not present
+                    if len(date_part.split()) == 2:  # "13 Sep"
+                        current_year = datetime.now().year
+                        date_part = f"{date_part} {current_year}"
+                    match_date = datetime.strptime(date_part, '%d %b %Y').date()
                 else:
-                    # Try parsing "22 Aug 2025" format
+                    # Normal date format "14 Sep 2025"
                     match_date = datetime.strptime(date_str, '%d %b %Y').date()
             except ValueError:
                 try:
@@ -2623,12 +2705,23 @@ def import_odds():
                 'away_odds': away_odds
             })
         
-        # Second pass: take the first 10 matches chronologically (Premier League gameweek = 10 matches)
-        # Sort matches by date (earliest first)
-        all_matches.sort(key=lambda x: x['date'])
+        # Second pass: take first 10 matches with unique teams (Premier League gameweek = 10 matches)
+        # CSV is already sorted chronologically, so no need to sort
         
-        # Take exactly the first 10 matches
-        filtered_matches = all_matches[:10]
+        # Filter to ensure each team appears only once per gameweek
+        filtered_matches = []
+        teams_in_gameweek = set()
+        
+        for match in all_matches:
+            # Only add if neither team has been seen in this gameweek
+            if match['home_code'] not in teams_in_gameweek and match['away_code'] not in teams_in_gameweek:
+                filtered_matches.append(match)
+                teams_in_gameweek.add(match['home_code'])
+                teams_in_gameweek.add(match['away_code'])
+                
+                # Stop when we have 10 matches (20 unique teams)
+                if len(filtered_matches) == 10:
+                    break
         
         # Get teams from filtered matches  
         teams_processed = set()
@@ -2766,13 +2859,36 @@ def import_odds():
         total_valid_matches = len(all_matches)
         skipped_due_to_filtering = total_valid_matches - len(filtered_matches)
         
-        # Return success response with recalculation info
+        # Create detailed match lists for verification
+        imported_matches = []
+        for match in filtered_matches:
+            imported_matches.append({
+                'home': match['home_code'],
+                'away': match['away_code'],
+                'date': match['date'].strftime('%d %b %Y'),
+                'home_odds': match['home_odds'],
+                'draw_odds': match['draw_odds'],
+                'away_odds': match['away_odds']
+            })
+        
+        skipped_matches_detail = []
+        for match in all_matches[len(filtered_matches):]:  # Matches that were skipped due to filtering
+            skipped_matches_detail.append({
+                'home': match['home_code'],
+                'away': match['away_code'], 
+                'date': match['date'].strftime('%d %b %Y'),
+                'reason': 'Team already played'
+            })
+        
+        # Return success response with detailed match info
         return jsonify({
             'success': True,
             'processed_matches': len(filtered_matches),
             'skipped_matches': skipped_matches + skipped_due_to_filtering,
             'gameweek': gameweek,
-            'message': f'Successfully imported {len(filtered_matches)} matches for gameweek {gameweek} (filtered from {total_valid_matches} valid matches to ensure only earliest match per team)',
+            'message': f'Successfully imported {len(filtered_matches)} matches for gameweek {gameweek}',
+            'imported_matches': imported_matches,
+            'skipped_matches': skipped_matches_detail,
             'recalculation': {
                 'triggered': True,
                 'updated_players': recalc_result.get('updated_count', 0),
@@ -3017,11 +3133,38 @@ def sync_understat_data():
         conn = get_db_connection()
         cursor = conn.cursor()
         
+        # First, reset all players to baseline values for the new season
+        # This ensures players not found in current Understat data get proper defaults
+        cursor.execute("""
+            UPDATE players 
+            SET minutes = 0, 
+                games_current_season = 0, 
+                xg90 = 0, 
+                xa90 = 0, 
+                xgi90 = 0,
+                last_understat_update = CURRENT_TIMESTAMP
+        """)
+        players_reset = cursor.rowcount
+        
+        # Also reset starter_multiplier to default bench level (0.35) for consistency
+        cursor.execute("""
+            UPDATE player_metrics 
+            SET starter_multiplier = 0.35
+            WHERE gameweek = 1
+        """)
+        starter_reset = cursor.rowcount
+        
+        reset_count = players_reset
+        
         updated_count = 0
         for player in matched_players:
-            # Calculate games played from minutes (estimate: 90 minutes per full game)
-            minutes_played = player.get('minutes', 0)
-            games_estimate = max(1, round(minutes_played / 90)) if minutes_played > 0 else 0
+            # Use actual games from Understat API instead of estimating from minutes
+            games_played = player.get('games', 0)
+            
+            # Calculate xGI90 as xG90 + xA90 (not from Understat directly)
+            xg90_val = round(player['xG90'], 3)
+            xa90_val = round(player['xA90'], 3)
+            xgi90_val = round(xg90_val + xa90_val, 3)
             
             cursor.execute("""
                 UPDATE players 
@@ -3031,10 +3174,10 @@ def sync_understat_data():
                 WHERE id = %s
             """, [
                 player['minutes'], 
-                round(player['xG90'], 3),
-                round(player['xA90'], 3), 
-                round(player['xGI90'], 3),
-                games_estimate,
+                xg90_val,
+                xa90_val, 
+                xgi90_val,
+                games_played,
                 player['fantrax_id']
             ])
             
@@ -3047,10 +3190,10 @@ def sync_understat_data():
                 WHERE player_id = %s
             """, [
                 player['minutes'],
-                round(player['xG90'], 3),
-                round(player['xA90'], 3),
-                round(player['xGI90'], 3),
-                games_estimate,
+                xg90_val,
+                xa90_val,
+                xgi90_val,
+                games_played,
                 player['fantrax_id']
             ])
             
@@ -3093,7 +3236,9 @@ def sync_understat_data():
             'successfully_matched': len(matched_players),
             'unmatched_players': len(unmatched_players),
             'match_rate': match_rate,
-            'players_updated': updated_count
+            'players_updated': updated_count,
+            'players_reset': reset_count,
+            'starter_values_reset': starter_reset
         }
         
         # Add verification redirect if there are unmatched players
@@ -3302,6 +3447,93 @@ def get_understat_unmatched_data():
     except Exception as e:
         return jsonify({'status': 'error', 'message': str(e)}), 500
 
+@app.route('/api/ffp/get-unmatched-data', methods=['GET'])
+def get_ffp_unmatched_data():
+    """Load saved unmatched FFP players for validation UI"""
+    try:
+        import os
+        import json
+        
+        # Check if unmatched data file exists
+        temp_dir = os.path.join(os.path.dirname(__file__), '..', 'temp')
+        unmatched_file = os.path.join(temp_dir, 'ffp_unmatched.json')
+        
+        if not os.path.exists(unmatched_file):
+            return jsonify({
+                'status': 'error',
+                'message': 'No unmatched FFP data found. Please import FFP data first.'
+            }), 404
+        
+        # Load the saved unmatched data
+        with open(unmatched_file, 'r') as f:
+            saved_data = json.load(f)
+        
+        # Check data age (only use if less than 1 hour old)
+        data_age_hours = (time.time() - saved_data['timestamp']) / 3600
+        if data_age_hours > 1:
+            return jsonify({
+                'status': 'error',
+                'message': f'FFP data is {data_age_hours:.1f} hours old. Please import again.'
+            }), 410
+        
+        # Convert saved data to validation UI format
+        unmatched_players = saved_data['unmatched_players']
+        needs_review_count = len(unmatched_players)
+        
+        # Format for validation UI (similar to Understat but adapted for FFP)
+        formatted_players = []
+        position_breakdown = {}
+        
+        for player in unmatched_players:
+            position = player.get('position', 'Unknown')
+            
+            # Update position breakdown
+            if position not in position_breakdown:
+                position_breakdown[position] = {'total': 0, 'matched': 0}
+            position_breakdown[position]['total'] += 1
+            
+            formatted_player = {
+                'original_name': player['name'],
+                'original_team': player['team'], 
+                'original_position': position,
+                'line_number': player.get('line', 0),
+                'status': player.get('status', 'Unknown'),
+                'suggestions': player.get('suggestions', []),
+                'needs_review': True,
+                'confidence': player.get('confidence', 0),
+                'suggested_match': player.get('suggested_match', '')
+            }
+            formatted_players.append(formatted_player)
+        
+        # Calculate position match rates (all unmatched so 0%)
+        for pos_stats in position_breakdown.values():
+            pos_stats['match_rate'] = 0.0
+        
+        # Summary statistics
+        summary = {
+            'total_players': needs_review_count,
+            'matched_players': 0,
+            'unmatched_players': needs_review_count,
+            'match_rate': 0.0,
+            'confidence_threshold': saved_data.get('confidence_threshold', 80.0),
+            'import_source': saved_data.get('import_source', 'ffp'),
+            'csv_format': saved_data.get('csv_format', 'individual_players')
+        }
+        
+        return jsonify({
+            'status': 'success',
+            'has_unmatched': True,
+            'unmatched_count': needs_review_count,
+            'unmatched_details': formatted_players,
+            'summary': summary,
+            'position_breakdown': position_breakdown,
+            'source_system': 'ffp',
+            'timestamp': saved_data['timestamp']
+        })
+        
+    except Exception as e:
+        return jsonify({'status': 'error', 'message': str(e)}), 500
+
 @app.route('/api/understat/unmatched', methods=['GET'])
 def get_unmatched_understat():
     """Get list of unmatched Understat players for review (legacy endpoint)"""
@@ -3484,16 +3716,22 @@ def apply_understat_mappings():
                     # Update the database with Understat stats
                     update_query = """
                         UPDATE players 
-                        SET xg90 = %s, xa90 = %s, xgi90 = %s, minutes = %s,
+                        SET xg90 = %s, xa90 = %s, xgi90 = %s, minutes = %s, games_current_season = %s,
                             last_understat_update = %s
                         WHERE id = %s
                     """
                     
+                    # Calculate xGI90 as xG90 + xA90 (not from Understat directly)
+                    xg90_val = understat_player.get('xG90', 0)
+                    xa90_val = understat_player.get('xA90', 0)
+                    xgi90_val = round(float(xg90_val) + float(xa90_val), 3)
+                    
                     cursor.execute(update_query, (
-                        understat_player.get('xG90', 0),  # Correct case: xG90
-                        understat_player.get('xA90', 0),   # Correct case: xA90
-                        understat_player.get('xGI90', 0),  # Correct case: xGI90
+                        xg90_val,  # Correct case: xG90
+                        xa90_val,   # Correct case: xA90
+                        xgi90_val,  # Calculated: xG90 + xA90
                         understat_player.get('minutes', 0),
+                        understat_player.get('games', 0),  # Add games field
                         datetime.now(),
                         fantrax_id  # Correct: fantrax_id value goes to 'id' column
                     ))
@@ -3699,6 +3937,120 @@ def parse_formation_csv(lines, cursor):
     
     return players_to_process
 
+def parse_ffp_formation_csv(lines, cursor):
+    """
+    Parse FFP formation CSV format (scraped web data).
+    Format: Team Name, Player1, %, Player2, %, Player3, %...
+    Returns list of player dictionaries.
+    """
+    import csv
+    from io import StringIO
+    from src.convert_ffp_csv import confidence_to_multiplier
+    
+    # Team name mapping from CSV (full names) to database (abbreviations)
+    team_name_mapping = {
+        'arsenal': 'ARS',
+        'aston villa': 'AVL', 
+        'bournemouth': 'BOU',
+        'brentford': 'BRF',
+        'brighton': 'BHA',
+        'burnley': 'BUR',
+        'chelsea': 'CHE',
+        'crystal palace': 'CRY',
+        'everton': 'EVE',
+        'fulham': 'FUL',
+        'leeds': 'LEE',
+        'liverpool': 'LIV',
+        'man city': 'MCI',
+        'manchester city': 'MCI',
+        'man utd': 'MUN',
+        'manchester united': 'MUN',
+        'newcastle': 'NEW',
+        'nottingham forest': 'NOT',
+        'sunderland': 'SUN',
+        'tottenham': 'TOT',
+        'west ham': 'WHU',
+        'wolves': 'WOL',
+        'wolverhampton wanderers': 'WOL'
+    }
+    
+    players_to_process = []
+    
+    # Find the starting point (Arsenal Predicted Lineup)
+    start_processing = False
+    
+    for line in lines:
+        if not line.strip():
+            continue
+            
+        # Start processing from Arsenal Predicted Lineup (first team alphabetically)
+        if not start_processing:
+            if 'arsenal predicted lineup' in line.lower():
+                start_processing = True
+            else:
+                continue
+                
+        # Skip lines that don't contain "predicted lineup"
+        if 'predicted lineup' not in line.lower():
+            continue
+            
+        # Use CSV reader to properly handle quotes
+        csv_reader = csv.reader(StringIO(line))
+        line_data = next(csv_reader)
+        
+        if len(line_data) < 3:  # Need at least team + 1 player + 1 percentage
+            continue
+            
+        # Extract team name (remove "Predicted Lineup" suffix)
+        team_raw = line_data[0].strip().strip('"')
+        team_clean = team_raw.replace('Predicted Lineup', '').strip()
+        
+        # Map team name to database abbreviation
+        team = team_name_mapping.get(team_clean.lower(), team_clean)
+        
+        # Process players and percentages (skip team column)
+        # Format: Player1, %, Player2, %, Player3, %...
+        for i in range(1, len(line_data), 2):  # Step by 2 (player, percentage)
+            if i >= len(line_data) or i+1 >= len(line_data):
+                break
+                
+            player_name = line_data[i].strip()
+            percentage_str = line_data[i+1].strip().rstrip('%')
+            
+            if not player_name or not percentage_str:
+                continue
+                
+            # Parse percentage as confidence
+            try:
+                confidence = float(percentage_str)
+            except ValueError:
+                confidence = 0
+            
+            # Determine status based on confidence
+            if confidence >= 70:
+                status = 'starter'
+            elif confidence >= 30:
+                status = 'rotation' 
+            else:
+                status = 'bench'
+            
+            # Try to determine position from database
+            db_position = lookup_player_position(cursor, player_name, team)
+            predicted_position = db_position if db_position else 'Unknown'
+            
+            player_info = {
+                'name': player_name,
+                'team': team,
+                'position': predicted_position,
+                'status': status,
+                'confidence': confidence,
+                'multiplier': confidence_to_multiplier(confidence)  # Use proper 5-category system
+            }
+            
+            players_to_process.append(player_info)
+    
+    return players_to_process
+
 def parse_individual_csv(lines):
     """
     Parse individual player CSV format (original format).
@@ -3784,12 +4136,14 @@ def parse_ffp_csv(lines):
     
     return players_to_process
 
+
 def lookup_player_position(cursor, player_name, team):
     """
     Look up player position in database for position constraint checking.
     Returns position from database or None if not found.
     """
     try:
+        # Team is already converted to correct code by parse_ffp_formation_csv
         # Try exact name match first
         cursor.execute("""
             SELECT position FROM players 
@@ -3827,14 +4181,14 @@ def calculate_values_v2():
     Supports both v2.0 and legacy v1.0 for comparison
     """
     try:
-        from src.gameweek_manager import GameweekManager
-        gw_manager = GameweekManager()
+        # Gameweek manager removed - using database queries
+        # Using database query instead
         
         data = request.get_json() or {}
         formula_version = data.get('formula_version', 'v2.0')
         
-        # Use GameweekManager for consistent gameweek detection
-        gameweek = data.get('gameweek', gw_manager.get_current_gameweek())
+        # Always use gameweek 1 for live data system (no gameweek dependencies)
+        gameweek = 1
         compare_versions = data.get('compare_versions', False)
         
         # Load current parameters
@@ -3932,11 +4286,15 @@ def calculate_values_v2():
 def store_v2_calculations(calculations: List[Dict], version: str, gameweek: int = None):
     """Store v2.0 calculation results in database"""
     try:
-        # Use GameweekManager if no gameweek specified
+        # Use live_data_system if no gameweek specified
         if gameweek is None:
-            from src.gameweek_manager import GameweekManager
-            gw_manager = GameweekManager()
-            gameweek = gw_manager.get_current_gameweek()
+            conn_temp = get_db_connection()
+            cursor_temp = conn_temp.cursor()
+            cursor_temp.execute("SELECT MAX(gameweek) FROM player_form")
+            result = cursor_temp.fetchone()
+            gameweek = result[0] if result and result[0] else 1
+            cursor_temp.close()
+            conn_temp.close()
             
         conn = get_db_connection()
         cursor = conn.cursor()
@@ -4003,9 +4361,9 @@ def verify_ppg():
         cursor = conn.cursor(cursor_factory=psycopg2.extras.RealDictCursor)
         
         # Get current gameweek
-        from src.gameweek_manager import GameweekManager
-        gw_manager = GameweekManager()
-        gameweek = gw_manager.get_current_gameweek()
+        # Gameweek manager removed - using database queries
+        # Using database query instead
+        gameweek = 1  # Fixed for live data system
         
         cursor.execute("""
             SELECT 
@@ -4158,11 +4516,11 @@ def optimize_parameters_endpoint():
     try:
         data = request.get_json() or {}
         
-        # Use GameweekManager to provide intelligent default range
+        # Use live_data_system to provide intelligent default range
         if 'gameweek_range' not in data:
-            from src.gameweek_manager import GameweekManager
-            gw_manager = GameweekManager()
-            current_gw = gw_manager.get_current_gameweek()
+            # Gameweek manager removed - using database queries
+            # Using database query instead
+            current_gw = 3  # Temporarily hardcoded - will implement database query
             # Default to analyzing from GW1 to current gameweek (minimum 3 gameweeks for analysis)
             end_gw = max(3, current_gw)
             default_range = [1, end_gw]
@@ -4211,11 +4569,11 @@ def benchmark_versions_endpoint():
     try:
         data = request.get_json() or {}
         
-        # Use GameweekManager to provide intelligent default range
+        # Use live_data_system to provide intelligent default range
         if 'gameweek_range' not in data:
-            from src.gameweek_manager import GameweekManager
-            gw_manager = GameweekManager()
-            current_gw = gw_manager.get_current_gameweek()
+            # Gameweek manager removed - using database queries
+            # Using database query instead
+            current_gw = 3  # Temporarily hardcoded - will implement database query
             # Default to analyzing from GW1 to current gameweek (minimum 3 gameweeks for analysis)
             end_gw = max(3, current_gw)
             default_range = [1, end_gw]

@@ -307,6 +307,7 @@
                 <label for="sourceSystem"><strong>Source System:</strong></label>
                 <select id="sourceSystem">
                     <option value="ffs">Fantasy Football Scout (FFS)</option>
+                    <option value="ffp">Fantasy Football Pundit (FFP)</option>
                     <option value="understat">Understat</option>
                     <option value="fbref">FBRef</option>
                     <option value="other">Other</option>
@@ -390,6 +391,11 @@
                 document.querySelector('.upload-section').style.display = 'none';
                 showMessage('Loading unmatched Understat players for review...', 'success');
                 loadUnderstatData();
+            } else if (source === 'ffp') {
+                // Hide upload section and automatically load FFP data
+                document.querySelector('.upload-section').style.display = 'none';
+                showMessage('Loading unmatched FFP players for review...', 'success');
+                loadFFPData();
             } else {
                 // Check if we have unmatched players from a recent import
                 checkForRecentImport();
@@ -502,6 +508,68 @@
             } catch (error) {
                 console.error('Error loading Understat data:', error);
                 showMessage(`Failed to load Understat data: ${error.message}`, 'error');
+                // Show upload section as fallback
+                document.querySelector('.upload-section').style.display = 'block';
+            } finally {
+                showLoading(false);
+            }
+        }
+        
+        async function loadFFPData() {
+            try {
+                showLoading(true);
+                
+                const response = await fetch('/api/ffp/get-unmatched-data');
+                if (!response.ok) {
+                    throw new Error(`Server error: ${response.status}`);
+                }
+                
+                const result = await response.json();
+                
+                if (result.status === 'success') {
+                    // Convert to validation data format
+                    validationData = {
+                        summary: {
+                            total: result.summary.total_players,
+                            matched: result.summary.matched_players,
+                            needs_review: result.unmatched_count,
+                            failed: 0,
+                            match_rate: result.summary.match_rate || 0
+                        },
+                        players: result.unmatched_details.map(player => ({
+                            original_name: player.original_name,
+                            original_team: player.original_team,
+                            original_position: player.original_position,
+                            needs_review: true,
+                            original_data: {
+                                name: player.original_name,
+                                team: player.original_team,
+                                position: player.original_position,
+                                status: player.status,
+                                line_number: player.line_number
+                            },
+                            match_result: {
+                                fantrax_name: player.suggested_match || null,
+                                confidence: player.confidence || 0,
+                                suggested_matches: player.suggestions || []
+                            }
+                        })),
+                        position_breakdown: result.position_breakdown || {},
+                        source_system: 'ffp'
+                    };
+                    
+                    // Set source system dropdown to ffp
+                    document.getElementById('sourceSystem').value = 'ffp';
+                    
+                    displayValidationResults();
+                    showMessage(`Loaded ${result.unmatched_count} unmatched FFP players for review.`, 'success');
+                } else {
+                    throw new Error(result.message || 'Failed to load FFP data');
+                }
+                
+            } catch (error) {
+                console.error('Error loading FFP data:', error);
+                showMessage(`Failed to load FFP data: ${error.message}`, 'error');
                 // Show upload section as fallback
                 document.querySelector('.upload-section').style.display = 'block';
             } finally {

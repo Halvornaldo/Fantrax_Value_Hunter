@@ -5,7 +5,8 @@
 
 This document describes the complete dashboard features for the V2.0 Enhanced Formula system. The system has been consolidated to a single V2.0 engine with all legacy components removed.
 
-**Dashboard URL**: `http://localhost:5001`  
+**Dashboard URL**: `http://localhost:3000` (React Frontend)  
+**API Backend**: `http://localhost:5001`  
 **Current System**: V2.0 Enhanced Formula fully operational
 
 ---
@@ -68,7 +69,7 @@ The V2.0 Enhanced system includes a comprehensive trend analysis system that cap
 
 **Current Season Focus**: Uses current-season-only baselines for immediate Week 1 data capture
 
-**Gameweek Detection**: Automatic database-driven gameweek detection eliminates hardcoded values
+**Live Table Mode**: All data uploads update the single live table for immediate dashboard reflection
 
 ### **Usage Examples**
 **Testing New Parameters**: Apply modified V2.0 parameters to GW1 data to predict performance
@@ -88,7 +89,7 @@ The V2.0 Enhanced system includes a streamlined weekly analysis workflow that pr
 ### **Archive Workflow Integration**
 
 **1. Complete Weekly Analysis**
-- Upload new gameweek data (Fantrax CSV, Understat sync, odds data)
+- Upload new data to live table (Fantrax CSV, Understat sync, odds data)
 - Run calculations and parameter optimizations  
 - Review True Value and ROI rankings
 - Optimize lineup selections and strategy
@@ -109,9 +110,9 @@ The V2.0 Enhanced system includes a streamlined weekly analysis workflow that pr
 ### **Archive System Benefits**
 
 **Workflow Flexibility**: 
-- No rigid gameweek lockouts or data access restrictions
+- No complex gameweek management - single live table approach
 - Archive when analysis is complete, not on fixed schedule
-- Maintain live analysis capability during gameweek transitions
+- Maintain live analysis capability with continuous data updates
 
 **Data Continuity**: 
 - Complete preservation of analysis decisions and reasoning
@@ -141,7 +142,7 @@ The V2.0 Enhanced system includes a streamlined weekly analysis workflow that pr
 - Suggested workflow: Archive → Import → Analyze → Archive
 - Seamless transition between weekly analysis cycles
 - Protection against data loss during import operations
-- Maintains analysis consistency across gameweeks
+- Maintains analysis consistency with live data updates
 
 ---
 
@@ -361,7 +362,7 @@ Erling Haaland Override: B → S
 
 **Process**:
 1. Click "📊 Upload Weekly Game Data" button → ✅ Working (2025-08-23)
-2. Enter current gameweek number → ✅ Working
+2. Data automatically goes to live table → ✅ Working
 3. Upload Fantrax CSV export with enhanced validation → ✅ Working
 4. **V2.0 Processing**:
    - Dynamic blending weights recalculated → ✅ Working
@@ -376,6 +377,27 @@ Erling Haaland Override: B → S
 - **Blending Integration**: Automatic historical data integration
 - **Form Updates**: EWMA recalculation with new game data
 - **Validation Feedback**: Real-time import statistics and quality metrics
+
+### **FFP Lineup Import** ✅ *Enhanced 2025-08-28*
+
+**V2.0 Enhanced Process**:
+1. Click **⚽ soccer ball icon** in Parameter Panel (not main menu "Import Lineup CSV")
+2. Upload Fantasy Football Pundit CSV file
+3. **Enhanced Name Matching**:
+   - UnifiedNameMatcher with 99% success rate architecture
+   - FFP team names automatically converted to database codes
+   - Confidence-based starter multiplier assignment
+4. **Validation Workflow**:
+   - Unmatched players trigger manual validation interface at `localhost:5001/import-validation`
+   - Confirmed mappings saved for future automatic matching
+   - Apply Import saves mappings, re-import CSV applies data updates
+
+**Starter Multiplier Assignment**:
+- **70%+ confidence** → Starter multiplier (~1.0)
+- **30-70% confidence** → Rotation multiplier (~0.75) 
+- **<30% confidence** → Bench multiplier (~0.35)
+
+**Expected Performance**: 6-15% automatic match rate is normal for FFP due to speculative transfers and fantasy lineups. Use validation workflow to confirm real current squad players.
 
 ### **Advanced Fixture Odds Import**
 

@@ -152,8 +152,9 @@ python src/app.py
 ```
 
 **Access V2.0 Dashboard**:
-- **URL**: `http://localhost:5001`
-- **Expected Interface**: V2.0 Enhanced Formula dashboard
+- **Dashboard**: `http://localhost:3000` (React Frontend)
+- **API Backend**: `http://localhost:5001` (Flask API)
+- **Expected Interface**: V2.0 Enhanced Formula React dashboard
 - **Status Indicators**: "⚡ V2.0 Ready" and "🎯 647 players loaded"
 - **Features**: True Value/ROI columns, dynamic blending display, exponential controls
 
@@ -212,7 +213,8 @@ curl "http://localhost:5001/api/players?limit=10&sort_by=true_value"
 ```
 
 **V2.0 Dashboard Testing**:
-- Dashboard loads at `http://localhost:5001`
+- React dashboard loads at `http://localhost:3000`
+- API backend accessible at `http://localhost:5001`
 - V2.0 Enhanced Formula controls respond
 - True Value and ROI columns display properly
 - Player table shows 647 players with V2.0 calculations
@@ -406,12 +408,43 @@ curl -X GET http://localhost:5001/api/understat/get-unmatched-data
 # Expected: Structured validation data with original names
 ```
 
+**FFP Import Testing** ✅ *Added 2025-08-28*:
+```bash
+# 1. Test FFP CSV upload and processing
+curl -X POST http://localhost:5001/api/import-lineups \
+  -F "file=@fantasyfootballpundit.csv"
+# Expected: 6-15% match rate, confidence-based multipliers
+
+# 2. Test validation workflow
+curl -X POST http://localhost:5001/api/validate-import \
+  -H "Content-Type: application/json" \
+  -d '{"source_system": "ffp", "players": [...]}'
+# Expected: Unmatched players with team/name suggestions
+
+# 3. Test mapping persistence
+curl -X POST http://localhost:5001/api/apply-import \
+  -H "Content-Type: application/json" \
+  -d '{"confirmed_mappings": [...], "dry_run": false}'
+# Expected: Mappings saved for future imports
+
+# 4. Verify starter multiplier updates
+curl -X GET "http://localhost:5001/api/players?limit=20" | grep starter_multiplier
+# Expected: Values of 1.0, 0.75, 0.35 based on FFP confidence
+```
+
 **Frontend Upload Testing** ✅ VERIFIED (2025-08-23):
 - Form upload page navigation: ✅ Working
 - File upload mechanism: ✅ Working  
 - CSV validation and processing: ✅ Working
 - Error handling (missing columns): ✅ Working
 - Success confirmation display: ✅ Working
+
+**FFP Import UI Testing** ✅ *Added 2025-08-28*:
+- Parameter Panel soccer ball upload: ✅ Working
+- FFP CSV format processing: ✅ Working
+- UnifiedNameMatcher integration: ✅ Working
+- Validation workflow triggers: ✅ Working
+- Mapping persistence across imports: ✅ Working
 
 ### **V2.0 Formula Validation Testing**
 

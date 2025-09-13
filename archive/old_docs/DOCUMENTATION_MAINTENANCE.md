@@ -174,84 +174,20 @@ This document defines the mandatory documentation updates required after complet
 - Broken cross-references between documents
 - Unclear distinction between v1.0 and v2.0 features
 
-## 🚨 SYSTEM ARCHITECTURE (2025-08-23)
+## Documentation Standards for V2.0 System
 
-### **Consolidated V2.0 Enhanced Engine**
+### System References
+When documenting the current system, always specify:
+- **"V2.0 Enhanced Formula"** for the calculation system  
+- **"Raw data snapshot system"** for trend analysis features
+- **Current implementation status** - V2.0-only architecture (no dual engines)
 
-**✅ SYSTEM ARCHITECTURE UPDATE:**
-The system has been consolidated to a single V2.0 Enhanced Formula engine:
-
-**V2.0 Enhanced Engine:**
-- Location: `calculation_engine_v2.py` (single engine)
-- Parameters: `formula_optimization_v2` structure with enhanced controls
-- Database: Uses `true_value` and `roi` columns (V2.0 calculations only)
-- Formula: `True Value = Blended_PPG × multipliers`, `ROI = True Value ÷ Price`
-
-**📋 DOCUMENTATION REQUIREMENTS:**
-- `API_REFERENCE.md` - V2.0 Enhanced endpoints and calculations
-- `DEVELOPMENT_SETUP.md` - V2.0 testing procedures and validation
-- `FEATURE_GUIDE.md` - V2.0 Enhanced dashboard features and controls
-- `DATABASE_SCHEMA.md` - V2.0 column usage and raw data snapshot system
-
-### **Gameweek Detection Logic - Document in DATABASE_SCHEMA.md**
-
-**🎯 CRITICAL FIX DISCOVERED:**
-Many functions were using hardcoded `gameweek = 1` instead of database detection.
-
-**✅ CORRECT PATTERN:**
-```sql
-SELECT MAX(gameweek) FROM player_metrics WHERE gameweek IS NOT NULL
-```
-
-**❌ INCORRECT PATTERNS TO AVOID:**
-- `gameweek = 1` (hardcoded)
-- `current_gameweek = getCurrentGameweek()` without database query
-- Using parameter gameweek without validation
-
-**📋 FILES THAT NEED GAMEWEEK LOGIC:**
-- `src/app.py` (manual overrides, data imports)
-- `calculation_engine_v2.py` (dynamic blending)
-- Any new calculation or import functionality
-
-### **Historical Data Integration - Document in API_REFERENCE.md**
-
-**🎯 ESSENTIAL DATA PIPELINE:**
-V2.0 Dynamic Blending requires historical PPG calculation in ALL player queries:
-
-```sql
-CASE 
-    WHEN COALESCE(pgd.games_played_historical, 0) > 0 
-    THEN COALESCE(pgd.total_points_historical, 0) / pgd.games_played_historical 
-    ELSE pm.ppg 
-END as historical_ppg
-```
-
-**📋 AFFECTED ENDPOINTS:**
-- `/api/players` - Main dashboard data
-- `/api/trends/calculate` - Raw data trend analysis
-- Any new player data endpoints
-
-### **Raw Data Snapshot System - Document in DATABASE_SCHEMA.md**
-
-**🎯 NEW TREND ANALYSIS ARCHITECTURE (2025-08-23):**
-The system now captures weekly raw data snapshots for retrospective trend analysis:
-
-**Raw Snapshot Tables:**
-```sql
-raw_player_snapshots   -- Weekly player performance and context data
-raw_fixture_snapshots  -- Weekly fixture difficulty and odds data  
-raw_form_snapshots     -- Weekly form tracking for EWMA calculations
-```
-
-**Key Features:**
-- Captures raw imported data (prices, FPts, xG stats, odds) without calculations
-- Enables "apples-to-apples" analysis by applying formulas retroactively
-- Supports home/away context and opponent data for comprehensive trend analysis
-
-**📋 TESTING REQUIREMENTS:**
-- Test trend analysis endpoints with historical gameweek data
-- Verify raw data capture during weekly imports (Fantrax, Understat, odds)
-- Confirm V2.0 parameter consistency across trend calculations
+### Required Updates After System Changes
+When the calculation engine or database structure changes, update these docs:
+- `DATABASE_SCHEMA.md` - New columns, tables, and relationships
+- `API_REFERENCE.md` - Endpoint changes and response format updates
+- `DEVELOPMENT_SETUP.md` - Testing procedures for new functionality  
+- `FEATURE_GUIDE.md` - User-facing feature documentation
 
 ## Tools and Automation
 
@@ -276,44 +212,6 @@ grep -r "Complete\|Pending\|Deferred" docs/
 
 **This maintenance guide ensures comprehensive, accurate, and up-to-date documentation throughout the Formula Optimization project lifecycle.**
 
-## 🎯 POST-V2.0 CONSOLIDATION MANDATORY UPDATES (2025-08-23)
-
-### **Every Documentation Update Must Now Include:**
-
-1. **V2.0 Enhanced System** - All features are V2.0 Enhanced Formula only
-2. **Parameter Structure** - `formula_optimization_v2` parameter format documentation
-3. **Database Columns** - V2.0 columns (`true_value`, `roi`) and raw snapshot tables
-4. **Gameweek Handling** - Verify proper database-driven gameweek detection
-5. **Historical Data** - Document historical PPG calculation and raw data capture
-
-### **Critical Files Requiring V2.0 Enhanced Documentation:**
-
-**High Priority:**
-- `DATABASE_SCHEMA.md` - V2.0 column usage, raw snapshot system, gameweek detection patterns
-- `API_REFERENCE.md` - V2.0 Enhanced endpoints, trend analysis endpoints, historical_ppg requirements  
-- `DEVELOPMENT_SETUP.md` - V2.0 testing procedures, raw data snapshot validation
-- `FEATURE_GUIDE.md` - V2.0 Enhanced dashboard features, trend analysis system
-
-**Medium Priority:**
-- `FORMULA_REFERENCE.md` - V2.0 Enhanced Formula calculations only
-- `TESTING_METHODOLOGY.md` - V2.0 Enhanced validation procedures, trend analysis testing
-
-### **New Documentation Standards (Post-2025-08-23):**
-
-**System References:**
-- Always specify "V2.0 Enhanced" when discussing the calculation system
-- Reference "raw data snapshot system" for trend analysis features
-
-**Code Examples:**
-- Include V2.0 Enhanced Formula examples only
-- Show correct gameweek detection pattern in any time-based functionality
-- Include historical_ppg calculation in player data queries
-- Document raw data capture patterns for new import functionality
-
-**Cross-References:**
-- Link to CLAUDE.md V2.0-only architecture from technical documents
-- Reference raw snapshot table structures for trend analysis features
-
 ---
 
-*Last updated: 2025-08-23 - Major update: Consolidated to V2.0-only system, added raw data snapshot system for trend analysis*
+*Last updated: 2025-08-28 - Cleaned up documentation maintenance guide by removing system architecture details*
