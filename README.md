@@ -82,4 +82,4 @@ docs/                   # Documentation
 archive/                # Historical files
 ```
 
-Built for the 2025-26 Premier League season with live table data model for real-time updates.
+Built for the 2025-26 Premier League season with live table data model for real-time updates.# Railway deployment trigger
