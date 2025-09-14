@@ -495,7 +495,7 @@ def recalculate_true_values(gameweek: int = None):
         if 'conn' in locals():
             conn.close()
 
-@app.route('/')
+@app.route('/api/status')
 def api_status():
     """API Status endpoint for production"""
     return jsonify({
