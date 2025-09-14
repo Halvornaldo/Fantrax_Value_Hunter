@@ -496,9 +496,19 @@ def recalculate_true_values(gameweek: int = None):
             conn.close()
 
 @app.route('/')
-def dashboard():
-    """Main dashboard UI"""
-    return render_template('dashboard.html')
+def api_status():
+    """API Status endpoint for production"""
+    return jsonify({
+        "status": "ok",
+        "message": "Fantrax Value Hunter API is running",
+        "integration_available": INTEGRATION_AVAILABLE,
+        "endpoints": {
+            "players": "/api/players",
+            "sync_understat": "/api/understat/sync",
+            "upload_fantrax": "/api/upload-fantrax",
+            "parameters": "/api/parameters"
+        }
+    })
 
 def make_cache_key():
     """Generate cache key based on all query parameters"""
