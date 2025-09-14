@@ -2,7 +2,7 @@ import React from 'react';
 import { Box, Chip, Typography } from '@mui/material';
 import { useTheme } from '@mui/material/styles';
 
-const Banner = () => {
+const Banner = ({ playersCount = 0 }) => {
   const theme = useTheme();
 
   return (
@@ -62,7 +62,7 @@ const Banner = () => {
           }}
         />
         <Chip
-          label="647 Players"
+          label={`${playersCount} Players`}
           size="small"
           sx={{
             fontWeight: 600,

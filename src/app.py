@@ -687,6 +687,7 @@ def get_players():
             
         if team:
             teams = [t.strip() for t in team.split(',')]
+            placeholders = ', '.join(['%s'] * len(teams))
             conditions.append(f"p.team IN ({placeholders})")
             params.extend(teams)
             
@@ -1859,6 +1860,7 @@ def export_players():
             
         if team:
             teams = [t.strip() for t in team.split(',')]
+            placeholders = ', '.join(['%s'] * len(teams))
             conditions.append(f"p.team IN ({placeholders})")
             params.extend(teams)
             

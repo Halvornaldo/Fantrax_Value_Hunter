@@ -495,7 +495,7 @@ def recalculate_true_values(gameweek: int = None):
         if 'conn' in locals():
             conn.close()
 
-@app.route('/')
+@app.route('/api/status')
 def api_status():
     """API Status endpoint for production"""
     return jsonify({
@@ -4849,6 +4849,43 @@ def get_archived_gameweeks():
 
 @app.route('/static/<path:filename>')
 def serve_react_static(filename):
+    """Serve React static files with robust fallback paths"""
+
+    # Try multiple paths in order of preference
+    static_paths = [
+        # Primary: Built files copied by Railway build process
+        os.path.join(os.path.dirname(__file__), 'static', 'react-build', 'static'),
+        # Fallback: Direct from frontend build (for development/Git)
+        os.path.join(os.path.dirname(os.path.dirname(__file__)), 'frontend', 'build', 'static')
+    ]
+
+    app.logger.info(f"📁 Static file request: {filename}")
+
+    for i, static_dir in enumerate(static_paths, 1):
+        file_path = os.path.join(static_dir, filename)
+        app.logger.info(f"🔍 Trying path {i}: {static_dir}")
+
+        if os.path.exists(file_path):
+            app.logger.info(f"✅ Found file at path {i}: {file_path}")
+            return send_file(file_path)
+        else:
+            app.logger.info(f"❌ Not found at path {i}: {file_path}")
+
+    # If no file found, log directory contents for debugging
+    for i, static_dir in enumerate(static_paths, 1):
+        if os.path.exists(static_dir):
+            try:
+                contents = os.listdir(static_dir)[:10]  # Limit to 10 items
+                app.logger.info(f"📋 Directory {i} contents: {contents}")
+            except Exception as e:
+                app.logger.error(f"📋 Could not list directory {i}: {e}")
+        else:
+            app.logger.error(f"📂 Directory {i} does not exist: {static_dir}")
+
+    app.logger.error(f"❌ Static file not found in any location: {filename}")
+    return f"Static file not found: {filename}", 404
+
+def serve_react_static_old(filename):
     """Serve React static files (CSS, JS, images)"""
     return send_from_directory(
         os.path.join(os.path.dirname(__file__), 'static', 'react-build', 'static'),
@@ -4914,6 +4951,6 @@ if __name__ == '__main__':
     
     # DEVELOPMENT: Enable auto-reload for code changes
     # Set debug=True to auto-restart server when Python files change
-    development_mode = True  # Change to False for production
+    development_mode = False  # Production mode
     
     app.run(debug=development_mode, host='0.0.0.0', port=port, use_reloader=development_mode)
