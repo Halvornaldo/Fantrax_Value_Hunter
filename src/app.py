@@ -21,7 +21,10 @@ from name_matching import UnifiedNameMatcher
 
 # Add integration package to path (optional for production)
 try:
-    sys.path.append('C:/Users/halvo/.claude/Fantrax_Expected_Stats')
+    # Use environment variable for integration path
+    integration_path = os.getenv('INTEGRATION_PATH', 'C:/Users/halvo/.claude/Fantrax_Expected_Stats')
+    if os.path.exists(integration_path):
+        sys.path.append(integration_path)
     from integration_package import IntegrationPipeline, UnderstatIntegrator, ValueHunterExtension
     INTEGRATION_AVAILABLE = True
 except ImportError:
@@ -639,9 +642,12 @@ def get_players():
         # Add filters
         if position:
             positions = [p.strip() for p in position.split(',')]
-            placeholders = ','.join(['%s'] * len(positions))
-            conditions.append(f"p.position IN ({placeholders})")
-            params.extend(positions)
+            # Handle multi-position matching: check if any requested position appears in player's positions
+            position_conditions = []
+            for pos in positions:
+                position_conditions.append("p.position LIKE %s")
+                params.append(f"%{pos}%")
+            conditions.append(f"({' OR '.join(position_conditions)})")
             
         if min_price is not None:
             conditions.append("pm.price >= %s")
@@ -653,7 +659,6 @@ def get_players():
             
         if team:
             teams = [t.strip() for t in team.split(',')]
-            placeholders = ','.join(['%s'] * len(teams))
             conditions.append(f"p.team IN ({placeholders})")
             params.extend(teams)
             
@@ -1809,9 +1814,12 @@ def export_players():
         # Add filters
         if position:
             positions = [p.strip() for p in position.split(',')]
-            placeholders = ','.join(['%s'] * len(positions))
-            conditions.append(f"p.position IN ({placeholders})")
-            params.extend(positions)
+            # Handle multi-position matching: check if any requested position appears in player's positions
+            position_conditions = []
+            for pos in positions:
+                position_conditions.append("p.position LIKE %s")
+                params.append(f"%{pos}%")
+            conditions.append(f"({' OR '.join(position_conditions)})")
             
         if min_price is not None:
             conditions.append("pm.price >= %s")
@@ -1823,7 +1831,6 @@ def export_players():
             
         if team:
             teams = [t.strip() for t in team.split(',')]
-            placeholders = ','.join(['%s'] * len(teams))
             conditions.append(f"p.team IN ({placeholders})")
             params.extend(teams)
             
@@ -2329,18 +2336,18 @@ def import_form_data():
                         skipped_players.append(f"{player_name} (ID: {player_id}) - Failed to add: {add_error}")
                         continue
                 else:
-                    # Update existing player's team if it has changed
+                    # Update existing player's team and position if they have changed
                     cursor.execute("""
                         UPDATE players 
-                        SET team = %s, updated_at = NOW()
-                        WHERE id = %s AND team != %s
-                    """, (team, player_id, team))
+                        SET team = %s, position = %s, updated_at = NOW()
+                        WHERE id = %s AND (team != %s OR position != %s)
+                    """, (team, position, player_id, team, position))
                     
                     if cursor.rowcount > 0:
-                        print(f"[OK] Updated team for {player_name}: now plays for {team}")
+                        print(f"[OK] Updated team/position for {player_name}: team={team}, position={position}")
                         if 'team_updates' not in locals():
                             team_updates = []
-                        team_updates.append(f"{player_name} -> {team}")
+                        team_updates.append(f"{player_name} -> team:{team}, pos:{position}")
                 
                 # Get fantasy points and price
                 fpts = float(row['FPts'])

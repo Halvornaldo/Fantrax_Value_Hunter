@@ -433,7 +433,7 @@ const PlayerTable = ({ playersData, gameweekInfo, onDataRefresh }) => {
     {
       field: 'position',
       headerName: 'Pos',
-      width: 60,
+      width: 80,
       renderHeader: (params) => (
         <Box sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
           <Typography variant="subtitle2" fontWeight={600}>Pos</Typography>
@@ -442,18 +442,32 @@ const PlayerTable = ({ playersData, gameweekInfo, onDataRefresh }) => {
           </Tooltip>
         </Box>
       ),
-      renderCell: (params) => (
-        <Chip 
-          label={params.value} 
-          size="small" 
-          color={
-            params.value === 'G' ? 'warning' :
-            params.value === 'D' ? 'info' :
-            params.value === 'M' ? 'success' : 'secondary'
+      renderCell: (params) => {
+        const positions = params.value ? params.value.split(',').map(p => p.trim()) : [];
+        const getPositionColor = (pos) => {
+          switch (pos) {
+            case 'G': return 'warning';
+            case 'D': return 'info';
+            case 'M': return 'success';
+            case 'F': return 'secondary';
+            default: return 'default';
           }
-          sx={{ fontWeight: 600, fontSize: '0.75rem' }}
-        />
-      ),
+        };
+
+        return (
+          <Box sx={{ display: 'flex', gap: 0.5, flexWrap: 'wrap' }}>
+            {positions.map((pos, index) => (
+              <Chip
+                key={pos + "-" + index}
+                label={pos}
+                size="small"
+                color={getPositionColor(pos)}
+                sx={{ fontWeight: 600, fontSize: '0.7rem', minWidth: 'auto' }}
+              />
+            ))}
+          </Box>
+        );
+      },
     },
     {
       field: 'price',
@@ -549,7 +563,7 @@ const PlayerTable = ({ playersData, gameweekInfo, onDataRefresh }) => {
     {
       field: 'games_played_historical',
       headerName: '24-25',
-      width: 60,
+      width: 80,
       renderHeader: (params) => (
         <Box sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
           <Typography variant="subtitle2" fontWeight={600}>24-25</Typography>
@@ -576,7 +590,7 @@ const PlayerTable = ({ playersData, gameweekInfo, onDataRefresh }) => {
     {
       field: 'games_played',
       headerName: '25-26',
-      width: 60,
+      width: 80,
       renderHeader: (params) => (
         <Box sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
           <Typography variant="subtitle2" fontWeight={600}>25-26</Typography>
@@ -846,7 +860,10 @@ const PlayerTable = ({ playersData, gameweekInfo, onDataRefresh }) => {
   const filteredData = useMemo(() => {
     return playersData.filter(player => {
       // Position filter
-      if (positionFilter !== 'All' && player.position !== positionFilter) return false;
+      if (positionFilter !== 'All') {
+        const playerPositions = player.position ? player.position.split(',').map(p => p.trim()) : [];
+        if (!playerPositions.includes(positionFilter)) return false;
+      }
       
       // Price filter
       if (player.price < priceMin || player.price > priceMax) return false;
