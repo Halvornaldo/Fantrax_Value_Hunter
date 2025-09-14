@@ -22,4 +22,4 @@ cmds = [
 ]
 
 [start]
-cmd = ". venv/bin/activate && python src/app.py"
+cmd = "/opt/venv/bin/python src/app.py"
