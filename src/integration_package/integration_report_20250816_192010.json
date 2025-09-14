@@ -1,0 +1,60 @@
+{
+  "integration_summary": {
+    "total_understat_players": 574,
+    "successfully_matched": 330,
+    "match_rate": 57.491289198606275,
+    "avg_xGI90": 0.2848714510037821,
+    "top_xGI90_player": "Asher Agbinone",
+    "max_xGI90": 1.7576164053752985
+  },
+  "extension_summary": {
+    "total_players_with_xgi": 322,
+    "avg_xgi_multiplier": 0.28612675451621306,
+    "max_xgi_multiplier": 1.7576164053752985,
+    "min_xgi_multiplier": 0.0
+  },
+  "schema_updates": "\n        -- Add Understat stats columns to players table\n        ALTER TABLE players \n        ADD COLUMN IF NOT EXISTS minutes INTEGER DEFAULT 0,\n        ADD COLUMN IF NOT EXISTS xG90 DECIMAL(5,3) DEFAULT 0.000,\n        ADD COLUMN IF NOT EXISTS xA90 DECIMAL(5,3) DEFAULT 0.000,\n        ADD COLUMN IF NOT EXISTS xGI90 DECIMAL(5,3) DEFAULT 0.000,\n        ADD COLUMN IF NOT EXISTS last_understat_update TIMESTAMP;\n        \n        -- Add index for xGI90 for performance\n        CREATE INDEX IF NOT EXISTS idx_players_xgi90 ON players(xGI90);\n        \n        -- Add xGI multiplier to player_metrics table\n        ALTER TABLE player_metrics\n        ADD COLUMN IF NOT EXISTS xgi_multiplier DECIMAL(5,3) DEFAULT 1.000;\n        ",
+  "total_data_updates": 330,
+  "sample_enhanced_calculations": [
+    {
+      "player_name": "Ollie Watkins",
+      "fantrax_id": "05ocl",
+      "xGI90": 0.7598640758681146,
+      "xgi_multiplier": 0.7598640758681146,
+      "sample_enhanced_true_value": 0.7021144061021379,
+      "calculation_note": "Sample calculation with hypothetical PPG/price/form/fixture/starter values"
+    },
+    {
+      "player_name": "Morgan Rogers",
+      "fantrax_id": "05uht",
+      "xGI90": 0.46149502154900823,
+      "xgi_multiplier": 0.46149502154900823,
+      "sample_enhanced_true_value": 0.4264213999112837,
+      "calculation_note": "Sample calculation with hypothetical PPG/price/form/fixture/starter values"
+    },
+    {
+      "player_name": "Ross Barkley",
+      "fantrax_id": "02lpf",
+      "xGI90": 0.555150593416049,
+      "xgi_multiplier": 0.555150593416049,
+      "sample_enhanced_true_value": 0.5129591483164294,
+      "calculation_note": "Sample calculation with hypothetical PPG/price/form/fixture/starter values"
+    },
+    {
+      "player_name": "Youri Tielemans",
+      "fantrax_id": "04yo7",
+      "xGI90": 0.3469534532010321,
+      "xgi_multiplier": 0.3469534532010321,
+      "sample_enhanced_true_value": 0.3205849907577537,
+      "calculation_note": "Sample calculation with hypothetical PPG/price/form/fixture/starter values"
+    },
+    {
+      "player_name": "Amadou Onana",
+      "fantrax_id": "063hu",
+      "xGI90": 0.17789987625384873,
+      "xgi_multiplier": 0.17789987625384873,
+      "sample_enhanced_true_value": 0.16437948565855626,
+      "calculation_note": "Sample calculation with hypothetical PPG/price/form/fixture/starter values"
+    }
+  ]
+}
