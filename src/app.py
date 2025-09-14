@@ -4914,6 +4914,6 @@ if __name__ == '__main__':
     
     # DEVELOPMENT: Enable auto-reload for code changes
     # Set debug=True to auto-restart server when Python files change
-    development_mode = True  # Change to False for production
+    development_mode = False  # Production mode
     
     app.run(debug=development_mode, host='0.0.0.0', port=port, use_reloader=development_mode)
