@@ -1,5 +1,3 @@
-providers = ["python", "node"]
-
 [variables]
 NIXPACKS_NO_CACHE = "1"
 
@@ -11,9 +9,9 @@ cmds = [
   "chmod +x build.sh",
   "./build.sh",
   "python -m venv venv",
-  "source venv/bin/activate && pip install -r requirements.txt",
+  ". venv/bin/activate && pip install -r requirements.txt",
   "chmod +x start.sh"
 ]
 
 [start]
-cmd = "bash start.sh"
+cmd = ". venv/bin/activate && python src/app.py"
