@@ -3,7 +3,7 @@ Flask Backend for Fantrax Value Hunter Dashboard
 Provides API endpoints for parameter adjustment and True Value recalculation
 """
 
-from flask import Flask, request, jsonify, render_template
+from flask import Flask, request, jsonify, render_template, send_from_directory, send_file
 from flask_cors import CORS
 from flask_caching import Cache
 import psycopg2
@@ -4841,6 +4841,54 @@ def get_archived_gameweeks():
         
     except Exception as e:
         return jsonify({'error': str(e)}), 500
+
+
+# ============================================================================
+# REACT FRONTEND ROUTES - Added for Railway deployment
+# ============================================================================
+
+@app.route('/static/<path:filename>')
+def serve_react_static(filename):
+    """Serve React static files (CSS, JS, images)"""
+    return send_from_directory(
+        os.path.join(os.path.dirname(__file__), 'static', 'react-build', 'static'),
+        filename
+    )
+
+@app.route('/manifest.json')
+@app.route('/favicon.ico')
+@app.route('/robots.txt')
+def serve_react_assets():
+    """Serve React assets from the build directory"""
+    filename = request.path[1:]  # Remove leading slash
+    return send_from_directory(
+        os.path.join(os.path.dirname(__file__), 'static', 'react-build'),
+        filename
+    )
+
+@app.route('/')
+@app.route('/<path:path>')
+def serve_react_app(path=''):
+    """Serve React app for all non-API routes"""
+    # Skip API routes
+    if path.startswith('api/'):
+        return jsonify({'error': 'API endpoint not found'}), 404
+
+    # Serve React index.html for all other routes
+    try:
+        return send_file(
+            os.path.join(os.path.dirname(__file__), 'static', 'react-build', 'index.html')
+        )
+    except FileNotFoundError:
+        return jsonify({
+            'error': 'Frontend not built. Run ./build.sh to build the React frontend.',
+            'instructions': [
+                '1. Run: chmod +x build.sh',
+                '2. Run: ./build.sh',
+                '3. Restart the Flask server'
+            ]
+        }), 404
+
 
 if __name__ == '__main__':
     print("Starting Fantrax Value Hunter Flask Backend...")
