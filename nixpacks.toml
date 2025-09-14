@@ -8,4 +8,4 @@ nixPkgs = ["nodejs_18", "python311", "python311Packages.pip"]
 cmds = ["chmod +x build.sh", "./build.sh", "chmod +x start.sh"]
 
 [start]
-cmd = "./start.sh"
+cmd = "bash start.sh"
