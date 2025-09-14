@@ -6,6 +6,7 @@ Provides API endpoints for parameter adjustment and True Value recalculation
 from flask import Flask, request, jsonify, render_template, send_from_directory, send_file
 from flask_cors import CORS
 from flask_caching import Cache
+from whitenoise import WhiteNoise
 import psycopg2
 import psycopg2.extras
 import json
@@ -56,6 +57,23 @@ CORS(app, resources={
 app.config['CACHE_TYPE'] = 'simple'  # Simple in-memory cache
 app.config['CACHE_DEFAULT_TIMEOUT'] = 60  # Cache for 60 seconds
 cache = Cache(app)
+
+# Configure WhiteNoise to serve React build files in production
+app.wsgi_app = WhiteNoise(
+    app.wsgi_app,
+    root=os.path.join(os.path.dirname(__file__), 'static', 'react-build'),
+    prefix='/',
+    index_file='index.html',
+    autorefresh=False
+)
+
+# Configure WhiteNoise to serve React static assets
+app.wsgi_app = WhiteNoise(
+    app.wsgi_app,
+    root=os.path.join(os.path.dirname(__file__), 'static', 'react-build', 'static'),
+    prefix='/static/',
+    autorefresh=False
+)
 
 # Database configuration - supports both local and production environments
 DB_CONFIG = {
@@ -4847,43 +4865,43 @@ def get_archived_gameweeks():
 # REACT FRONTEND ROUTES - Added for Railway deployment
 # ============================================================================
 
-@app.route('/static/<path:filename>')
-def serve_react_static(filename):
-    """Serve React static files with robust fallback paths"""
-
-    # Try multiple paths in order of preference
-    static_paths = [
-        # Primary: Built files copied by Railway build process
-        os.path.join(os.path.dirname(__file__), 'static', 'react-build', 'static'),
-        # Fallback: Direct from frontend build (for development/Git)
-        os.path.join(os.path.dirname(os.path.dirname(__file__)), 'frontend', 'build', 'static')
-    ]
-
-    app.logger.info(f"📁 Static file request: {filename}")
-
-    for i, static_dir in enumerate(static_paths, 1):
-        file_path = os.path.join(static_dir, filename)
-        app.logger.info(f"🔍 Trying path {i}: {static_dir}")
-
-        if os.path.exists(file_path):
-            app.logger.info(f"✅ Found file at path {i}: {file_path}")
-            return send_file(file_path)
-        else:
-            app.logger.info(f"❌ Not found at path {i}: {file_path}")
-
-    # If no file found, log directory contents for debugging
-    for i, static_dir in enumerate(static_paths, 1):
-        if os.path.exists(static_dir):
-            try:
-                contents = os.listdir(static_dir)[:10]  # Limit to 10 items
-                app.logger.info(f"📋 Directory {i} contents: {contents}")
-            except Exception as e:
-                app.logger.error(f"📋 Could not list directory {i}: {e}")
-        else:
-            app.logger.error(f"📂 Directory {i} does not exist: {static_dir}")
-
-    app.logger.error(f"❌ Static file not found in any location: {filename}")
-    return f"Static file not found: {filename}", 404
+# DISABLED - WhiteNoise handles this: @app.route('/static/<path:filename>')
+# DISABLED - WhiteNoise handles this: def serve_react_static(filename):
+# DISABLED - WhiteNoise handles this:     """Serve React static files with robust fallback paths"""
+# DISABLED - WhiteNoise handles this: 
+# DISABLED - WhiteNoise handles this:     # Try multiple paths in order of preference
+# DISABLED - WhiteNoise handles this:     static_paths = [
+# DISABLED - WhiteNoise handles this:         # Primary: Built files copied by Railway build process
+# DISABLED - WhiteNoise handles this:         os.path.join(os.path.dirname(__file__), 'static', 'react-build', 'static'),
+# DISABLED - WhiteNoise handles this:         # Fallback: Direct from frontend build (for development/Git)
+# DISABLED - WhiteNoise handles this:         os.path.join(os.path.dirname(os.path.dirname(__file__)), 'frontend', 'build', 'static')
+# DISABLED - WhiteNoise handles this:     ]
+# DISABLED - WhiteNoise handles this: 
+# DISABLED - WhiteNoise handles this:     app.logger.info(f"📁 Static file request: {filename}")
+# DISABLED - WhiteNoise handles this: 
+# DISABLED - WhiteNoise handles this:     for i, static_dir in enumerate(static_paths, 1):
+# DISABLED - WhiteNoise handles this:         file_path = os.path.join(static_dir, filename)
+# DISABLED - WhiteNoise handles this:         app.logger.info(f"🔍 Trying path {i}: {static_dir}")
+# DISABLED - WhiteNoise handles this: 
+# DISABLED - WhiteNoise handles this:         if os.path.exists(file_path):
+# DISABLED - WhiteNoise handles this:             app.logger.info(f"✅ Found file at path {i}: {file_path}")
+# DISABLED - WhiteNoise handles this:             return send_file(file_path)
+# DISABLED - WhiteNoise handles this:         else:
+# DISABLED - WhiteNoise handles this:             app.logger.info(f"❌ Not found at path {i}: {file_path}")
+# DISABLED - WhiteNoise handles this: 
+# DISABLED - WhiteNoise handles this:     # If no file found, log directory contents for debugging
+# DISABLED - WhiteNoise handles this:     for i, static_dir in enumerate(static_paths, 1):
+# DISABLED - WhiteNoise handles this:         if os.path.exists(static_dir):
+# DISABLED - WhiteNoise handles this:             try:
+# DISABLED - WhiteNoise handles this:                 contents = os.listdir(static_dir)[:10]  # Limit to 10 items
+# DISABLED - WhiteNoise handles this:                 app.logger.info(f"📋 Directory {i} contents: {contents}")
+# DISABLED - WhiteNoise handles this:             except Exception as e:
+# DISABLED - WhiteNoise handles this:                 app.logger.error(f"📋 Could not list directory {i}: {e}")
+# DISABLED - WhiteNoise handles this:         else:
+# DISABLED - WhiteNoise handles this:             app.logger.error(f"📂 Directory {i} does not exist: {static_dir}")
+# DISABLED - WhiteNoise handles this: 
+# DISABLED - WhiteNoise handles this:     app.logger.error(f"❌ Static file not found in any location: {filename}")
+# DISABLED - WhiteNoise handles this:     return f"Static file not found: {filename}", 404
 
 def serve_react_static_old(filename):
     """Serve React static files (CSS, JS, images)"""
