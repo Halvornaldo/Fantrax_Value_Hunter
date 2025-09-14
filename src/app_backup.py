@@ -495,7 +495,7 @@ def recalculate_true_values(gameweek: int = None):
         if 'conn' in locals():
             conn.close()
 
-@app.route('/api/status')
+@app.route('/')
 def api_status():
     """API Status endpoint for production"""
     return jsonify({
@@ -4850,37 +4850,6 @@ def get_archived_gameweeks():
 @app.route('/static/<path:filename>')
 def serve_react_static(filename):
     """Serve React static files (CSS, JS, images)"""
-    static_dir = os.path.join(os.path.dirname(__file__), 'static', 'react-build', 'static')
-    file_path = os.path.join(static_dir, filename)
-
-    # Log for debugging on Railway
-    app.logger.info(f"Static file request: {filename}")
-    app.logger.info(f"Looking in directory: {static_dir}")
-    app.logger.info(f"Full path: {file_path}")
-    app.logger.info(f"File exists: {os.path.exists(file_path)}")
-
-    # List directory contents for debugging
-    if os.path.exists(static_dir):
-        contents = os.listdir(static_dir)
-        app.logger.info(f"Static directory contents: {contents}")
-
-        # Check subdirectories
-        for item in contents:
-            item_path = os.path.join(static_dir, item)
-            if os.path.isdir(item_path):
-                subdir_contents = os.listdir(item_path)
-                app.logger.info(f"Subdirectory '{item}' contents: {subdir_contents}")
-    else:
-        app.logger.error(f"Static directory does not exist: {static_dir}")
-
-    if os.path.exists(file_path):
-        return send_file(file_path)
-    else:
-        app.logger.error(f"File not found: {filename} at {file_path}")
-        return f"File not found: {filename}", 404
-
-def serve_react_static_old(filename):
-    """Serve React static files (CSS, JS, images)"""
     return send_from_directory(
         os.path.join(os.path.dirname(__file__), 'static', 'react-build', 'static'),
         filename
@@ -4945,6 +4914,6 @@ if __name__ == '__main__':
     
     # DEVELOPMENT: Enable auto-reload for code changes
     # Set debug=True to auto-restart server when Python files change
-    development_mode = False  # Production mode
+    development_mode = True  # Change to False for production
     
     app.run(debug=development_mode, host='0.0.0.0', port=port, use_reloader=development_mode)

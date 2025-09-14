@@ -3,7 +3,7 @@ Flask Backend for Fantrax Value Hunter Dashboard
 Provides API endpoints for parameter adjustment and True Value recalculation
 """
 
-from flask import Flask, request, jsonify, render_template, send_from_directory, send_file
+from flask import Flask, request, jsonify, render_template
 from flask_cors import CORS
 from flask_caching import Cache
 import psycopg2
@@ -495,7 +495,7 @@ def recalculate_true_values(gameweek: int = None):
         if 'conn' in locals():
             conn.close()
 
-@app.route('/api/status')
+@app.route('/')
 def api_status():
     """API Status endpoint for production"""
     return jsonify({
@@ -4842,85 +4842,6 @@ def get_archived_gameweeks():
     except Exception as e:
         return jsonify({'error': str(e)}), 500
 
-
-# ============================================================================
-# REACT FRONTEND ROUTES - Added for Railway deployment
-# ============================================================================
-
-@app.route('/static/<path:filename>')
-def serve_react_static(filename):
-    """Serve React static files (CSS, JS, images)"""
-    static_dir = os.path.join(os.path.dirname(__file__), 'static', 'react-build', 'static')
-    file_path = os.path.join(static_dir, filename)
-
-    # Log for debugging on Railway
-    app.logger.info(f"Static file request: {filename}")
-    app.logger.info(f"Looking in directory: {static_dir}")
-    app.logger.info(f"Full path: {file_path}")
-    app.logger.info(f"File exists: {os.path.exists(file_path)}")
-
-    # List directory contents for debugging
-    if os.path.exists(static_dir):
-        contents = os.listdir(static_dir)
-        app.logger.info(f"Static directory contents: {contents}")
-
-        # Check subdirectories
-        for item in contents:
-            item_path = os.path.join(static_dir, item)
-            if os.path.isdir(item_path):
-                subdir_contents = os.listdir(item_path)
-                app.logger.info(f"Subdirectory '{item}' contents: {subdir_contents}")
-    else:
-        app.logger.error(f"Static directory does not exist: {static_dir}")
-
-    if os.path.exists(file_path):
-        return send_file(file_path)
-    else:
-        app.logger.error(f"File not found: {filename} at {file_path}")
-        return f"File not found: {filename}", 404
-
-def serve_react_static_old(filename):
-    """Serve React static files (CSS, JS, images)"""
-    return send_from_directory(
-        os.path.join(os.path.dirname(__file__), 'static', 'react-build', 'static'),
-        filename
-    )
-
-@app.route('/manifest.json')
-@app.route('/favicon.ico')
-@app.route('/robots.txt')
-def serve_react_assets():
-    """Serve React assets from the build directory"""
-    filename = request.path[1:]  # Remove leading slash
-    return send_from_directory(
-        os.path.join(os.path.dirname(__file__), 'static', 'react-build'),
-        filename
-    )
-
-@app.route('/')
-@app.route('/<path:path>')
-def serve_react_app(path=''):
-    """Serve React app for all non-API routes"""
-    # Skip API routes
-    if path.startswith('api/'):
-        return jsonify({'error': 'API endpoint not found'}), 404
-
-    # Serve React index.html for all other routes
-    try:
-        return send_file(
-            os.path.join(os.path.dirname(__file__), 'static', 'react-build', 'index.html')
-        )
-    except FileNotFoundError:
-        return jsonify({
-            'error': 'Frontend not built. Run ./build.sh to build the React frontend.',
-            'instructions': [
-                '1. Run: chmod +x build.sh',
-                '2. Run: ./build.sh',
-                '3. Restart the Flask server'
-            ]
-        }), 404
-
-
 if __name__ == '__main__':
     print("Starting Fantrax Value Hunter Flask Backend...")
     print(f"Database: {DB_CONFIG['database']} on port {DB_CONFIG['port']}")
@@ -4945,6 +4866,6 @@ if __name__ == '__main__':
     
     # DEVELOPMENT: Enable auto-reload for code changes
     # Set debug=True to auto-restart server when Python files change
-    development_mode = False  # Production mode
+    development_mode = True  # Change to False for production
     
     app.run(debug=development_mode, host='0.0.0.0', port=port, use_reloader=development_mode)
