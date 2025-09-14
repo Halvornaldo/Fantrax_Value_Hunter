@@ -4,4 +4,4 @@ set -e
 
 echo "🚀 Starting Fantrax Value Hunter production server..."
 echo "🐍 Starting Flask server..."
-python src/app.py
+source venv/bin/activate && python src/app.py

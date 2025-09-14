@@ -1,3 +1,5 @@
+providers = ["python", "node"]
+
 [variables]
 NIXPACKS_NO_CACHE = "1"
 
@@ -8,7 +10,8 @@ nixPkgs = ["nodejs_18", "python311", "python311Packages.pip"]
 cmds = [
   "chmod +x build.sh",
   "./build.sh",
-  "pip install -r requirements.txt",
+  "python -m venv venv",
+  "source venv/bin/activate && pip install -r requirements.txt",
   "chmod +x start.sh"
 ]
 
