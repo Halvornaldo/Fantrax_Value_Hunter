@@ -99,41 +99,12 @@ if DATABASE_URL:
     }
 
 def get_db_connection():
-    """Get database connection with error handling and Railway optimizations"""
+    """Get database connection with error handling"""
     try:
-        # Add Railway-specific connection parameters
-        connection_params = DB_CONFIG.copy()
-
-        # Check if we're running on Railway
-        is_railway = os.getenv('RAILWAY_ENVIRONMENT') is not None
-
-        if is_railway or os.getenv('DATABASE_URL'):
-            # Railway requires specific connection settings
-            connection_params.update({
-                'connect_timeout': 10,  # 10 second connection timeout
-                'sslmode': 'require',   # Railway proxy requires SSL
-                'options': '-c statement_timeout=30000',  # 30 second query timeout
-                'application_name': 'fantrax_value_hunter'
-            })
-        else:
-            # Local development settings
-            connection_params.update({
-                'connect_timeout': 5,
-                'sslmode': 'prefer'
-            })
-
-        conn = psycopg2.connect(**connection_params)
-
-        # Set connection encoding and timezone
-        conn.set_client_encoding('UTF8')
-
+        conn = psycopg2.connect(**DB_CONFIG)
         return conn
-    except psycopg2.OperationalError as e:
-        print(f"Database connection error: {e}")
-        print(f"Connection params: host={connection_params.get('host')}, port={connection_params.get('port')}, db={connection_params.get('database')}")
-        raise
     except Exception as e:
-        print(f"Unexpected database error: {e}")
+        print(f"Database connection error: {e}")
         raise
 
 def load_system_parameters():
