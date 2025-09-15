@@ -4979,27 +4979,52 @@ def serve_react_app(path=''):
 if __name__ == '__main__':
     print("Starting Fantrax Value Hunter Flask Backend...")
     print(f"Database: {DB_CONFIG['database']} on port {DB_CONFIG['port']}")
-    
-    # Test database connection on startup
-    try:
-        conn = get_db_connection()
-        cursor = conn.cursor()
-        cursor.execute("SELECT COUNT(*) FROM players")
-        player_count = cursor.fetchone()[0]
-        print(f"Database connected: {player_count} players loaded")
-        
-        cursor.close()
-        conn.close()
-    except Exception as e:
-        print(f"Database connection failed: {e}")
-        print("Starting app anyway...")
-    
+
+    # Test database connection on startup with timeout
+    def test_db_connection():
+        """Test database connection in a separate thread"""
+        try:
+            conn = get_db_connection()
+            cursor = conn.cursor()
+            cursor.execute("SELECT COUNT(*) FROM players")
+            player_count = cursor.fetchone()[0]
+            print(f"Database connected: {player_count} players loaded")
+
+            cursor.close()
+            conn.close()
+            return True
+        except Exception as e:
+            print(f"Database connection failed: {e}")
+            print("App will start anyway - database operations may fail until connection is established")
+            return False
+
+    # Run database test with timeout
+    import threading
+    import time
+
+    db_test_result = {'connected': False}
+
+    def db_test_thread():
+        db_test_result['connected'] = test_db_connection()
+
+    # Start database test in background
+    test_thread = threading.Thread(target=db_test_thread)
+    test_thread.daemon = True
+    test_thread.start()
+
+    # Wait max 8 seconds for database test
+    test_thread.join(timeout=8)
+
+    if test_thread.is_alive():
+        print("Database connection test timed out - starting app anyway")
+        print("Note: Database operations may fail until connection is established")
+
     # Production-ready configuration
     port = int(os.getenv('PORT', 5001))  # Use 5001 to avoid conflict
     debug = os.getenv('FLASK_ENV') == 'development'
-    
+
     # DEVELOPMENT: Enable auto-reload for code changes
     # Set debug=True to auto-restart server when Python files change
     development_mode = False  # Production mode
-    
+
     app.run(debug=development_mode, host='0.0.0.0', port=port, use_reloader=development_mode)
