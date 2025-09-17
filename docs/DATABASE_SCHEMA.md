@@ -11,7 +11,7 @@ This document describes the complete database schema for the V2.0 Enhanced Formu
 - **Port**: `5433`  
 - **Username**: `fantrax_user`  
 - **Password**: `fantrax_password`
-- **Total Players**: 647 Premier League players
+- **Total Players**: 714 Premier League players
 
 ---
 
@@ -239,6 +239,21 @@ SELECT MAX(gameweek) FROM raw_player_snapshots WHERE gameweek IS NOT NULL
 - `form_multiplier` (DECIMAL 5,3, DEFAULT 1.0) - EWMA form calculation
 - `fixture_multiplier` (DECIMAL 5,3, DEFAULT 1.0) - Exponential fixture difficulty
 - `starter_multiplier` (DECIMAL 5,3, DEFAULT 1.0) - Rotation penalty
+n### **⚠️ CRITICAL: Games Count Data Sources**
+The system uses **TWO** different sources for games count with potential discrepancies:
+
+1. **`players.games_current_season`** - From Understat sync, **ACCURATE** game counts ✅
+2. **`player_games_data` (SUM)** - May have incorrect aggregations ⚠️
+
+**ALWAYS use `p.games_current_season` for:**
+- PPG calculations in recalculation (app.py:423)
+- Dynamic blending `games_current` parameter (app.py:475)
+- Frontend display (25-26 column)
+
+**Known Issue Pattern**: Players may show exactly 2x expected Dynamic PPG when incorrect games source is used in calculation. This occurs when `pgd.games_played_current` (SUM aggregation) is used instead of `p.games_current_season` (Understat direct).
+
+**Resolution**: Modified app.py to consistently use `p.games_current_season` for all games-related calculations.
+
 - `xgi_multiplier` (DECIMAL 5,3, DEFAULT 1.0) - Normalized xGI ratio
 
 **Games Tracking** (V2.0 Dynamic Blending):
@@ -517,10 +532,10 @@ WHERE ...
 ## **V2.0 Performance Metrics**
 
 ### **Current System Performance**
-- **Total Players**: 647 Premier League players
+- **Total Players**: 714 Premier League players
 - **Database Size**: Optimized for efficient queries
 - **API Response Time**: Sub-second response times
-- **Calculation Speed**: All 647 players recalculated efficiently
+- **Calculation Speed**: All 714 players recalculated efficiently
 - **Name Matching**: 99% success rate for external data integration
 - **Data Freshness**: Real-time updates via weekly upload workflows
 
@@ -546,7 +561,7 @@ SELECT
     COUNT(blended_ppg) as with_blending,
     COUNT(baseline_xgi) as with_baseline_xgi
 FROM players;
--- Expected: 647 players with all V2.0 columns populated
+-- Expected: 714 players with all V2.0 columns populated
 ```
 
 ### **Performance Monitoring**
@@ -595,4 +610,4 @@ WHERE gameweek = (SELECT MAX(gameweek) FROM player_metrics);
 
 **Last Updated**: 2025-08-23 - V2.0 Enhanced Formula Database Schema with Raw Data Snapshot System
 
-*This document reflects the current V2.0-only database structure with all legacy components removed. The database serves 647 Premier League players with optimized V2.0 Enhanced Formula calculations including True Value predictions, ROI analysis, dynamic blending, EWMA form calculations, and normalized xGI integration. The raw data snapshot system enables retrospective trend analysis by capturing weekly imported data without calculations.*
+*This document reflects the current V2.0-only database structure with all legacy components removed. The database serves 714 Premier League players with optimized V2.0 Enhanced Formula calculations including True Value predictions, ROI analysis, dynamic blending, EWMA form calculations, and normalized xGI integration. The raw data snapshot system enables retrospective trend analysis by capturing weekly imported data without calculations.*

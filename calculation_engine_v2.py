@@ -428,39 +428,52 @@ class FormulaEngineV2:
     
     def _calculate_blended_ppg(self, player_data: Dict[str, Any]) -> Tuple[float, float]:
         """
-        SPRINT 2: Calculate dynamically blended PPG using smooth transition
+        Enhanced blending using games-based weighting with MAX formula
+        Formula: MAX(games_ratio, transition_ratio) for fair weighting
         Returns (blended_ppg, current_weight)
         """
         current_ppg = player_data.get('ppg', 0.0)
         historical_ppg = player_data.get('historical_ppg', None)
-        
+        games_current = player_data.get('games_current', 0)
+        games_historical = player_data.get('games_historical', 0)
+
         # Handle Decimal conversion
         if hasattr(current_ppg, 'quantize'):
             current_ppg = float(current_ppg)
         if historical_ppg is not None and hasattr(historical_ppg, 'quantize'):
             historical_ppg = float(historical_ppg)
-        
-        # Handle NULL historical PPG for new players
-        if historical_ppg is None:
-            # For new players without historical data, use current PPG only
+
+        # Handle no historical data (new players or no 2024-25 data)
+        if historical_ppg is None or historical_ppg == 0.0 or games_historical == 0:
+            # Use current PPG only for players without historical data
             blended_ppg = current_ppg
             w_current = 1.0
+            logger.debug(f"Player without historical data - using 100% current PPG: {current_ppg:.2f}")
         else:
-            # Get dynamic blending parameters
-            K = self.v2_config.get('dynamic_blending', {}).get('full_adaptation_gw', 12)
-            
-            # Calculate current weight using smooth transition formula
-            if self.current_gameweek <= 1:
-                w_current = 0.0
-                w_historical = 1.0
+            # Get transition period from config (default 12 games)
+            transition_period = self.v2_config.get('dynamic_blending', {}).get('transition_period', 12)
+
+            # Step 1: Calculate Weight_A (games-based ratio)
+            total_games = games_current + games_historical
+            if total_games > 0:
+                weight_A = games_current / total_games
             else:
-                # Smooth transition: w_current = min(1, (N-1)/(K-1))
-                w_current = min(1.0, (self.current_gameweek - 1) / (K - 1))
-                w_historical = 1.0 - w_current
-            
-            # Blend the PPG values
+                weight_A = 0.0
+
+            # Step 2: Calculate Weight_B (transition-based)
+            weight_B = min(1.0, games_current / transition_period)
+
+            # Step 3: Take maximum of both weights (ensures fair weighting)
+            w_current = max(weight_A, weight_B)
+            w_historical = 1.0 - w_current
+
+            # Step 4: Blend the PPG values
             blended_ppg = (w_current * current_ppg) + (w_historical * historical_ppg)
-        
+
+            logger.debug(f"Blending: {games_current}c + {games_historical}h games, "
+                        f"Weight_A={weight_A:.3f}, Weight_B={weight_B:.3f}, "
+                        f"Final={w_current:.3f} current, {w_historical:.3f} historical")
+
         return max(0.1, blended_ppg), w_current
     
     def _get_current_gameweek(self) -> int:

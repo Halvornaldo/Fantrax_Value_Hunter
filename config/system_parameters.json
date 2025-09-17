@@ -6,19 +6,14 @@
   },
   "xgi_integration": {
     "enabled": true,
-    "last_sync": 1757713830.4349947,
-    "matched_players": 369,
+    "last_sync": 1758136757.0966952,
+    "matched_players": 402,
     "unmatched_players": 2,
     "description": "xGI integration toggle and statistics"
   },
   "starter_prediction": {
     "enabled": true,
-    "manual_overrides": {
-      "05nt6": {
-        "type": "unlikely",
-        "multiplier": 0.5
-      }
-    },
+    "manual_overrides": {},
     "likely_starter_penalty": 0.9,
     "auto_rotation_penalty": 0.75,
     "unlikely_starter_penalty": 0.5,
@@ -40,7 +35,9 @@
     },
     "dynamic_blending": {
       "enabled": true,
-      "full_adaptation_gw": 12
+      "full_adaptation_gw": 13,
+      "transition_period": 12,
+      "description": "MAX(games_ratio, transition_ratio) blending formula - transition_period controls pace of adaptation"
     },
     "normalized_xgi": {
       "enabled": false,

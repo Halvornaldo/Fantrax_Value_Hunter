@@ -47,9 +47,11 @@ const ParameterPanel = ({ systemConfig, onParametersUpdate, playersCount }) => {
     formEnabled: false,
     fixtureEnabled: true,
     starterEnabled: true,
-    // Starter penalties
+    // Starter penalties (5-tier system)
+    likelyStarterPenalty: 0.9,
     rotationPenalty: 0.75,
-    benchPenalty: 0.6,
+    unlikelyStarterPenalty: 0.5,
+    benchPenalty: 0.35,
     outPenalty: 0.0
   });
 
@@ -75,9 +77,11 @@ const ParameterPanel = ({ systemConfig, onParametersUpdate, playersCount }) => {
         formEnabled: v2Config.formula_toggles?.form_enabled ?? false,
         fixtureEnabled: v2Config.formula_toggles?.fixture_enabled ?? true,
         starterEnabled: v2Config.formula_toggles?.starter_enabled ?? true,
-        // Starter penalties
+        // Starter penalties (5-tier system)
+        likelyStarterPenalty: starterConfig?.likely_starter_penalty || 0.9,
         rotationPenalty: starterConfig?.auto_rotation_penalty || 0.75,
-        benchPenalty: starterConfig?.force_bench_penalty || 0.6,
+        unlikelyStarterPenalty: starterConfig?.unlikely_starter_penalty || 0.5,
+        benchPenalty: starterConfig?.force_bench_penalty || 0.35,
         outPenalty: starterConfig?.force_out_penalty || 0.0
       });
       setPendingChanges(false);
@@ -132,7 +136,9 @@ const ParameterPanel = ({ systemConfig, onParametersUpdate, playersCount }) => {
         },
         starter_prediction: {
           enabled: true,
+          likely_starter_penalty: parameters.likelyStarterPenalty,
           auto_rotation_penalty: parameters.rotationPenalty,
+          unlikely_starter_penalty: parameters.unlikelyStarterPenalty,
           force_bench_penalty: parameters.benchPenalty,
           force_out_penalty: parameters.outPenalty
         }
@@ -437,6 +443,25 @@ const ParameterPanel = ({ systemConfig, onParametersUpdate, playersCount }) => {
 
         <Divider orientation="vertical" flexItem />
 
+        {/* Likely Starter Penalty */}
+        <Grid item xs={1.5}>
+          <Typography variant="body2" gutterBottom>Likely Starter</Typography>
+          <Slider
+            value={parameters.likelyStarterPenalty}
+            onChange={(e, value) => handleParameterChange('likelyStarterPenalty', value)}
+            min={0.0}
+            max={1.0}
+            step={0.05}
+            size="small"
+            valueLabelDisplay="auto"
+          />
+          <Typography variant="caption" color="text.secondary">
+            {parameters.likelyStarterPenalty.toFixed(2)}x
+          </Typography>
+        </Grid>
+
+        <Divider orientation="vertical" flexItem />
+
         {/* Rotation Penalty */}
         <Grid item xs={1.5}>
           <Typography variant="body2" gutterBottom>Rotation Risk</Typography>
@@ -451,6 +476,26 @@ const ParameterPanel = ({ systemConfig, onParametersUpdate, playersCount }) => {
           />
           <Typography variant="caption" color="text.secondary">
             {parameters.rotationPenalty.toFixed(2)}x
+          </Typography>
+        </Grid>
+
+
+        <Divider orientation="vertical" flexItem />
+
+        {/* Unlikely Starter Penalty */}
+        <Grid item xs={1.5}>
+          <Typography variant="body2" gutterBottom>Unlikely Starter</Typography>
+          <Slider
+            value={parameters.unlikelyStarterPenalty}
+            onChange={(e, value) => handleParameterChange('unlikelyStarterPenalty', value)}
+            min={0.0}
+            max={1.0}
+            step={0.05}
+            size="small"
+            valueLabelDisplay="auto"
+          />
+          <Typography variant="caption" color="text.secondary">
+            {parameters.unlikelyStarterPenalty.toFixed(2)}x
           </Typography>
         </Grid>
 

@@ -453,6 +453,19 @@ WHERE ...
 ```
 
 ### **`POST /api/recalculate`** - Parameter Updates
+n**⚠️ CRITICAL: Games Count Data Source Fix**
+Recalculation now uses the correct games count source to prevent 2x Dynamic PPG issues:
+
+- **Correct Source**: `p.games_current_season` (from Understat sync)
+- **Previous Issue**: Used `pgd.games_played_current` (SUM aggregation) causing exactly 2x expected Dynamic PPG
+- **Resolution Applied**: Modified app.py:423 and app.py:475 to use `p.games_current_season` consistently
+
+**Behavior**:
+1. Triggers V2.0 Enhanced Formula recalculation for all players
+2. Uses correct `p.games_current_season` for PPG calculations
+3. Passes correct `games_current` parameter to dynamic blending formula
+4. Ensures accurate Dynamic PPG = Blended PPG results
+
 **Description**: Update V2.0 system parameters and recalculate  
 **Body**: JSON configuration with V2.0 parameter structure  
 **Returns**: Updated calculations with performance metrics
@@ -494,7 +507,7 @@ WHERE ...
   },
   "system_metadata": {
     "formula_version": "v2.0",
-    "total_players": 647,
+    "total_players": 714,
     "current_gameweek": 2,
     "calculation_engine": "enhanced"
   }
@@ -853,7 +866,7 @@ curl "http://localhost:5001/api/archives"
   "status": "healthy",
   "formula_version": "v2.0",
   "system_info": {
-    "total_players": 647,
+    "total_players": 714,
     "database_status": "connected",
     "calculation_engine": "enhanced",
     "last_calculation": "2025-08-22T10:30:00Z"
@@ -1022,7 +1035,7 @@ ROI = True Value ÷ Price
 ## **Performance Specifications - V2.0**
 
 ### **Response Time Targets**
-- **Player Data API**: < 500ms for 647 players
+- **Player Data API**: < 500ms for 714 players
 - **V2.0 Calculations**: < 1000ms for full recalculation  
 - **Parameter Updates**: < 300ms for configuration changes
 - **Data Import**: < 5000ms for 300 player CSV
@@ -1031,10 +1044,10 @@ ROI = True Value ÷ Price
 - **Concurrent Users**: 10+ simultaneous dashboard users
 - **Database Performance**: Sub-second query response
 - **Memory Usage**: < 200MB peak during calculations
-- **Calculation Throughput**: 647 players/second
+- **Calculation Throughput**: 714 players/second
 
 ---
 
 **Last Updated**: 2025-08-23 - V2.0 Enhanced Formula API with Trend Analysis System
 
-*This document reflects the current V2.0-only API structure with all legacy endpoints removed. The API serves 647 Premier League players with optimized V2.0 Enhanced Formula calculations including True Value predictions, ROI analysis, dynamic blending, EWMA form calculations, and normalized xGI integration. The trend analysis system enables retrospective analysis using captured raw data snapshots.*
+*This document reflects the current V2.0-only API structure with all legacy endpoints removed. The API serves 714 Premier League players with optimized V2.0 Enhanced Formula calculations including True Value predictions, ROI analysis, dynamic blending, EWMA form calculations, and normalized xGI integration. The trend analysis system enables retrospective analysis using captured raw data snapshots.*

@@ -7,7 +7,7 @@ The Fantasy Football Value Hunter uses a research-based V2.0 Enhanced Formula sy
 
 **Core Architecture:**
 - **Engine**: `calculation_engine_v2.py` (FormulaEngineV2 class)
-- **Players**: 647 Premier League players
+- **Players**: 714 Premier League players
 - **Performance**: Sub-second calculations, <500ms API response
 - **Database**: PostgreSQL with V2.0 schema integration
 
@@ -28,10 +28,39 @@ ROI = True Value ÷ Player_Price
 ## **V2.0 Component Calculations**
 
 ### **1. Dynamic Blending System**
+n#### **⚠️ CRITICAL: Games Count Data Sources**
+The system uses **TWO** different sources for games count:
+1. **`players.games_current_season`** - From Understat sync, **ACCURATE** game counts ✅
+2. **`player_games_data` (SUM)** - May have incorrect aggregations ⚠️
+
+**ALWAYS use `p.games_current_season` for:**
+- PPG calculations in recalculation
+- Dynamic blending `games_current` parameter
+- Frontend display (25-26 column)
+n#### **Enhanced MAX Formula Implementation** ✅ *Updated 2025-09-17*
+
+**For players WITH historical data:**
+1. **Weight_A** = `games_current / (games_current + games_historical)` (games-based ratio)
+2. **Weight_B** = `MIN(1.0, games_current / transition_period)` (transition-based, default 12 games)
+3. **Final weight** = `MAX(Weight_A, Weight_B)` - Ensures fair weighting for limited historical data
+4. **Blended PPG** = `(weight × current_PPG) + ((1-weight) × historical_PPG)`
+
+**For players WITHOUT historical data:**
+- Use **100% current season PPG**
+- Orange/amber visual indicator in frontend
+- No blending applied
+
+
 **Purpose**: Smooth transition from historical (2024-25) to current season data
 
+
+**Games-Based Formula**: The system uses games played instead of calendar gameweeks for weighting. This ensures:
+- Sustainable operation regardless of when data is uploaded
+- Adaptation based on actual player performance data
+- Consistency across different upload schedules
+
 **Formula**: 
-- `w_current = min(1, (N-1)/(K-1))` where N=current gameweek, K=16
+- `w_current = min(1, (games_played - 1) / 15)` where games_played is actual games data
 - `Blended_PPG = (w_current × Current_PPG) + (w_historical × Historical_PPG)`
 
 **Examples**:
@@ -325,7 +354,7 @@ V2.0 improvements based on comprehensive analysis in `calculation-research/Fanta
 ### **Performance Monitoring**
 - **Calculation Status**: Real-time progress tracking
 - **Parameter Updates**: <300ms configuration changes
-- **Full Recalculation**: <1 second for 647 players
+- **Full Recalculation**: <1 second for 714 players
 
 ---
 
@@ -345,7 +374,7 @@ curl http://localhost:5001/api/config
 
 ### **Data Quality Metrics**
 - **Name Matching**: 96.95% accuracy across data sources
-- **xGI Coverage**: 335/647 players with baseline data
+- **xGI Coverage**: 335/714 players with baseline data
 - **Form Coverage**: 100% with graceful fallbacks
 - **Calculation Reliability**: Robust error handling and validation
 
@@ -374,4 +403,4 @@ curl http://localhost:5001/api/config
 
 **Last Updated**: 2025-08-23 - V2.0 Enhanced Formula Production System
 
-*This guide documents the complete V2.0 Enhanced Formula system serving 647 Premier League players with advanced mathematical calculations including True Value predictions, ROI analysis, dynamic blending, EWMA form tracking, and normalized xGI integration.*
+*This guide documents the complete V2.0 Enhanced Formula system serving 714 Premier League players with advanced mathematical calculations including True Value predictions, ROI analysis, dynamic blending, EWMA form tracking, and normalized xGI integration.*

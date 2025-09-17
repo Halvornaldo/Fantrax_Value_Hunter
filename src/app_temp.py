@@ -419,13 +419,12 @@ def recalculate_true_values(gameweek: int = None):
                 pm.price, 
                 COALESCE(pf.total_points, 0) as total_fpts,
                 CASE 
-                    WHEN COALESCE(p.games_current_season, 0) > 0 
-                    THEN COALESCE(pf.total_points, 0) / p.games_current_season
+                    WHEN COALESCE(pgd.games_played_current, 0) > 0 
+                    THEN COALESCE(pf.total_points, 0) / pgd.games_played_current
                     ELSE 0 
                 END as ppg, 
                 pm.form_multiplier, pm.fixture_multiplier, pm.starter_multiplier,
                 p.xgi90, p.baseline_xgi,
-                p.games_current_season,
                 pgd.total_points_historical, pgd.games_played_historical,
                 pgd.total_points_current, pgd.games_played_current,
                 tf.difficulty_score as fixture_difficulty
@@ -470,16 +469,15 @@ def recalculate_true_values(gameweek: int = None):
                 # Historical data for dynamic blending
                 'total_points_historical': float(player['total_points_historical']) if player['total_points_historical'] else 0.0,
                 'games_played_historical': int(player['games_played_historical']) if player['games_played_historical'] else 0,
-                'games_historical': int(player['games_played_historical']) if player['games_played_historical'] else 0,  # NEW: For blending formula
                 'total_points_current': float(player['total_points_current']) if player['total_points_current'] else 0.0,
-                'games_current': int(player['games_current_season']) if player['games_current_season'] else 0,
+                'games_played_current': int(player['games_played_current']) if player['games_played_current'] else 0,
             }
             
             # Calculate historical PPG for blending
             if player_data['games_played_historical'] > 0:
                 player_data['historical_ppg'] = player_data['total_points_historical'] / player_data['games_played_historical']
             else:
-                player_data['historical_ppg'] = None  # Changed from 0.0 to None for proper handling
+                player_data['historical_ppg'] = 0.0
             
             # Use v2.0 engine for calculation
             v2_result = v2_engine.calculate_player_value(player_data)
@@ -614,7 +612,7 @@ def get_players():
         'position': 'p.position',
         'price': 'pm.price',
         'total_fpts': 'COALESCE(pf.total_points, 0)',
-        'ppg': 'CASE WHEN COALESCE(p.games_current_season, 0) > 0 THEN COALESCE(pf.total_points, 0) / p.games_current_season ELSE 0 END',
+        'ppg': 'CASE WHEN COALESCE(pgd.games_played, 0) > 0 THEN COALESCE(pf.total_points, 0) / pgd.games_played ELSE 0 END',
         'value_score': 'pm.value_score',
         'true_value': 'pm.true_value',
         'roi': 'p.roi',
@@ -646,13 +644,12 @@ def get_players():
             SELECT 
                 p.id, p.name, p.team, p.position,
                 p.minutes, p.xg90, p.xa90, p.xgi90, p.baseline_xgi,
-                p.games_current_season,
                 pm.price, 
                 COALESCE(pf.total_points, 0) as total_fpts,
-                CASE
-                    WHEN COALESCE(p.games_current_season, 0) > 0
-                    THEN COALESCE(pf.total_points, 0) / p.games_current_season
-                    ELSE 0
+                CASE 
+                    WHEN COALESCE(pgd.games_played, 0) > 0 
+                    THEN COALESCE(pf.total_points, 0) / pgd.games_played
+                    ELSE 0 
                 END as ppg,
                 pm.value_score, pm.true_value,
                 p.roi,
@@ -758,14 +755,13 @@ def get_players():
                 player_dict['last_updated'] = player_dict['last_updated'].isoformat()
             
             # Send games data separately for frontend to handle display
-            games_current = player_dict.get('games_played_current', 0)
+            games_current = player_dict.get('games_played', 0)
             games_historical = player_dict.get('games_played_historical', 0)
             
             # Ensure games data is properly typed and handle None values
             player_dict['games_current'] = int(games_current) if games_current is not None else 0
             player_dict['games_historical'] = int(games_historical) if games_historical is not None else 0
             player_dict['games_total'] = player_dict['games_current'] + player_dict['games_historical']
-            player_dict['has_historical_data'] = player_dict['games_historical'] > 0  # NEW: Flag for frontend visual indicators
             players_list.append(player_dict)
         
         # V2.0 calculations are pre-calculated in database - no need for live calculation
@@ -2531,7 +2527,7 @@ def import_form_data():
             SET ppg = (
                 SELECT 
                     CASE 
-                        WHEN COALESCE(p.games_current_season, 0) > 0 
+                        WHEN COALESCE(pgd.games_played_current, 0) > 0 
                         THEN COALESCE(pf_max.total_points, 0) / pgd.games_played_current
                         ELSE 0 
                     END
@@ -2567,7 +2563,6 @@ def import_form_data():
                 SELECT 
                     p.id as player_id, p.name, p.team, p.position,
                     p.xgi90, p.baseline_xgi, pm.price,
-                p.games_current_season,
                     -- Calculate fresh PPG using same logic as form import
                     CASE 
                         WHEN COALESCE(pgd.games_played, 0) > 0 
@@ -4309,10 +4304,10 @@ def calculate_values_v2():
                 p.baseline_xgi,
                 pm.price,
                 -- Calculate fresh PPG using same logic as form import
-                CASE
-                    WHEN COALESCE(p.games_current_season, 0) > 0
-                    THEN COALESCE(pf_max.total_points, 0) / p.games_current_season
-                    ELSE 0
+                CASE 
+                    WHEN COALESCE(pgd.games_played, 0) > 0 
+                    THEN COALESCE(pf_max.total_points, 0) / pgd.games_played
+                    ELSE 0 
                 END as ppg,
                 pm.form_multiplier,
                 pm.fixture_multiplier,
@@ -4467,12 +4462,12 @@ def verify_ppg():
                 p.name,
                 p.team,
                 pm.ppg as stored_ppg,
-                CASE
-                    WHEN COALESCE(p.games_current_season, 0) > 0
-                    THEN COALESCE(pf.total_points, 0) / p.games_current_season
-                    ELSE 0
+                CASE 
+                    WHEN COALESCE(pgd.games_played, 0) > 0 
+                    THEN COALESCE(pf.total_points, 0) / pgd.games_played
+                    ELSE 0 
                 END as calculated_ppg,
-                ROUND(ABS(pm.ppg - COALESCE(pf.total_points / NULLIF(p.games_current_season, 0), 0)), 2) as difference,
+                ROUND(ABS(pm.ppg - COALESCE(pf.total_points / NULLIF(pgd.games_played, 0), 0)), 2) as difference,
                 pf.total_points,
                 pgd.games_played,
                 pm.true_value,
@@ -4487,7 +4482,7 @@ def verify_ppg():
             WHERE pm.gameweek = %s
               AND p.team != 'TST'  -- Exclude test players
               AND COALESCE(pgd.games_played, 0) > 0  -- Only players with games played
-            ORDER BY ABS(pm.ppg - COALESCE(pf.total_points / NULLIF(p.games_current_season, 0), 0)) DESC
+            ORDER BY ABS(pm.ppg - COALESCE(pf.total_points / NULLIF(pgd.games_played, 0), 0)) DESC
             LIMIT 50
         """, [gameweek, gameweek])
         

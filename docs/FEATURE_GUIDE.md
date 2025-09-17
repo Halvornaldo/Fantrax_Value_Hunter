@@ -572,4 +572,4 @@ Result: Moderate True Value with below-average ROI due to premium pricing
 
 **Last Updated**: 2025-08-23 - V2.0 Enhanced Formula Dashboard with Trend Analysis System
 
-*This document reflects the current V2.0-only dashboard features with all legacy components removed. The dashboard serves 647 Premier League players with optimized V2.0 Enhanced Formula calculations including True Value predictions, ROI analysis, dynamic blending, EWMA form calculations, and normalized xGI integration. The trend analysis system enables retrospective analysis using captured raw data snapshots for season-long performance tracking.*
+*This document reflects the current V2.0-only dashboard features with all legacy components removed. The dashboard serves 714 Premier League players with optimized V2.0 Enhanced Formula calculations including True Value predictions, ROI analysis, dynamic blending, EWMA form calculations, and normalized xGI integration. The trend analysis system enables retrospective analysis using captured raw data snapshots for season-long performance tracking.*
