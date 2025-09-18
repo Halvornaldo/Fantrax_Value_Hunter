@@ -29,9 +29,15 @@ This document describes the complete API for the V2.0 Enhanced Formula system. T
 **Returns**: HTML form for betting odds CSV imports
 
 #### `GET /import-validation`
-**Description**: Data import validation interface  
+**Description**: Data import validation interface
 **Returns**: HTML validation page with 99% match rate system
 **Testing Status**: ✅ Verified working - file upload, validation, and unmatched player workflow functional
+
+#### `GET /import-games`
+**Description**: Game scores import interface for enhanced Form calculations
+**Returns**: HTML form for importing individual game scores with validation workflow
+**Features**: Auto-detects next gameweek, shows recent imports with validation status
+**Testing Status**: ✅ Verified working - complete import and validation workflow operational
 
 #### `GET /monitoring`
 **Description**: V2.0 system monitoring interface  
@@ -556,6 +562,35 @@ Recalculation now uses the correct games count source to prevent 2x Dynamic PPG 
 ### **`POST /api/import-odds`**
 **Description**: Import fixture odds for V2.0 exponential difficulty calculation  
 **Returns**: Import results with exponential multiplier updates
+
+### **`POST /api/import-game-scores`** - Enhanced Form Calculation Data Import
+**Description**: Import individual game scores for enhanced Form multiplier calculations with validation workflow
+
+**Enhanced Features** ✅ *Updated 2025-09-18*:
+- **Fantrax CSV Support**: Processes exported game scores from Fantrax league dashboard
+- **Auto Gameweek Detection**: Automatically detects and suggests next gameweek number
+- **Validation Workflow**: Two-step process (CSV import → Understat validation)
+- **Player Participation Tracking**: Uses `did_play` column to distinguish actual participation vs bench/absence
+- **Form Calculation Enhancement**: Filters out false zero-scores for more accurate EWMA calculations
+
+**Request**: `multipart/form-data` with CSV file and game number
+**Parameters**:
+- `file` (file, required): CSV file from Fantrax export
+- `game_number` (int, required): Gameweek number for this import
+
+**Response**:
+```json
+{
+  "success": true,
+  "message": "Game 5 scores imported successfully",
+  "imported_count": 234,
+  "error_count": 3,
+  "game_number": 5,
+  "errors": ["Player not found: Example Player"]
+}
+```
+
+**Validation Workflow**: After successful import, run `/import-validation` to mark which players actually played vs those who were benched, enabling accurate Form calculations.
 
 ### **`POST /api/import-lineups`** - FFP Import with Enhanced Validation
 **Description**: Import lineup predictions (FFP format) with intelligent name matching and starter multiplier updates

@@ -550,8 +550,8 @@ const PlayerTable = ({ playersData, gameweekInfo, onDataRefresh }) => {
         const weight = parseFloat(params.row.current_season_weight || 0);
         const isReliable = weight > 0.5; // More than 50% current season data
 
-        const cellColor = isReliable ? '#dc3545' : weight > 0.2 ? '#28a745' : '#6c757d';
-        const bgColor = isReliable ? 'rgba(220, 53, 69, 0.1)' : weight > 0.2 ? 'rgba(40, 167, 69, 0.1)' : 'rgba(108, 117, 125, 0.1)';
+        const cellColor = isReliable ? '#28a745' : weight > 0.2 ? '#ffc107' : '#dc3545';
+        const bgColor = isReliable ? 'rgba(40, 167, 69, 0.1)' : weight > 0.2 ? 'rgba(255, 193, 7, 0.1)' : 'rgba(220, 53, 69, 0.1)';
 
         return (
           <Box sx={{
@@ -760,14 +760,14 @@ const PlayerTable = ({ playersData, gameweekInfo, onDataRefresh }) => {
         const autoOption = { value: 'auto', label: 'A', title: 'Auto (CSV)', color: '#6c757d' };
 
         return (
-          <Box sx={{ display: 'flex', gap: 0.25, alignItems: 'center' }}>
+          <Box sx={{ display: 'flex', gap: 0.5, alignItems: 'center' }}>
             {/* 2x3 Grid for S/L/R/U/B/O */}
             <Box sx={{
               display: 'grid',
-              gridTemplateColumns: 'repeat(3, 16px)',
-              gridTemplateRows: 'repeat(2, 16px)',
-              gap: 0.25,
-              mr: 0.25
+              gridTemplateColumns: 'repeat(3, 1fr)',
+              gridTemplateRows: 'repeat(2, 1fr)',
+              gap: 0.5,
+              mr: 0.5
             }}>
               {overrideOptions.map(option => (
                 <Button
@@ -777,10 +777,10 @@ const PlayerTable = ({ playersData, gameweekInfo, onDataRefresh }) => {
                   disabled={isLoading}
                   onClick={() => handleStarterOverride(playerId, option.value)}
                   sx={{
-                    minWidth: '16px',
-                    width: '16px',
-                    height: '16px',
-                    fontSize: '0.55rem',
+                    minWidth: '24px',
+                    width: '24px',
+                    height: '24px',
+                    fontSize: '0.7rem',
                     fontWeight: 600,
                     p: 0,
                     borderColor: option.color,
@@ -806,10 +806,10 @@ const PlayerTable = ({ playersData, gameweekInfo, onDataRefresh }) => {
               disabled={isLoading}
               onClick={() => handleStarterOverride(playerId, autoOption.value)}
               sx={{
-                minWidth: '28px',
-                width: '28px',
-                height: '28px',
-                fontSize: '0.7rem',
+                minWidth: '32px',
+                width: '32px',
+                height: '32px',
+                fontSize: '0.8rem',
                 fontWeight: 600,
                 p: 0,
                 borderColor: autoOption.color,

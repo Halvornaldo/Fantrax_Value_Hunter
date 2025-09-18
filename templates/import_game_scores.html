@@ -1,0 +1,422 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Game Scores Import - Fantrax Value Hunter</title>
+    <style>
+        body {
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+            margin: 0;
+            padding: 20px;
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            min-height: 100vh;
+        }
+
+        .container {
+            max-width: 900px;
+            margin: 0 auto;
+            background: white;
+            border-radius: 10px;
+            padding: 30px;
+            box-shadow: 0 10px 30px rgba(0,0,0,0.2);
+        }
+
+        h1 {
+            color: #333;
+            text-align: center;
+            margin-bottom: 30px;
+            font-size: 2.2em;
+        }
+
+        .upload-section {
+            background: #f8f9fa;
+            border-radius: 8px;
+            padding: 25px;
+            margin-bottom: 25px;
+            border: 2px dashed #dee2e6;
+        }
+
+        .form-group {
+            margin-bottom: 20px;
+        }
+
+        label {
+            display: block;
+            margin-bottom: 8px;
+            font-weight: 600;
+            color: #495057;
+        }
+
+        input[type="file"] {
+            width: 100%;
+            padding: 12px;
+            border: 2px solid #dee2e6;
+            border-radius: 6px;
+            font-size: 16px;
+            background: white;
+        }
+
+        input[type="number"] {
+            width: 200px;
+            padding: 12px;
+            border: 2px solid #dee2e6;
+            border-radius: 6px;
+            font-size: 16px;
+        }
+
+        .upload-btn {
+            background: linear-gradient(135deg, #28a745, #20c997);
+            color: white;
+            border: none;
+            padding: 15px 30px;
+            font-size: 16px;
+            border-radius: 6px;
+            cursor: pointer;
+            transition: all 0.3s ease;
+            margin-top: 10px;
+        }
+
+        .upload-btn:hover {
+            transform: translateY(-2px);
+            box-shadow: 0 5px 15px rgba(40, 167, 69, 0.4);
+        }
+
+        .upload-btn:disabled {
+            background: #6c757d;
+            cursor: not-allowed;
+            transform: none;
+            box-shadow: none;
+        }
+
+        .validate-btn {
+            background: linear-gradient(135deg, #17a2b8, #007bff);
+            color: white;
+            border: none;
+            padding: 12px 25px;
+            font-size: 14px;
+            border-radius: 6px;
+            cursor: pointer;
+            transition: all 0.3s ease;
+            margin-left: 10px;
+        }
+
+        .validate-btn:hover {
+            transform: translateY(-2px);
+            box-shadow: 0 5px 15px rgba(23, 162, 184, 0.4);
+        }
+
+        .result {
+            padding: 20px;
+            border-radius: 6px;
+            margin-top: 20px;
+            display: none;
+        }
+
+        .result.success {
+            background: #d4edda;
+            border: 1px solid #c3e6cb;
+            color: #155724;
+        }
+
+        .result.error {
+            background: #f8d7da;
+            border: 1px solid #f5c6cb;
+            color: #721c24;
+        }
+
+        .info-box {
+            background: #e3f2fd;
+            border-left: 4px solid #2196F3;
+            padding: 15px;
+            margin-bottom: 20px;
+            border-radius: 4px;
+        }
+
+        .warning-box {
+            background: #fff3cd;
+            border-left: 4px solid #ffc107;
+            padding: 15px;
+            margin-bottom: 20px;
+            border-radius: 4px;
+        }
+
+        .stats-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(180px, 1fr));
+            gap: 15px;
+            margin-top: 15px;
+        }
+
+        .stat-item {
+            background: #f8f9fa;
+            padding: 15px;
+            border-radius: 6px;
+            text-align: center;
+            border: 1px solid #dee2e6;
+        }
+
+        .stat-number {
+            font-size: 1.8em;
+            font-weight: bold;
+            color: #28a745;
+        }
+
+        .stat-label {
+            color: #6c757d;
+            font-size: 0.9em;
+            margin-top: 5px;
+        }
+
+        .back-link {
+            display: inline-block;
+            margin-bottom: 20px;
+            color: #667eea;
+            text-decoration: none;
+            font-weight: 500;
+        }
+
+        .back-link:hover {
+            text-decoration: underline;
+        }
+
+        .loading {
+            display: none;
+            text-align: center;
+            padding: 20px;
+        }
+
+        .loading-spinner {
+            border: 3px solid #f3f3f3;
+            border-top: 3px solid #667eea;
+            border-radius: 50%;
+            width: 30px;
+            height: 30px;
+            animation: spin 1s linear infinite;
+            margin: 0 auto 10px;
+        }
+
+        @keyframes spin {
+            0% { transform: rotate(0deg); }
+            100% { transform: rotate(360deg); }
+        }
+
+        .recent-imports {
+            background: #f8f9fa;
+            border-radius: 8px;
+            padding: 20px;
+            margin-bottom: 25px;
+        }
+
+        .recent-imports h3 {
+            margin-top: 0;
+            color: #495057;
+        }
+
+        .import-item {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            padding: 10px 0;
+            border-bottom: 1px solid #dee2e6;
+        }
+
+        .import-item:last-child {
+            border-bottom: none;
+        }
+
+        .game-number {
+            font-weight: bold;
+            color: #007bff;
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <a href="/" class="back-link">← Back to Dashboard</a>
+
+        <h1>🎮 Game Scores Import</h1>
+
+        {% if error %}
+        <div class="result error" style="display: block;">
+            <h3>⚠️ Warning</h3>
+            <p>{{ error }}</p>
+        </div>
+        {% endif %}
+
+        <div class="info-box">
+            <strong>🎯 Enhanced Form Calculation</strong>
+            <p>This tool imports individual game scores for improved Form multiplier calculations. The system now uses validated player participation data to exclude false zero-scores and provide more accurate form assessments.</p>
+        </div>
+
+        <div class="warning-box">
+            <strong>⚠️ Import Process (2 Steps Required)</strong>
+            <ol>
+                <li><strong>Upload CSV:</strong> Import game scores from Fantrax (this page)</li>
+                <li><strong>Run Validation:</strong> Use Understat data to mark who actually played</li>
+            </ol>
+            <p><em>Note: Without step 2, the system can't distinguish between players who played and scored 0 vs players who didn't play at all.</em></p>
+        </div>
+
+        {% if recent_imports %}
+        <div class="recent-imports">
+            <h3>📊 Recent Imports</h3>
+            {% for import in recent_imports %}
+            <div class="import-item">
+                <div>
+                    <span class="game-number">Game {{ import[0] }}</span>
+                    <span style="color: #6c757d; margin-left: 10px;">{{ import[1] }} players, {{ import[3] }} validated</span>
+                </div>
+                <div style="color: #28a745; font-weight: 500;">
+                    {% if import[3] > 0 %}✅ Validated{% else %}⏳ Needs Validation{% endif %}
+                </div>
+            </div>
+            {% endfor %}
+        </div>
+        {% endif %}
+
+        <div class="upload-section">
+            <form id="uploadForm" enctype="multipart/form-data">
+                <div class="form-group">
+                    <label for="csvFile">Fantrax CSV Export File:</label>
+                    <input type="file" id="csvFile" name="file" accept=".csv" required>
+                    <small style="color: #6c757d;">Select the CSV file downloaded from Fantrax with game scores</small>
+                </div>
+
+                <div class="form-group">
+                    <label for="gameNumber">Game Number:</label>
+                    <input type="number" id="gameNumber" name="game_number" value="{{ next_game }}" min="1" max="38" required>
+                    <small style="color: #6c757d;">The gameweek number for this import (auto-detected: Game {{ next_game }})</small>
+                </div>
+
+                <button type="submit" class="upload-btn">
+                    📤 Import Game {{ next_game }} Scores
+                </button>
+
+                <button type="button" class="validate-btn" id="validateBtn" style="display: none;">
+                    🔍 Run Validation
+                </button>
+            </form>
+        </div>
+
+        <div class="loading" id="loading">
+            <div class="loading-spinner"></div>
+            <div>Processing import...</div>
+        </div>
+
+        <div class="result" id="result"></div>
+    </div>
+
+    <script>
+        document.getElementById('uploadForm').addEventListener('submit', async function(e) {
+            e.preventDefault();
+
+            const formData = new FormData(this);
+            const uploadBtn = document.querySelector('.upload-btn');
+            const validateBtn = document.getElementById('validateBtn');
+            const loading = document.getElementById('loading');
+            const result = document.getElementById('result');
+
+            // Show loading state
+            uploadBtn.disabled = true;
+            uploadBtn.textContent = 'Importing...';
+            loading.style.display = 'block';
+            result.style.display = 'none';
+            validateBtn.style.display = 'none';
+
+            try {
+                const response = await fetch('/api/import-game-scores', {
+                    method: 'POST',
+                    body: formData
+                });
+
+                const data = await response.json();
+
+                // Hide loading
+                loading.style.display = 'none';
+
+                if (data.success) {
+                    result.className = 'result success';
+                    result.innerHTML = `
+                        <h3>✅ Import Successful!</h3>
+                        <p>${data.message}</p>
+
+                        <div class="stats-grid">
+                            <div class="stat-item">
+                                <div class="stat-number">${data.imported_count}</div>
+                                <div class="stat-label">Players Imported</div>
+                            </div>
+                            <div class="stat-item">
+                                <div class="stat-number">${data.error_count || 0}</div>
+                                <div class="stat-label">Errors</div>
+                            </div>
+                            <div class="stat-item">
+                                <div class="stat-number">Game ${data.game_number}</div>
+                                <div class="stat-label">Game Number</div>
+                            </div>
+                        </div>
+
+                        <div style="margin-top: 20px; padding: 15px; background: #fff3cd; border-radius: 6px;">
+                            <strong>🔍 Next Step: Run Validation</strong>
+                            <p style="margin: 5px 0 0 0;">Use Understat data to identify which players actually played vs those who were benched. This ensures accurate Form calculations.</p>
+                        </div>
+
+                        ${data.errors && data.errors.length > 0 ? `
+                            <div style="margin-top: 15px; padding: 15px; background: #f8d7da; border-radius: 6px;">
+                                <strong>⚠️ Errors (${data.error_count}):</strong><br>
+                                ${data.errors.slice(0, 5).join('<br>')}
+                                ${data.error_count > 5 ? `<br><em>... and ${data.error_count - 5} more</em>` : ''}
+                            </div>
+                        ` : ''}
+                    `;
+
+                    // Show validation button after successful import
+                    validateBtn.style.display = 'inline-block';
+                    validateBtn.onclick = function() {
+                        window.open('/import-validation', '_blank');
+                    };
+
+                } else {
+                    result.className = 'result error';
+                    result.innerHTML = `
+                        <h3>❌ Import Failed</h3>
+                        <p><strong>Error:</strong> ${data.error}</p>
+                    `;
+                }
+
+                result.style.display = 'block';
+
+            } catch (error) {
+                loading.style.display = 'none';
+                result.className = 'result error';
+                result.innerHTML = `
+                    <h3>❌ Import Failed</h3>
+                    <p><strong>Network Error:</strong> ${error.message}</p>
+                `;
+                result.style.display = 'block';
+            } finally {
+                // Reset button
+                uploadBtn.disabled = false;
+                const gameNum = document.getElementById('gameNumber').value;
+                uploadBtn.textContent = `📤 Import Game ${gameNum} Scores`;
+            }
+        });
+
+        // Update button text when game number changes
+        document.getElementById('gameNumber').addEventListener('input', function(e) {
+            const gameNum = e.target.value;
+            const uploadBtn = document.querySelector('.upload-btn');
+            uploadBtn.textContent = `📤 Import Game ${gameNum} Scores`;
+        });
+
+        // File input validation
+        document.getElementById('csvFile').addEventListener('change', function(e) {
+            const file = e.target.files[0];
+            if (file && !file.name.toLowerCase().endsWith('.csv')) {
+                alert('Please select a CSV file');
+                this.value = '';
+            }
+        });
+    </script>
+</body>
+</html>

@@ -89,7 +89,7 @@ echo "File size: $(du -h railway_sync_$(date +%Y%m%d).sql | cut -f1)"
 #### Step 2: Import to Railway
 ```bash
 # Set environment variable
-export DATABASE_URL="postgresql://postgres:bwSnKgVZWqlCPtpYqzYAvGypxObPadTM@centerbeam.proxy.rlwy.net:16207/railway"
+export DATABASE_URL="postgresql://postgres:YOUR_RAILWAY_PASSWORD@centerbeam.proxy.rlwy.net:16207/railway"
 
 # Import database (use today's export file)
 psql $DATABASE_URL < railway_sync_$(date +%Y%m%d).sql

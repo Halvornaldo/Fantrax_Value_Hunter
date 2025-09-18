@@ -253,44 +253,45 @@ class FormulaEngineV2:
     
     def _get_recent_points_from_db(self, player_id: str, limit: int = 5) -> List[float]:
         """
-        Fetch recent points from player_form table for EWMA calculation
+        Fetch recent points from player_game_scores table for EWMA calculation
+        Only includes games where player actually played (did_play = true)
         Returns points in chronological order (most recent first)
         """
         if not player_id:
             return []
-            
+
         try:
             import psycopg2
             import psycopg2.extras
-            
+
             conn = psycopg2.connect(**self.db_config)
             cursor = conn.cursor(cursor_factory=psycopg2.extras.RealDictCursor)
-            
-            # Get last N gameweeks of form data, ordered by gameweek DESC (most recent first)
+
+            # Get last N games where player actually played, ordered by game_number DESC (most recent first)
             cursor.execute("""
-                SELECT points 
-                FROM player_form 
-                WHERE player_id = %s 
-                ORDER BY gameweek DESC 
+                SELECT points_scored
+                FROM player_game_scores
+                WHERE player_id = %s AND did_play = true
+                ORDER BY game_number DESC
                 LIMIT %s
             """, [player_id, limit])
-            
+
             results = cursor.fetchall()
             cursor.close()
             conn.close()
-            
+
             # Convert to list of floats
             recent_points = []
             for row in results:
                 try:
-                    points = float(row['points'] or 0.0)
+                    points = float(row['points_scored'] or 0.0)
                     recent_points.append(points)
                 except (ValueError, TypeError):
                     continue
-            
+
             logger.debug(f"Found {len(recent_points)} recent games for player {player_id}: {recent_points}")
             return recent_points
-            
+
         except Exception as e:
             logger.warning(f"Error fetching recent points for player {player_id}: {e}")
             return []

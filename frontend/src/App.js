@@ -1,7 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { ThemeProvider, createTheme } from '@mui/material/styles';
 import { CssBaseline, Box, IconButton, Toolbar, AppBar, Button, Menu, MenuItem, Divider } from '@mui/material';
-import { Brightness4, Brightness7, Upload, CloudSync, Archive } from '@mui/icons-material';
+import { Brightness4, Brightness7, Upload, CloudSync, Archive, SportsEsports } from '@mui/icons-material';
 import Banner from './components/Banner';
 import Dashboard from './components/Dashboard';
 import './App.css';
@@ -110,14 +110,8 @@ const App = () => {
     handleUploadMenuClose();
   };
 
-  const handleRunValidation = async () => {
-    try {
-      const response = await fetch('/api/run-validation', { method: 'POST' });
-      const result = await response.json();
-      alert(result.message || 'Validation completed');
-    } catch (error) {
-      alert('Validation failed: ' + error.message);
-    }
+  const handleRunValidation = () => {
+    window.open('http://localhost:5001/api/validation-dashboard', '_blank');
     handleUploadMenuClose();
   };
 
@@ -189,14 +183,21 @@ const App = () => {
                 <CloudSync sx={{ mr: 1 }} />
                 Sync Understat
               </MenuItem>
-              <MenuItem 
+              <MenuItem
                 onClick={() => { window.open('http://localhost:5001/form-upload', '_blank'); handleUploadMenuClose(); }}
                 sx={{ color: darkMode ? '#ffffff' : '#333333' }}
               >
                 <Upload sx={{ mr: 1 }} />
                 Upload Form Data
               </MenuItem>
-              <MenuItem 
+              <MenuItem
+                onClick={() => { window.open('http://localhost:5001/import-games', '_blank'); handleUploadMenuClose(); }}
+                sx={{ color: darkMode ? '#ffffff' : '#333333' }}
+              >
+                <SportsEsports sx={{ mr: 1 }} />
+                Import Game Scores
+              </MenuItem>
+              <MenuItem
                 onClick={() => { window.open('http://localhost:5001/import-validation', '_blank'); handleUploadMenuClose(); }}
                 sx={{ color: darkMode ? '#ffffff' : '#333333' }}
               >

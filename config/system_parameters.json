@@ -6,9 +6,9 @@
   },
   "xgi_integration": {
     "enabled": true,
-    "last_sync": 1758136757.0966952,
-    "matched_players": 402,
-    "unmatched_players": 2,
+    "last_sync": 1758213603.4143474,
+    "matched_players": 404,
+    "unmatched_players": 0,
     "description": "xGI integration toggle and statistics"
   },
   "starter_prediction": {
@@ -31,11 +31,11 @@
     },
     "exponential_form": {
       "enabled": true,
-      "alpha": 0.87
+      "alpha": 0.65
     },
     "dynamic_blending": {
       "enabled": true,
-      "full_adaptation_gw": 13,
+      "full_adaptation_gw": 12,
       "transition_period": 12,
       "description": "MAX(games_ratio, transition_ratio) blending formula - transition_period controls pace of adaptation"
     },
@@ -102,7 +102,7 @@
       "global": 3
     },
     "ewma_form": {
-      "alpha": 0.87
+      "alpha": 0.65
     }
   },
   "candidate_pools": {

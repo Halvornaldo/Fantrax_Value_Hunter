@@ -14,9 +14,7 @@ import {
   Tooltip,
   ToggleButton,
   ToggleButtonGroup,
-  Paper,
-  Checkbox,
-  FormControlLabel
+  Paper
 } from '@mui/material';
 import { DataGrid } from '@mui/x-data-grid';
 import {
@@ -25,9 +23,7 @@ import {
   FilterList,
   Search,
   SportsFootball,
-  TrendingUp,
-  Add,
-  Remove
+  TrendingUp
 } from '@mui/icons-material';
 import { useTheme } from '@mui/material/styles';
 import { Tooltip as ReactTooltip } from 'react-tooltip';
@@ -44,14 +40,11 @@ const PlayerTable = ({ playersData, gameweekInfo, onDataRefresh }) => {
   const [priceMax, setPriceMax] = useState(30.0);
   const [teamFilter, setTeamFilter] = useState('All');
   const [searchTerm, setSearchTerm] = useState('');
-  const [historicalDataFilter, setHistoricalDataFilter] = useState('All');
-  const [minutesFilterEnabled, setMinutesFilterEnabled] = useState(false);
-  const [minutesThreshold, setMinutesThreshold] = useState(180);
 
   // Table states
   const [sortModel, setSortModel] = useState([{ field: 'true_value', sort: 'desc' }]);
   const [pageSize, setPageSize] = useState(100);
-
+  
   // Starter override states
   const [processingOverride, setProcessingOverride] = useState(null);
 
@@ -60,11 +53,6 @@ const PlayerTable = ({ playersData, gameweekInfo, onDataRefresh }) => {
     const uniqueTeams = [...new Set(playersData.map(p => p.team))].sort();
     return ['All', ...uniqueTeams];
   }, [playersData]);
-
-  // Helper function to adjust minutes threshold
-  const adjustMinutesThreshold = (increment) => {
-    setMinutesThreshold(prev => Math.max(0, prev + (increment ? 45 : -45)));
-  };
 
   // Gradient color functions
   const getTrueValueColor = (value) => {
@@ -105,9 +93,9 @@ const PlayerTable = ({ playersData, gameweekInfo, onDataRefresh }) => {
   // Individual tier functions for xG90 and xA90
   const getXG90Tier = (position, xg90) => {
     if (!xg90 || xg90 === 0) return 'Poor';
-
+    
     const pos = position?.toUpperCase();
-
+    
     // Attackers/Forwards (F)
     if (pos === 'F') {
       if (xg90 >= 0.60) return 'Elite';
@@ -116,7 +104,7 @@ const PlayerTable = ({ playersData, gameweekInfo, onDataRefresh }) => {
       if (xg90 >= 0.15) return 'Below Average';
       return 'Poor';
     }
-
+    
     // Midfielders (M)
     if (pos === 'M') {
       if (xg90 >= 0.30) return 'Elite';
@@ -125,7 +113,7 @@ const PlayerTable = ({ playersData, gameweekInfo, onDataRefresh }) => {
       if (xg90 >= 0.05) return 'Below Average';
       return 'Poor';
     }
-
+    
     // Defenders (D)
     if (pos === 'D') {
       if (xg90 >= 0.15) return 'Elite';
@@ -134,15 +122,15 @@ const PlayerTable = ({ playersData, gameweekInfo, onDataRefresh }) => {
       if (xg90 >= 0.02) return 'Below Average';
       return 'Poor';
     }
-
+    
     return 'Poor';
   };
 
   const getXA90Tier = (position, xa90) => {
     if (!xa90 || xa90 === 0) return 'Poor';
-
+    
     const pos = position?.toUpperCase();
-
+    
     // Attackers/Forwards (F)
     if (pos === 'F') {
       if (xa90 >= 0.25) return 'Elite';
@@ -151,7 +139,7 @@ const PlayerTable = ({ playersData, gameweekInfo, onDataRefresh }) => {
       if (xa90 >= 0.07) return 'Below Average';
       return 'Poor';
     }
-
+    
     // Midfielders (M)
     if (pos === 'M') {
       if (xa90 >= 0.20) return 'Elite';
@@ -160,7 +148,7 @@ const PlayerTable = ({ playersData, gameweekInfo, onDataRefresh }) => {
       if (xa90 >= 0.05) return 'Below Average';
       return 'Poor';
     }
-
+    
     // Defenders (D)
     if (pos === 'D') {
       if (xa90 >= 0.12) return 'Elite';
@@ -169,7 +157,7 @@ const PlayerTable = ({ playersData, gameweekInfo, onDataRefresh }) => {
       if (xa90 >= 0.02) return 'Below Average';
       return 'Poor';
     }
-
+    
     return 'Poor';
   };
 
@@ -177,7 +165,7 @@ const PlayerTable = ({ playersData, gameweekInfo, onDataRefresh }) => {
   const getPerformanceTierColor = (tier) => {
     switch (tier) {
       case 'Elite': return '#00cc66';        // Deep green
-      case 'Good': return '#28a745';         // Green
+      case 'Good': return '#28a745';         // Green  
       case 'Above Average': return '#a4c639'; // Yellow-green
       case 'Below Average': return '#ffc107'; // Yellow
       case 'Poor': return '#dc3545';         // Red
@@ -188,9 +176,9 @@ const PlayerTable = ({ playersData, gameweekInfo, onDataRefresh }) => {
   // Position-aware xGI90 tier calculation
   const getXGI90Tier = (position, xgi90) => {
     if (!xgi90 || xgi90 === 0) return 'Poor';
-
+    
     const pos = position?.toUpperCase();
-
+    
     // Attackers/Forwards (F)
     if (pos === 'F') {
       if (xgi90 >= 0.80) return 'Elite';
@@ -199,7 +187,7 @@ const PlayerTable = ({ playersData, gameweekInfo, onDataRefresh }) => {
       if (xgi90 >= 0.20) return 'Below Average';
       return 'Poor';
     }
-
+    
     // Midfielders (M)
     if (pos === 'M') {
       if (xgi90 >= 0.45) return 'Elite';
@@ -208,7 +196,7 @@ const PlayerTable = ({ playersData, gameweekInfo, onDataRefresh }) => {
       if (xgi90 >= 0.10) return 'Below Average';
       return 'Poor';
     }
-
+    
     // Defenders (D)
     if (pos === 'D') {
       if (xgi90 >= 0.25) return 'Elite';
@@ -217,7 +205,7 @@ const PlayerTable = ({ playersData, gameweekInfo, onDataRefresh }) => {
       if (xgi90 >= 0.05) return 'Below Average';
       return 'Poor';
     }
-
+    
     return 'Poor';
   };
 
@@ -229,8 +217,8 @@ const PlayerTable = ({ playersData, gameweekInfo, onDataRefresh }) => {
       position: { title: 'Position', description: 'Primary playing position: G (Goalkeeper), D (Defender), M (Midfielder), F (Forward)' },
       price: { title: 'Price', description: 'Current fantasy price in millions (£)', formula: 'Set by Fantrax based on demand' },
       ppg: { title: 'Points Per Game', description: 'Average fantasy points per game played', formula: 'Total Points ÷ Games Played' },
-      games: {
-        title: 'Games Data',
+      games: { 
+        title: 'Games Data', 
         description: 'Total games used for analysis',
         interpretation: 'Green (≥10): Reliable • Yellow (5-9): Moderate • Red (<5): Limited data'
       },
@@ -278,9 +266,9 @@ const PlayerTable = ({ playersData, gameweekInfo, onDataRefresh }) => {
   const handleStarterOverride = async (playerId, overrideType) => {
     try {
       setProcessingOverride(playerId);
-
+      
       const response = await applyStarterOverride(playerId, overrideType);
-
+      
       if (response.success) {
         // Refresh data to show updated values
         if (onDataRefresh) {
@@ -327,7 +315,7 @@ const PlayerTable = ({ playersData, gameweekInfo, onDataRefresh }) => {
     const value = params.value;
     const position = params.row.position;
     const xg90 = params.row.xg90 || 0;
-
+    
     const tier = getXG90Tier(position, xg90);
     const color = getPerformanceTierColor(tier);
     const displayValue = typeof value === 'number' ? value.toFixed(3) : (value || '--');
@@ -356,7 +344,7 @@ const PlayerTable = ({ playersData, gameweekInfo, onDataRefresh }) => {
     const value = params.value;
     const position = params.row.position;
     const xa90 = params.row.xa90 || 0;
-
+    
     const tier = getXA90Tier(position, xa90);
     const color = getPerformanceTierColor(tier);
     const displayValue = typeof value === 'number' ? value.toFixed(3) : (value || '--');
@@ -385,7 +373,7 @@ const PlayerTable = ({ playersData, gameweekInfo, onDataRefresh }) => {
     const value = params.value;
     const position = params.row.position;
     const xgi90 = params.row.xgi90 || 0;
-
+    
     const tier = getXGI90Tier(position, xgi90);
     const color = getPerformanceTierColor(tier);
     const displayValue = typeof value === 'number' ? value.toFixed(3) : (value || '--');
@@ -549,16 +537,16 @@ const PlayerTable = ({ playersData, gameweekInfo, onDataRefresh }) => {
         const value = parseFloat(params.value);
         const weight = parseFloat(params.row.current_season_weight || 0);
         const isReliable = weight > 0.5; // More than 50% current season data
-
-        const cellColor = isReliable ? '#dc3545' : weight > 0.2 ? '#28a745' : '#6c757d';
-        const bgColor = isReliable ? 'rgba(220, 53, 69, 0.1)' : weight > 0.2 ? 'rgba(40, 167, 69, 0.1)' : 'rgba(108, 117, 125, 0.1)';
-
+        
+        const cellColor = isReliable ? '#28a745' : weight > 0.2 ? '#ffc107' : '#dc3545';
+        const bgColor = isReliable ? 'rgba(40, 167, 69, 0.1)' : weight > 0.2 ? 'rgba(255, 193, 7, 0.1)' : 'rgba(220, 53, 69, 0.1)';
+        
         return (
-          <Box sx={{
-            color: cellColor,
-            backgroundColor: bgColor,
-            padding: '4px 8px',
-            borderRadius: 1,
+          <Box sx={{ 
+            color: cellColor, 
+            backgroundColor: bgColor, 
+            padding: '4px 8px', 
+            borderRadius: 1, 
             fontWeight: 500,
             display: 'flex',
             alignItems: 'center',
@@ -587,10 +575,10 @@ const PlayerTable = ({ playersData, gameweekInfo, onDataRefresh }) => {
       renderCell: (params) => {
         const historical = params.row.games_played_historical || 0;
         const color = historical >= 10 ? '#28a745' : historical >= 5 ? '#ffc107' : '#dc3545';
-
+        
         return (
-          <Typography
-            variant="body2"
+          <Typography 
+            variant="body2" 
             fontWeight={600}
             sx={{ color, textAlign: 'center' }}
           >
@@ -614,10 +602,10 @@ const PlayerTable = ({ playersData, gameweekInfo, onDataRefresh }) => {
       renderCell: (params) => {
         const current = params.row.games_played || 0;
         const color = current >= 5 ? '#28a745' : current >= 2 ? '#ffc107' : current === 0 ? '#dc3545' : '#ff9800';
-
+        
         return (
-          <Typography
-            variant="body2"
+          <Typography 
+            variant="body2" 
             fontWeight={600}
             sx={{ color, textAlign: 'center' }}
           >
@@ -632,10 +620,10 @@ const PlayerTable = ({ playersData, gameweekInfo, onDataRefresh }) => {
       width: 110,
       type: 'number',
       renderHeader: (params) => (
-        <Box
-          sx={{
-            display: 'flex',
-            alignItems: 'center',
+        <Box 
+          sx={{ 
+            display: 'flex', 
+            alignItems: 'center', 
             gap: 1,
             background: 'linear-gradient(135deg, #28a745, #20c997)',
             color: 'white',
@@ -660,10 +648,10 @@ const PlayerTable = ({ playersData, gameweekInfo, onDataRefresh }) => {
       width: 100,
       type: 'number',
       renderHeader: (params) => (
-        <Box
-          sx={{
-            display: 'flex',
-            alignItems: 'center',
+        <Box 
+          sx={{ 
+            display: 'flex', 
+            alignItems: 'center', 
             gap: 1,
             background: 'linear-gradient(135deg, #17a2b8, #138496)',
             color: 'white',
@@ -733,12 +721,12 @@ const PlayerTable = ({ playersData, gameweekInfo, onDataRefresh }) => {
     {
       field: 'starter_override',
       headerName: 'Override',
-      width: 180,
+      width: 120,
       sortable: false,
       renderHeader: (params) => (
         <Box sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
           <Typography variant="subtitle2" fontWeight={600}>Override</Typography>
-          <Tooltip title="Manual starter override controls: S=Starter (1.0x), L=Likely (0.90x), R=Rotation (0.75x), U=Unlikely (0.50x), B=Bench (0.35x), O=Out (0.0x), A=Auto">
+          <Tooltip title="Manual starter override controls: S=Starter (1.0x), R=Rotation Risk (0.75x), B=Bench (0.6x), O=Out (0.0x), A=Auto">
             <Info fontSize="small" sx={{ opacity: 0.7, cursor: 'help' }} />
           </Tooltip>
         </Box>
@@ -747,83 +735,46 @@ const PlayerTable = ({ playersData, gameweekInfo, onDataRefresh }) => {
         const playerId = params.row.id;
         const currentOverride = params.row.starter_override || 'auto';
         const isLoading = processingOverride === playerId;
-
+        
         const overrideOptions = [
           { value: 'starter', label: 'S', title: 'Definite Starter (1.0x)', color: '#28a745' },
           { value: 'likely', label: 'L', title: 'Likely Starter (0.90x)', color: '#20c997' },
           { value: 'rotation', label: 'R', title: 'Rotation Risk (0.75x)', color: '#ff9800' },
           { value: 'unlikely', label: 'U', title: 'Unlikely Starter (0.50x)', color: '#fd7e14' },
           { value: 'bench', label: 'B', title: 'Bench (0.35x)', color: '#ffc107' },
-          { value: 'out', label: 'O', title: 'Out (0.0x)', color: '#dc3545' }
+          { value: 'out', label: 'O', title: 'Out (0.0x)', color: '#dc3545' },
+          { value: 'auto', label: 'A', title: 'Auto (CSV)', color: '#6c757d' }
         ];
 
-        const autoOption = { value: 'auto', label: 'A', title: 'Auto (CSV)', color: '#6c757d' };
-
         return (
-          <Box sx={{ display: 'flex', gap: 0.25, alignItems: 'center' }}>
-            {/* 2x3 Grid for S/L/R/U/B/O */}
-            <Box sx={{
-              display: 'grid',
-              gridTemplateColumns: 'repeat(3, 16px)',
-              gridTemplateRows: 'repeat(2, 16px)',
-              gap: 0.25,
-              mr: 0.25
-            }}>
-              {overrideOptions.map(option => (
-                <Button
-                  key={option.value}
-                  size="small"
-                  variant={currentOverride === option.value ? 'contained' : 'outlined'}
-                  disabled={isLoading}
-                  onClick={() => handleStarterOverride(playerId, option.value)}
-                  sx={{
-                    minWidth: '16px',
-                    width: '16px',
-                    height: '16px',
-                    fontSize: '0.55rem',
-                    fontWeight: 600,
-                    p: 0,
-                    borderColor: option.color,
-                    color: currentOverride === option.value ? 'white' : option.color,
-                    bgcolor: currentOverride === option.value ? option.color : 'transparent',
-                    '&:hover': {
-                      bgcolor: option.color,
-                      color: 'white',
-                    },
-                  }}
-                  title={option.title}
-                >
-                  {option.label}
-                </Button>
-              ))}
-            </Box>
-
-            {/* Auto button behind the grid */}
-            <Button
-              key={autoOption.value}
-              size="small"
-              variant={currentOverride === autoOption.value ? 'contained' : 'outlined'}
-              disabled={isLoading}
-              onClick={() => handleStarterOverride(playerId, autoOption.value)}
-              sx={{
-                minWidth: '28px',
-                width: '28px',
-                height: '28px',
-                fontSize: '0.7rem',
-                fontWeight: 600,
-                p: 0,
-                borderColor: autoOption.color,
-                color: currentOverride === autoOption.value ? 'white' : autoOption.color,
-                bgcolor: currentOverride === autoOption.value ? autoOption.color : 'transparent',
-                '&:hover': {
-                  bgcolor: autoOption.color,
-                  color: 'white',
-                },
-              }}
-              title={autoOption.title}
-            >
-              {autoOption.label}
-            </Button>
+          <Box sx={{ display: 'flex', gap: 0.5 }}>
+            {overrideOptions.map(option => (
+              <Button
+                key={option.value}
+                size="small"
+                variant={currentOverride === option.value ? 'contained' : 'outlined'}
+                disabled={isLoading}
+                onClick={() => handleStarterOverride(playerId, option.value)}
+                sx={{
+                  minWidth: '24px',
+                  width: '24px',
+                  height: '24px',
+                  fontSize: '0.7rem',
+                  fontWeight: 600,
+                  p: 0,
+                  borderColor: option.color,
+                  color: currentOverride === option.value ? 'white' : option.color,
+                  bgcolor: currentOverride === option.value ? option.color : 'transparent',
+                  '&:hover': {
+                    bgcolor: option.color,
+                    color: 'white',
+                  },
+                }}
+                title={option.title}
+              >
+                {option.label}
+              </Button>
+            ))}
           </Box>
         );
       },
@@ -913,32 +864,19 @@ const PlayerTable = ({ playersData, gameweekInfo, onDataRefresh }) => {
         const playerPositions = player.position ? player.position.split(',').map(p => p.trim()) : [];
         if (!playerPositions.includes(positionFilter)) return false;
       }
-
+      
       // Price filter
       if (player.price < priceMin || player.price > priceMax) return false;
-
+      
       // Team filter
       if (teamFilter !== 'All' && player.team !== teamFilter) return false;
-
+      
       // Search filter
       if (searchTerm && !player.name.toLowerCase().includes(searchTerm.toLowerCase())) return false;
-
-      // Historical data filter
-      if (historicalDataFilter !== 'All') {
-        const hasHistorical = (player.games_played_historical || 0) > 0;
-        if (historicalDataFilter === 'Has Historical' && !hasHistorical) return false;
-        if (historicalDataFilter === 'No Historical' && hasHistorical) return false;
-      }
-
-      // Minutes filter
-      if (minutesFilterEnabled) {
-        const minutes = player.minutes || 0;
-        if (minutes < minutesThreshold) return false;
-      }
-
+      
       return true;
     });
-  }, [playersData, positionFilter, priceMin, priceMax, teamFilter, searchTerm, historicalDataFilter, minutesFilterEnabled, minutesThreshold]);
+  }, [playersData, positionFilter, priceMin, priceMax, teamFilter, searchTerm]);
 
   // Export CSV handler
   const handleExportCSV = async () => {
@@ -959,7 +897,7 @@ const PlayerTable = ({ playersData, gameweekInfo, onDataRefresh }) => {
   return (
     <Box>
       {/* Header */}
-      <Box sx={{
+      <Box sx={{ 
         background: 'linear-gradient(135deg, #2c3e50 0%, #34495e 100%)',
         color: 'white',
         p: 2,
@@ -973,7 +911,7 @@ const PlayerTable = ({ playersData, gameweekInfo, onDataRefresh }) => {
             All {filteredData.length} Premier League Players
           </Typography>
           {gameweekInfo && (
-            <Chip
+            <Chip 
               label={`Gameweek ${gameweekInfo.current_gameweek}`}
               icon={<TrendingUp />}
               sx={{ bgcolor: 'rgba(0,255,136,0.9)', color: 'black', fontWeight: 600 }}
@@ -1045,64 +983,6 @@ const PlayerTable = ({ playersData, gameweekInfo, onDataRefresh }) => {
                 ))}
               </Select>
             </FormControl>
-          </Grid>
-
-          {/* Historical Data Filter */}
-          <Grid item>
-            <FormControl size="small" sx={{ minWidth: 150 }}>
-              <InputLabel>Historical Data</InputLabel>
-              <Select
-                value={historicalDataFilter}
-                label="Historical Data"
-                onChange={(e) => setHistoricalDataFilter(e.target.value)}
-              >
-                <MenuItem value="All">All</MenuItem>
-                <MenuItem value="Has Historical">Has Historical</MenuItem>
-                <MenuItem value="No Historical">No Historical</MenuItem>
-              </Select>
-            </FormControl>
-          </Grid>
-
-          {/* Minutes Filter */}
-          <Grid item>
-            <FormControlLabel
-              control={
-                <Checkbox
-                  checked={minutesFilterEnabled}
-                  onChange={(e) => setMinutesFilterEnabled(e.target.checked)}
-                  size="small"
-                />
-              }
-              label="Min Minutes"
-            />
-          </Grid>
-          <Grid item>
-            <Box sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
-              <IconButton
-                size="small"
-                onClick={() => adjustMinutesThreshold(false)}
-                disabled={!minutesFilterEnabled}
-                sx={{ bgcolor: isDark ? 'rgba(255,255,255,0.1)' : 'rgba(0,0,0,0.1)' }}
-              >
-                <Remove fontSize="small" />
-              </IconButton>
-              <TextField
-                type="number"
-                value={minutesThreshold}
-                onChange={(e) => setMinutesThreshold(parseInt(e.target.value) || 180)}
-                size="small"
-                disabled={!minutesFilterEnabled}
-                sx={{ width: 80 }}
-              />
-              <IconButton
-                size="small"
-                onClick={() => adjustMinutesThreshold(true)}
-                disabled={!minutesFilterEnabled}
-                sx={{ bgcolor: isDark ? 'rgba(255,255,255,0.1)' : 'rgba(0,0,0,0.1)' }}
-              >
-                <Add fontSize="small" />
-              </IconButton>
-            </Box>
           </Grid>
 
           {/* Search */}

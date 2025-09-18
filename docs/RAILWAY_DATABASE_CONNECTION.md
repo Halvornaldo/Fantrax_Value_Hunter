@@ -4,7 +4,7 @@
 
 ### Database URL
 ```
-postgresql://postgres:bwSnKgVZWqlCPtpYqzYAvGypxObPadTM@centerbeam.proxy.rlwy.net:16207/railway
+postgresql://postgres:YOUR_RAILWAY_PASSWORD@centerbeam.proxy.rlwy.net:16207/railway
 ```
 
 ### Connection Parameters
@@ -12,7 +12,7 @@ postgresql://postgres:bwSnKgVZWqlCPtpYqzYAvGypxObPadTM@centerbeam.proxy.rlwy.net
 - **Port**: `16207`
 - **Database**: `railway`
 - **User**: `postgres`
-- **Password**: `bwSnKgVZWqlCPtpYqzYAvGypxObPadTM`
+- **Password**: `YOUR_RAILWAY_PASSWORD`
 - **SSL Mode**: `prefer` or `require`
 
 ## Railway Configuration Requirements
@@ -31,10 +31,10 @@ Required variables in Railway:
 
 ```bash
 # Primary database URL (already set)
-DATABASE_URL=postgresql://postgres:bwSnKgVZWqlCPtpYqzYAvGypxObPadTM@centerbeam.proxy.rlwy.net:16207/railway
+DATABASE_URL=postgresql://postgres:YOUR_RAILWAY_PASSWORD@centerbeam.proxy.rlwy.net:16207/railway
 
 # Public URL for Railway UI (must be added)
-DATABASE_PUBLIC_URL=postgresql://postgres:bwSnKgVZWqlCPtpYqzYAvGypxObPadTM@centerbeam.proxy.rlwy.net:16207/railway
+DATABASE_PUBLIC_URL=postgresql://postgres:YOUR_RAILWAY_PASSWORD@centerbeam.proxy.rlwy.net:16207/railway
 
 # Flask configuration
 PORT=8080
@@ -47,7 +47,7 @@ FLASK_DEBUG=false
 ### From Local Machine
 ```bash
 # Test connection (will timeout from local - this is normal)
-psql "postgresql://postgres:bwSnKgVZWqlCPtpYqzYAvGypxObPadTM@centerbeam.proxy.rlwy.net:16207/railway"
+psql "postgresql://postgres:YOUR_RAILWAY_PASSWORD@centerbeam.proxy.rlwy.net:16207/railway"
 ```
 
 Note: The Railway database is only accessible from within Railway's network, not from external locations.
@@ -114,7 +114,7 @@ pg_dump fantrax_value_hunter --data-only > data_only.sql
 ### Import to Railway
 ```bash
 # Set environment variable
-export DATABASE_URL="postgresql://postgres:bwSnKgVZWqlCPtpYqzYAvGypxObPadTM@centerbeam.proxy.rlwy.net:16207/railway"
+export DATABASE_URL="postgresql://postgres:YOUR_RAILWAY_PASSWORD@centerbeam.proxy.rlwy.net:16207/railway"
 
 # Import full database
 psql $DATABASE_URL < database.sql
