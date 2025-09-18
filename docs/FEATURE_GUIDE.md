@@ -40,7 +40,7 @@ The V2.0 Enhanced system includes a comprehensive trend analysis system that cap
 
 1. **Fantrax Upload**: Captures player prices, FPts, team assignments
 2. **Understat Sync**: Captures xG/xA stats and minutes played  
-3. **FFS Lineup Import**: Captures starting predictions and rotation risk
+3. **FFP Lineup Import**: Captures starting predictions and confidence-based multipliers
 4. **Odds CSV Import**: Captures fixture difficulty and home/away status
 5. **Form Processing**: Captures weekly points and games played
 
@@ -378,26 +378,36 @@ Erling Haaland Override: B → S
 - **Form Updates**: EWMA recalculation with new game data
 - **Validation Feedback**: Real-time import statistics and quality metrics
 
-### **FFP Lineup Import** ✅ *Enhanced 2025-08-28*
+### **FFP Lineup Import** ✅ *Working September 2025*
+
+**🚨 IMPORTANT PATH**: Only use the dashboard football icon button for FFP imports:
+- ✅ **WORKING**: Main dashboard → Football icon button → "Import lineup CSV" (hover text)
+- ❌ **NOT WORKING**: Top menu "Upload & Sync" → "Import Lineup CSV"
 
 **V2.0 Enhanced Process**:
-1. Click **⚽ soccer ball icon** in Parameter Panel (not main menu "Import Lineup CSV")
+1. Click **⚽ football icon** on main dashboard (with hover text "Import lineup CSV")
 2. Upload Fantasy Football Pundit CSV file
 3. **Enhanced Name Matching**:
-   - UnifiedNameMatcher with 99% success rate architecture
+   - UnifiedNameMatcher with source system consistency ('ffp')
    - FFP team names automatically converted to database codes
-   - Confidence-based starter multiplier assignment
+   - Confidence-based starter multiplier assignment using frontend parameters
 4. **Validation Workflow**:
    - Unmatched players trigger manual validation interface at `localhost:5001/import-validation`
-   - Confirmed mappings saved for future automatic matching
-   - Apply Import saves mappings, re-import CSV applies data updates
+   - Manual confirmation creates persistent database mappings
+   - Pre-validated players bypass validation on subsequent imports
+5. **Automatic Multiplier Application**:
+   - Confidence-based multipliers applied immediately after validation
+   - Uses configurable system parameters from frontend adjustment panels
+   - Triggers automatic true value recalculation
 
-**Starter Multiplier Assignment**:
-- **70%+ confidence** → Starter multiplier (~1.0)
-- **30-70% confidence** → Rotation multiplier (~0.75) 
-- **<30% confidence** → Bench multiplier (~0.35)
+**Confidence-Based Multipliers** (configurable via frontend):
+- **90-100% confidence** → 1.0x multiplier (definite starter)
+- **70-89% confidence** → likely_starter_penalty parameter (~0.90)
+- **50-69% confidence** → auto_rotation_penalty parameter (~0.75)
+- **30-49% confidence** → unlikely_starter_penalty parameter (~0.50)
+- **<30% confidence** → force_bench_penalty parameter (~0.35)
 
-**Expected Performance**: 6-15% automatic match rate is normal for FFP due to speculative transfers and fantasy lineups. Use validation workflow to confirm real current squad players.
+**Expected Performance**: Name mapping persistence ensures no repeated validations. Confidence parsing works correctly (90% CSV = 90% system = 1.0x multiplier).
 
 ### **Advanced Fixture Odds Import**
 

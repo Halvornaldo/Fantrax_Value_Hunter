@@ -56,6 +56,17 @@ python check_current_state.py
 - **FFP (Fantasy Football Pundit)**: Starter predictions (replaced FFS)
 - **OddsPortal**: Fixture difficulty via betting odds upload
 
+## FFP CSV Import (Working)
+**IMPORTANT**: Only use the dashboard import button for FFP CSV imports:
+- ✅ **Working**: Main dashboard → Football icon button → "Import lineup CSV" (hover text)
+- ❌ **Not Working**: Top menu "Upload & Sync" → "Import Lineup CSV"
+- **Process**: Upload CSV → Validate unmatched players → Apply → Multipliers applied automatically
+- **Features**:
+  - Confidence-based multipliers (90-100% → 1.0x, 70-89% → configurable, etc.)
+  - Name mapping persistence (no repeated validations)
+  - Uses system parameters from frontend adjustment panels
+  - Triggers automatic true value recalculation
+
 ## Archive Structure
 - `archive/setup_scripts/` - One-time utility scripts
 - `archive/old_docs/` - Historical documentation

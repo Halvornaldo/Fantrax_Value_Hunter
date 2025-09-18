@@ -47,26 +47,36 @@ TEAM_MAPPING = {
     "Wolverhampton Wanderers": "WOL"
 }
 
-def confidence_to_multiplier(confidence_percentage):
+def confidence_to_multiplier(confidence_percentage, starter_params=None):
     """
-    Convert confidence percentage to starter multiplier
-    
+    Convert confidence percentage to starter multiplier using system parameters
+
     Args:
         confidence_percentage (float): Confidence percentage (0-100)
-        
+        starter_params (dict): System parameters for starter multipliers
+
     Returns:
         float: Starter multiplier
     """
+    if starter_params is None:
+        # Default values if no parameters provided (backwards compatibility)
+        starter_params = {
+            'likely_starter_penalty': 0.90,
+            'auto_rotation_penalty': 0.75,
+            'unlikely_starter_penalty': 0.50,
+            'force_bench_penalty': 0.35
+        }
+
     if confidence_percentage >= 90:
         return 1.0    # Definite starter
     elif confidence_percentage >= 70:
-        return 0.9    # Likely starter
+        return starter_params.get('likely_starter_penalty', 0.90)
     elif confidence_percentage >= 50:
-        return 0.75   # Rotation risk
+        return starter_params.get('auto_rotation_penalty', 0.75)
     elif confidence_percentage >= 30:
-        return 0.50   # Unlikely starter
+        return starter_params.get('unlikely_starter_penalty', 0.50)
     else:
-        return 0.35   # Bench
+        return starter_params.get('force_bench_penalty', 0.35)
 
 def parse_confidence_percentage(confidence_str):
     """
@@ -87,13 +97,14 @@ def parse_confidence_percentage(confidence_str):
     except (ValueError, AttributeError):
         return 0.0
 
-def parse_ffp_row(row):
+def parse_ffp_row(row, starter_params=None):
     """
     Parse a single FFP CSV row into player predictions
-    
+
     Args:
         row (list): CSV row data
-        
+        starter_params (dict): System parameters for starter multipliers
+
     Returns:
         list: List of player dictionaries with name, confidence, and multiplier
     """
@@ -131,8 +142,8 @@ def parse_ffp_row(row):
         if confidence <= 0:
             continue
             
-        # Convert to multiplier
-        multiplier = confidence_to_multiplier(confidence)
+        # Convert to multiplier using system parameters
+        multiplier = confidence_to_multiplier(confidence, starter_params)
         
         players.append({
             'team': team_name,

@@ -1464,6 +1464,19 @@ def health_check():
 @app.route('/api/import-lineups', methods=['POST'])
 def import_lineups():
     """
+    FFP CSV Import - Working Implementation
+
+    IMPORTANT: Only use the main dashboard football icon button for FFP imports:
+    ✅ WORKING: Main dashboard → Football icon button → "Import lineup CSV" (hover text)
+    ❌ NOT WORKING: Top menu "Upload & Sync" → "Import Lineup CSV"
+
+    Features:
+    - Confidence-based multiplier assignment using configurable frontend parameters
+    - Name mapping persistence (no repeated validations)
+    - Automatic true value recalculation after multiplier application
+    - Source system consistency ('ffp' for Fantasy Football Pundit)
+    """
+    """
     Import starter predictions from CSV file
     Updates starter_multiplier for players based on CSV data
     """
@@ -1585,7 +1598,8 @@ def import_lineups():
             if is_ffp_formation:
                 # Process FFP format (team rows with multiple players and percentages)
                 # Pass all lines since the function will find Arsenal Predicted Lineup as starting point
-                players_to_process = parse_ffp_formation_csv(lines, cursor)
+                starter_params = params.get('starter_prediction', {})
+                players_to_process = parse_ffp_formation_csv(lines, cursor, starter_params)
             else:
                 # Process formation matrix format (FFS scraping)
                 players_to_process = parse_formation_csv(lines[1:], cursor)  # Skip header
@@ -1614,10 +1628,14 @@ def import_lineups():
                 })
                 continue
             
-            # Use UnifiedNameMatcher for improved matching  
-            # Note: Use 'ffs' for all imports since name format is identical
-            # The 'ffp' vs 'ffs' distinction is only for tracking import source
-            source_system = 'ffs'
+            # Use UnifiedNameMatcher for improved matching
+            # Determine source system based on format type
+            # FFP = Fantasy Football Pundit (current system)
+            # FFS = Fantasy Football Scout (legacy system)
+            if is_ffp_formation:
+                source_system = 'ffp'  # Fantasy Football Pundit format
+            else:
+                source_system = 'ffs'  # Legacy FFS format (if still used)
             match_result = matcher.match_player(
                 source_name=player_name,
                 source_system=source_system,
@@ -2177,10 +2195,13 @@ def apply_import():
         user_id = data.get('user_id', 'web_user')
         dry_run = data.get('dry_run', False)
         players = data.get('players', [])
-        
-        print(f"confirmed_mappings count: {len(confirmed_mappings)}")
-        print(f"players count: {len(players)}")
-        print(f"dry_run: {dry_run}")
+
+        print(f"[DEBUG] Apply import called with:")
+        print(f"  confirmed_mappings count: {len(confirmed_mappings)}")
+        print(f"  source_system: '{source_system}'")
+        print(f"  players count: {len(players)}")
+        print(f"  dry_run: {dry_run}")
+        print(f"  user_id: {user_id}")
         
         # Handle dry run case - just count confirmed mappings
         if dry_run:
@@ -2228,7 +2249,7 @@ def apply_import():
         # Count how many players would be imported
         for player in players:
             player_name = player.get('name', '')
-            
+
             # Check if this player would be successfully imported
             if player_name in confirmed_mappings:
                 import_count += 1
@@ -2242,13 +2263,88 @@ def apply_import():
                 )
                 if match_result['fantrax_id'] and not match_result['needs_review']:
                     import_count += 1
-        
+
+        # Apply starter multipliers for FFP imports
+        multipliers_applied = 0
+        print(f"[DEBUG] Source system: '{source_system}', checking for FFP multiplier application...")
+        if source_system == 'ffp':
+            print(f"[DEBUG] Starting FFP multiplier application...")
+            try:
+                # Load system parameters for starter predictions
+                cursor = get_db_connection().cursor()
+                cursor.execute("SELECT parameters FROM system_parameters WHERE id = 1")
+                params_row = cursor.fetchone()
+
+                if params_row:
+                    params = json.loads(params_row[0])
+                    starter_params = params.get('starter_prediction', {})
+
+                    # Load FFP data from temp file
+                    ffp_unmatched_path = os.path.join('temp', 'ffp_unmatched.json')
+                    if os.path.exists(ffp_unmatched_path):
+                        with open(ffp_unmatched_path, 'r', encoding='utf-8') as f:
+                            ffp_data = json.load(f)
+                            ffp_players = ffp_data.get('unmatched_players', [])
+                    else:
+                        ffp_players = players
+
+                    # Apply multipliers for successfully mapped players
+                    for player in ffp_players:
+                        player_name = player.get('name', '')
+                        confidence = player.get('confidence', 0.0)
+
+                        # Check if player has a mapping (either new or existing)
+                        fantrax_id = None
+                        if player_name in confirmed_mappings:
+                            fantrax_id = confirmed_mappings[player_name]['fantrax_id']
+                        else:
+                            match_result = matcher.match_player(
+                                source_name=player_name,
+                                source_system=source_system,
+                                team=player.get('team', ''),
+                                position=player.get('position', '')
+                            )
+                            if match_result['fantrax_id'] and not match_result['needs_review']:
+                                fantrax_id = match_result['fantrax_id']
+
+                        if fantrax_id and confidence > 0:
+                            # Calculate multiplier using system parameters
+                            from convert_ffp_csv import confidence_to_multiplier
+                            multiplier = confidence_to_multiplier(confidence, starter_params)
+
+                            # Update player_metrics with new starter multiplier
+                            cursor.execute("""
+                                UPDATE player_metrics
+                                SET starter_multiplier = %s,
+                                    last_updated = CURRENT_TIMESTAMP
+                                WHERE fantrax_id = %s
+                            """, (multiplier, fantrax_id))
+
+                            if cursor.rowcount > 0:
+                                multipliers_applied += 1
+                                print(f"Applied {multiplier:.2f}x multiplier to player {player_name} ({fantrax_id}) based on {confidence}% confidence")
+
+                    # Commit multiplier updates
+                    cursor.connection.commit()
+
+                    # Trigger true value recalculation for updated players
+                    if multipliers_applied > 0:
+                        print(f"Triggering true value recalculation for {multipliers_applied} players...")
+                        cursor.execute("SELECT trigger_true_value_calculation()")
+                        cursor.connection.commit()
+
+                cursor.close()
+
+            except Exception as e:
+                print(f"Error applying starter multipliers: {e}")
+
         return jsonify({
             'success': True,
             'import_count': import_count,
             'mappings_saved': saved_count,
+            'multipliers_applied': multipliers_applied,
             'failed_mappings': failed_mappings,
-            'message': f'Successfully imported {import_count} players with {saved_count} new mappings'
+            'message': f'Successfully imported {import_count} players with {saved_count} new mappings and {multipliers_applied} starter multipliers applied'
         })
         
     except Exception as e:
@@ -3001,6 +3097,129 @@ def import_odds():
         }), 500
 
 # ===============================
+# INDIVIDUAL GAME SCORES IMPORT
+# ===============================
+
+@app.route('/api/import-game-scores', methods=['POST'])
+def import_game_scores():
+    """
+    Import individual game scores from Fantrax CSV export
+    Expects CSV with columns: ID, Player, Team, Position, RkOv, Opponent, Salary, FPts, etc.
+    Stores individual game scores in player_game_scores table for enhanced Form calculation
+    """
+    try:
+        # Check for uploaded file
+        if 'file' not in request.files:
+            return jsonify({
+                'success': False,
+                'error': 'No file uploaded'
+            }), 400
+
+        file = request.files['file']
+        if file.filename == '':
+            return jsonify({
+                'success': False,
+                'error': 'No file selected'
+            }), 400
+
+        # Get game number from form data
+        game_number = request.form.get('game_number')
+        if not game_number:
+            return jsonify({
+                'success': False,
+                'error': 'Game number is required'
+            }), 400
+
+        try:
+            game_number = int(game_number)
+        except ValueError:
+            return jsonify({
+                'success': False,
+                'error': 'Game number must be a valid integer'
+            }), 400
+
+        # Read CSV file
+        import pandas as pd
+        import io
+
+        # Read the CSV content
+        stream = io.StringIO(file.stream.read().decode("UTF8"), newline=None)
+        csv_input = pd.read_csv(stream)
+
+        # Validate required columns
+        required_columns = ['ID', 'Player', 'FPts', 'Opponent']
+        missing_columns = [col for col in required_columns if col not in csv_input.columns]
+        if missing_columns:
+            return jsonify({
+                'success': False,
+                'error': f'Missing required columns: {missing_columns}'
+            }), 400
+
+        # Process the data
+        conn = get_db_connection()
+        cursor = conn.cursor()
+
+        imported_count = 0
+        error_count = 0
+        errors = []
+
+        # Get all existing player IDs to check against
+        cursor.execute("SELECT id FROM players")
+        existing_player_ids = set(row[0] for row in cursor.fetchall())
+
+        for index, row in csv_input.iterrows():
+            try:
+                # Extract player ID (remove asterisks from ID column)
+                player_id = str(row['ID']).strip('*')
+                player_name = row.get('Player', 'Unknown')
+                opponent = row.get('Opponent', 'Unknown')
+
+                # Skip if player not in our database
+                if player_id not in existing_player_ids:
+                    continue
+
+                # Get fantasy points
+                fpts = float(row['FPts'])
+
+                # Insert/update game score data
+                cursor.execute("""
+                    INSERT INTO player_game_scores (player_id, game_number, points_scored, opponent, import_timestamp)
+                    VALUES (%s, %s, %s, %s, NOW())
+                    ON CONFLICT (player_id, game_number)
+                    DO UPDATE SET
+                        points_scored = EXCLUDED.points_scored,
+                        opponent = EXCLUDED.opponent,
+                        import_timestamp = NOW()
+                """, [player_id, game_number, fpts, opponent])
+
+                imported_count += 1
+
+            except Exception as e:
+                error_count += 1
+                player_name = row.get('Player', 'Unknown')
+                errors.append(f"Row {index + 1} ({player_name}): {str(e)}")
+                continue
+
+        # Commit all changes
+        conn.commit()
+        conn.close()
+
+        return jsonify({
+            'success': True,
+            'message': f'Game {game_number} scores imported successfully',
+            'imported_count': imported_count,
+            'error_count': error_count,
+            'errors': errors[:10],  # Limit errors shown
+            'game_number': game_number
+        })
+
+    except Exception as e:
+        return jsonify({
+            'success': False,
+            'error': f'Import failed: {str(e)}'
+        }), 500
+
+# ===============================
 # VALIDATION UI ROUTES
 # ===============================
 
@@ -3018,6 +3237,40 @@ def form_upload_ui():
 def odds_upload_ui():
     """Serve the fixture odds upload UI"""
     return render_template('odds_upload.html')
+
+@app.route('/import-games')
+def import_games_ui():
+    """Serve the game scores import UI"""
+    try:
+        # Get the last imported game number
+        conn = get_db_connection()
+        cursor = conn.cursor()
+        cursor.execute("SELECT MAX(game_number) FROM player_game_scores")
+        last_game = cursor.fetchone()[0] or 0
+        next_game = last_game + 1
+
+        # Get import statistics
+        cursor.execute("""
+            SELECT game_number, COUNT(DISTINCT player_id) as players,
+                   COUNT(*) as total_scores,
+                   COUNT(CASE WHEN did_play = true THEN 1 END) as validated_played
+            FROM player_game_scores
+            GROUP BY game_number
+            ORDER BY game_number DESC
+            LIMIT 5
+        """)
+        recent_imports = cursor.fetchall()
+        cursor.close()
+        conn.close()
+
+        return render_template('import_game_scores.html',
+                             next_game=next_game,
+                             recent_imports=recent_imports)
+    except Exception as e:
+        return render_template('import_game_scores.html',
+                             next_game=5,
+                             recent_imports=[],
+                             error=f"Error loading import data: {str(e)}")
 
 @app.route('/monitoring')
 def monitoring_ui():
@@ -4034,7 +4287,7 @@ def parse_formation_csv(lines, cursor):
     
     return players_to_process
 
-def parse_ffp_formation_csv(lines, cursor):
+def parse_ffp_formation_csv(lines, cursor, starter_params=None):
     """
     Parse FFP formation CSV format (scraped web data).
     Format: Team Name, Player1, %, Player2, %, Player3, %...
@@ -4141,7 +4394,7 @@ def parse_ffp_formation_csv(lines, cursor):
                 'position': predicted_position,
                 'status': status,
                 'confidence': confidence,
-                'multiplier': confidence_to_multiplier(confidence)  # Use proper 5-category system
+                'multiplier': confidence_to_multiplier(confidence, starter_params)  # Use proper 5-category system
             }
             
             players_to_process.append(player_info)
