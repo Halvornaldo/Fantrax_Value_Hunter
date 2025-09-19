@@ -121,7 +121,7 @@ def initialize_database(conn):
         logger.info(f"Loading database from {dump_file}")
 
         # Read and execute the SQL dump
-        with open(dump_file, 'r', encoding='utf-8') as f:
+        with open(dump_file, 'r', encoding='latin-1') as f:
             sql_content = f.read()
 
         # Execute the entire SQL dump as one transaction
