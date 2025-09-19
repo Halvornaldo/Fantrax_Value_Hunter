@@ -3528,7 +3528,7 @@ INSERT INTO team_fixtures (gameweek, team_code, opponent_code, is_home, difficul
 
 -- Table: name_mappings (1,508 rows)
 CREATE TABLE IF NOT EXISTS name_mappings (
-    id INTEGER NOT NULL DEFAULT nextval('name_mappings_id_seq'::regclass),
+    id SERIAL PRIMARY KEY,
     source_system CHARACTER VARYING NOT NULL,
     source_name CHARACTER VARYING NOT NULL,
     fantrax_id CHARACTER VARYING NOT NULL,
@@ -5059,7 +5059,7 @@ INSERT INTO name_mappings (id, source_system, source_name, fantrax_id, fantrax_n
 
 -- Table: fixture_odds (10 rows)
 CREATE TABLE IF NOT EXISTS fixture_odds (
-    id INTEGER NOT NULL DEFAULT nextval('fixture_odds_id_seq'::regclass),
+    id SERIAL PRIMARY KEY,
     gameweek INTEGER NOT NULL,
     match_date DATE NOT NULL,
     home_team CHARACTER VARYING NOT NULL,
@@ -6452,7 +6452,7 @@ INSERT INTO player_form (player_id, gameweek, points, timestamp, imported_at) VA
 
 -- Table: player_game_scores (2,724 rows)
 CREATE TABLE IF NOT EXISTS player_game_scores (
-    id INTEGER NOT NULL DEFAULT nextval('player_game_scores_id_seq'::regclass),
+    id SERIAL PRIMARY KEY,
     player_id CHARACTER VARYING NOT NULL,
     game_number INTEGER NOT NULL,
     points_scored NUMERIC,
@@ -9190,7 +9190,7 @@ INSERT INTO player_game_scores (id, player_id, game_number, points_scored, oppon
 
 -- Table: raw_fixture_snapshots (40 rows)
 CREATE TABLE IF NOT EXISTS raw_fixture_snapshots (
-    id INTEGER NOT NULL DEFAULT nextval('raw_fixture_snapshots_id_seq'::regclass),
+    id SERIAL PRIMARY KEY,
     gameweek INTEGER NOT NULL,
     team CHARACTER VARYING NOT NULL,
     opponent CHARACTER VARYING,
@@ -9247,7 +9247,7 @@ INSERT INTO raw_fixture_snapshots (id, gameweek, team, opponent, is_home, home_o
 
 -- Table: raw_form_snapshots (1,991 rows)
 CREATE TABLE IF NOT EXISTS raw_form_snapshots (
-    id INTEGER NOT NULL DEFAULT nextval('raw_form_snapshots_id_seq'::regclass),
+    id SERIAL PRIMARY KEY,
     player_id CHARACTER VARYING NOT NULL,
     gameweek INTEGER NOT NULL,
     points_scored NUMERIC NOT NULL,
@@ -11251,7 +11251,7 @@ INSERT INTO raw_form_snapshots (id, player_id, gameweek, points_scored, minutes_
 
 -- Table: raw_player_snapshots (1,996 rows)
 CREATE TABLE IF NOT EXISTS raw_player_snapshots (
-    id INTEGER NOT NULL DEFAULT nextval('raw_player_snapshots_id_seq'::regclass),
+    id SERIAL PRIMARY KEY,
     player_id CHARACTER VARYING NOT NULL,
     gameweek INTEGER NOT NULL,
     import_timestamp TIMESTAMP WITHOUT TIME ZONE DEFAULT CURRENT_TIMESTAMP,
@@ -13279,7 +13279,7 @@ INSERT INTO raw_player_snapshots (id, player_id, gameweek, import_timestamp, nam
 
 -- Table: understat_name_mappings (163 rows)
 CREATE TABLE IF NOT EXISTS understat_name_mappings (
-    id INTEGER NOT NULL DEFAULT nextval('understat_name_mappings_id_seq'::regclass),
+    id SERIAL PRIMARY KEY,
     understat_name CHARACTER VARYING NOT NULL,
     fantrax_id CHARACTER VARYING NOT NULL,
     confidence NUMERIC NOT NULL,
