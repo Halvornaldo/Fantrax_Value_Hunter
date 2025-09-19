@@ -91,22 +91,15 @@ def initialize_database(conn):
         with open(dump_file, 'r', encoding='utf-8') as f:
             sql_content = f.read()
 
-        # Split into individual statements and execute
-        statements = sql_content.split(';\n')
-
-        for i, statement in enumerate(statements):
-            statement = statement.strip()
-            if statement and not statement.startswith('--'):
-                try:
-                    cursor.execute(statement)
-                    if i % 100 == 0:  # Log progress every 100 statements
-                        logger.info(f"Executed {i} SQL statements...")
-                except Exception as e:
-                    # Log error but continue - some statements might be expected to fail
-                    if "already exists" not in str(e).lower():
-                        logger.warning(f"Statement failed (continuing): {e}")
-
-        conn.commit()
+        # Execute the entire SQL dump as one transaction
+        # The dump already contains BEGIN; and COMMIT; statements
+        try:
+            cursor.execute(sql_content)
+            logger.info("SQL dump executed successfully")
+        except Exception as e:
+            logger.error(f"SQL execution failed: {e}")
+            conn.rollback()
+            raise
 
         # Verify the import
         cursor.execute("SELECT COUNT(*) FROM players")
