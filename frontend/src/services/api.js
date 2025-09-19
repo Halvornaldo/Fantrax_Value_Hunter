@@ -1,4 +1,4 @@
-const API_BASE_URL = process.env.REACT_APP_API_BASE_URL || "http://localhost:5001"
+const API_BASE_URL = process.env.REACT_APP_API_BASE_URL || (window.location.origin.includes('railway.app') ? window.location.origin : "http://localhost:5001")
 
 // Helper function to make API requests
 const makeRequest = async (endpoint, options = {}) => {
