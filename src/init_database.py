@@ -36,22 +36,38 @@ def get_database_connection():
         raise
 
 def check_database_empty(conn):
-    """Check if database is empty or missing the players table"""
+    """Check if database is empty or missing essential tables"""
     try:
         cursor = conn.cursor()
 
-        # Check if players table exists
-        cursor.execute("""
-            SELECT EXISTS (
-                SELECT FROM information_schema.tables
-                WHERE table_schema = 'public'
-                AND table_name = 'players'
-            );
-        """)
-        table_exists = cursor.fetchone()[0]
+        # Essential tables that must exist for full functionality
+        essential_tables = [
+            'players',
+            'player_metrics',
+            'player_games_data',
+            'team_fixtures',
+            'name_mappings',
+            'fixture_odds',
+            'player_form'
+        ]
 
-        if not table_exists:
-            logger.info("Players table does not exist - database is empty")
+        # Check if all essential tables exist
+        missing_tables = []
+        for table in essential_tables:
+            cursor.execute("""
+                SELECT EXISTS (
+                    SELECT FROM information_schema.tables
+                    WHERE table_schema = 'public'
+                    AND table_name = %s
+                );
+            """, (table,))
+            table_exists = cursor.fetchone()[0]
+
+            if not table_exists:
+                missing_tables.append(table)
+
+        if missing_tables:
+            logger.info(f"Missing essential tables: {', '.join(missing_tables)} - needs initialization")
             return True
 
         # Check if players table has data
@@ -67,7 +83,15 @@ def check_database_empty(conn):
             logger.warning(f"Players table has only {player_count} records - may need reinitialization")
             return True
         else:
-            logger.info(f"Database already populated with {player_count} players")
+            # Check total table count to ensure we have the complete database
+            cursor.execute("SELECT COUNT(*) FROM information_schema.tables WHERE table_schema='public'")
+            table_count = cursor.fetchone()[0]
+
+            if table_count < 10:
+                logger.warning(f"Only {table_count} tables found - incomplete database, reinitializing")
+                return True
+
+            logger.info(f"Database already populated with {player_count} players and {table_count} tables")
             return False
 
     except Exception as e:
@@ -78,6 +102,15 @@ def initialize_database(conn):
     """Initialize database with data from railway_database_dump.sql"""
     try:
         cursor = conn.cursor()
+
+        # Drop all existing tables first to ensure clean slate
+        logger.info("🧹 Cleaning existing tables for fresh initialization...")
+        cursor.execute("""
+            DROP SCHEMA public CASCADE;
+            CREATE SCHEMA public;
+            GRANT ALL ON SCHEMA public TO public;
+        """)
+        conn.commit()
 
         # Get the SQL dump file path
         dump_file = os.path.join(os.path.dirname(os.path.dirname(__file__)), 'railway_database_dump.sql')
