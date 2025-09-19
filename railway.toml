@@ -2,4 +2,4 @@
 builder = "NIXPACKS"
 
 [deploy]
-startCommand = "python src/app.py"
+startCommand = "python startup_with_db_init.py"

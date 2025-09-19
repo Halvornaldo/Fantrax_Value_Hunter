@@ -22,4 +22,4 @@ cmds = [
 ]
 
 [start]
-cmd = "/opt/venv/bin/python src/app.py"
+cmd = "/opt/venv/bin/python startup_with_db_init.py"

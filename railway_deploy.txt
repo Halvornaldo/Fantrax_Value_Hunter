@@ -1,2 +1,0 @@
-# Railway deployment trigger - Sun, Sep 14, 2025  1:29:15 PM
-# Force Railway redeploy - Sun, Sep 14, 2025  1:31:24 PM
