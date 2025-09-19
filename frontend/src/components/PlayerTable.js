@@ -47,6 +47,7 @@ const PlayerTable = ({ playersData, gameweekInfo, onDataRefresh }) => {
   const [historicalDataFilter, setHistoricalDataFilter] = useState('All');
   const [minutesFilterEnabled, setMinutesFilterEnabled] = useState(false);
   const [minutesThreshold, setMinutesThreshold] = useState(180);
+  const [overrideFilter, setOverrideFilter] = useState('All');
 
   // Table states
   const [sortModel, setSortModel] = useState([{ field: 'true_value', sort: 'desc' }]);
@@ -936,9 +937,16 @@ const PlayerTable = ({ playersData, gameweekInfo, onDataRefresh }) => {
         if (minutes < minutesThreshold) return false;
       }
 
+      // Override filter
+      if (overrideFilter !== 'All') {
+        const hasOverride = player.override_type && player.override_type !== 'auto';
+        if (overrideFilter === 'Has Override' && !hasOverride) return false;
+        if (overrideFilter === 'No Override' && hasOverride) return false;
+      }
+
       return true;
     });
-  }, [playersData, positionFilter, priceMin, priceMax, teamFilter, searchTerm, historicalDataFilter, minutesFilterEnabled, minutesThreshold]);
+  }, [playersData, positionFilter, priceMin, priceMax, teamFilter, searchTerm, historicalDataFilter, minutesFilterEnabled, minutesThreshold, overrideFilter]);
 
   // Export CSV handler
   const handleExportCSV = async () => {
@@ -1059,6 +1067,22 @@ const PlayerTable = ({ playersData, gameweekInfo, onDataRefresh }) => {
                 <MenuItem value="All">All</MenuItem>
                 <MenuItem value="Has Historical">Has Historical</MenuItem>
                 <MenuItem value="No Historical">No Historical</MenuItem>
+              </Select>
+            </FormControl>
+          </Grid>
+
+          {/* Override Filter */}
+          <Grid item>
+            <FormControl size="small" sx={{ minWidth: 130 }}>
+              <InputLabel>Override</InputLabel>
+              <Select
+                value={overrideFilter}
+                label="Override"
+                onChange={(e) => setOverrideFilter(e.target.value)}
+              >
+                <MenuItem value="All">All</MenuItem>
+                <MenuItem value="Has Override">Has Override</MenuItem>
+                <MenuItem value="No Override">No Override</MenuItem>
               </Select>
             </FormControl>
           </Grid>
