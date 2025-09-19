@@ -1112,7 +1112,7 @@ def manual_override():
             'player_id': player_id,
             'override_type': override_type,
             'new_multiplier': multiplier,
-            'new_true_value': float(updated_player[0]) if updated_player else 0,
+            'new_true_value': round(float(updated_player[0]), 3) if updated_player else 0,
             'player_name': updated_player[2] if updated_player else 'Unknown'
         })
         
