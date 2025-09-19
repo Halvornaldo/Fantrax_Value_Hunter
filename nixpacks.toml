@@ -8,7 +8,6 @@ nixPkgs = ["nodejs_18", "python311", "python311Packages.pip"]
 cmds = [
   "echo '🏗️ Starting Fantrax Value Hunter build process...'",
   "echo '📦 Building React frontend...'",
-  "cd frontend && npm install && npm run build && cd ..",
   "echo '📁 Setting up Flask static directory...'",
   "mkdir -p src/static/react-build",
   "echo '📋 Copying React build to Flask static directory...'",
