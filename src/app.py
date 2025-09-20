@@ -64,7 +64,7 @@ app.wsgi_app = WhiteNoise(
     root=os.path.join(os.path.dirname(__file__), 'static', 'react-build'),
     prefix='/',
     index_file='index.html',
-    autorefresh=False
+    autorefresh=True  # Enable file change detection for deployments
 )
 
 # Configure WhiteNoise to serve React static assets
@@ -72,7 +72,7 @@ app.wsgi_app = WhiteNoise(
     app.wsgi_app,
     root=os.path.join(os.path.dirname(__file__), 'static', 'react-build', 'static'),
     prefix='/static/',
-    autorefresh=False
+    autorefresh=True  # Enable file change detection for deployments
 )
 
 # Database configuration - supports both local and production environments
@@ -544,6 +544,18 @@ def recalculate_true_values(gameweek: int = None):
         if 'conn' in locals():
             conn.close()
 
+# Add cache-control headers to prevent stale content
+@app.after_request
+def after_request(response):
+    """Add cache control headers to ensure fresh content for index.html"""
+    # Check if this is serving the main page or index.html
+    if (request.path == "/" or
+        "index.html" in request.path or
+        request.path.endswith(".html")):
+        response.headers["Cache-Control"] = "no-cache, no-store, must-revalidate"
+        response.headers["Pragma"] = "no-cache"
+        response.headers["Expires"] = "0"
+    return response
 @app.route('/api/status')
 def api_status():
     """API Status endpoint for production"""

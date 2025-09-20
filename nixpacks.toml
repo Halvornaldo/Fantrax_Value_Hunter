@@ -1,6 +1,6 @@
 [variables]
 NIXPACKS_NO_CACHE = "1"
-# Force rebuild - 2025-09-19-1742
+# Force rebuild - 2025-09-20-1045 (WhiteNoise cache fix)
 
 [phases.setup]
 nixPkgs = ["nodejs_18", "python311", "python311Packages.pip"]
@@ -11,11 +11,15 @@ cmds = [
   "echo '📦 Building React frontend...'",
   "cd frontend && npm install && CI=false npm run build && cd ..",
   "echo '📁 Setting up Flask static directory...'",
+  "echo '🧹 Cleaning existing React build to ensure fresh deployment...'",
+  "rm -rf src/static/react-build/*",
   "mkdir -p src/static/react-build",
   "echo '📋 Copying fresh React build to Flask static directory...'",
   "cp -r frontend/build/* src/static/react-build/",
   "echo '🔍 Verifying build files...'",
   "ls -la src/static/react-build/static/",
+  "echo '📝 React build files:'",
+  "ls -la src/static/react-build/static/js/ | grep main",
   "echo '🐍 Setting up Python environment...'",
   "python -m venv venv",
   ". venv/bin/activate && pip install -r requirements.txt",

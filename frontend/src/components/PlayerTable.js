@@ -1188,6 +1188,17 @@ const PlayerTable = ({ playersData, gameweekInfo, onDataRefresh }) => {
           }}
         />
       </Box>
+n      {/* Build Version Footer */}
+      <Box sx={{
+        mt: 2,
+        textAlign: "center",
+        opacity: 0.6,
+        fontSize: "0.75rem",
+        color: theme.palette.text.secondary
+      }}>
+        Build: {process.env.REACT_APP_BUILD_TIME || new Date().toISOString().slice(0, 19).replace("T", " ")} |
+        Tooltips: {columns.length} columns
+      </Box>
     </Box>
   );
 };
