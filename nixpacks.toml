@@ -6,10 +6,12 @@ NIXPACKS_NO_CACHE = "1"
 nixPkgs = ["nodejs_18", "python311", "python311Packages.pip"]
 
 [phases.build]
+cache = false
 cmds = [
+  "echo '🚨 FORCE REBUILD AT: 'Sat, Sep 20, 2025  7:50:15 PM",
   "echo '🏗️ Starting Fantrax Value Hunter build process...'",
   "echo '📦 Building React frontend...'",
-  "cd frontend && npm install && CI=false npm run build && cd ..",
+  "cd frontend && rm -rf node_modules && npm ci && CI=false npm run build && cd ..",
   "echo '📁 Setting up Flask static directory...'",
   "echo '🧹 Cleaning existing React build to ensure fresh deployment...'",
   "rm -rf src/static/react-build/*",
