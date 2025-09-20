@@ -8,10 +8,16 @@ WORKDIR /app/frontend
 
 # Copy package files first for better layer caching
 COPY frontend/package.json ./
-COPY frontend/package-lock.json ./
+COPY frontend/package-lock.json* ./
 
-# Install dependencies
-RUN npm ci --no-audit --no-fund
+# Install dependencies (fallback to npm install if package-lock.json missing)
+RUN if [ -f package-lock.json ]; then \
+        echo "Using npm ci with package-lock.json"; \
+        npm ci --no-audit --no-fund; \
+    else \
+        echo "package-lock.json not found, using npm install"; \
+        npm install --no-audit --no-fund; \
+    fi
 
 # Copy frontend source code
 COPY frontend/ ./
