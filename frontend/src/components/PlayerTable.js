@@ -16,7 +16,10 @@ import {
   ToggleButtonGroup,
   Paper,
   Checkbox,
-  FormControlLabel
+  FormControlLabel,
+  Collapse,
+  Card,
+  CardContent
 } from '@mui/material';
 import { DataGrid } from '@mui/x-data-grid';
 import {
@@ -27,7 +30,9 @@ import {
   SportsFootball,
   TrendingUp,
   Add,
-  Remove
+  Remove,
+  ExpandMore,
+  Help
 } from '@mui/icons-material';
 import { useTheme } from '@mui/material/styles';
 import { Tooltip as ReactTooltip } from 'react-tooltip';
@@ -55,6 +60,9 @@ const PlayerTable = ({ playersData, gameweekInfo, onDataRefresh }) => {
 
   // Starter override states
   const [processingOverride, setProcessingOverride] = useState(null);
+
+  // Help panel state
+  const [helpPanelOpen, setHelpPanelOpen] = useState(false);
 
   // Get unique teams for filter
   const teams = useMemo(() => {
@@ -249,53 +257,117 @@ const PlayerTable = ({ playersData, gameweekInfo, onDataRefresh }) => {
     return 'Poor';
   };
 
-  // Tooltip content generator
+  // Enhanced tooltip content for help panel
   const getColumnTooltip = (field) => {
     const tooltips = {
-      name: { title: 'Player Name', description: 'Full player name as registered in Fantasy Premier League' },
-      team: { title: 'Team', description: 'Current Premier League team' },
-      position: { title: 'Position', description: 'Primary playing position: G (Goalkeeper), D (Defender), M (Midfielder), F (Forward)' },
-      price: { title: 'Price', description: 'Current fantasy price in millions (£)', formula: 'Set by Fantrax based on demand' },
-      ppg: { title: 'Points Per Game', description: 'Average fantasy points per game played', formula: 'Total Points ÷ Games Played' },
-      games: {
-        title: 'Games Data',
-        description: 'Total games used for analysis',
-        interpretation: 'Green (≥10): Reliable • Yellow (5-9): Moderate • Red (<5): Limited data'
+      name: {
+        title: 'Player Name',
+        description: 'Full player name as registered in Fantasy Premier League'
+      },
+      team: {
+        title: 'Team',
+        description: 'Current Premier League team'
+      },
+      position: {
+        title: 'Position',
+        description: 'Playing position with multi-position support',
+        details: 'G (Goalkeeper), D (Defender), M (Midfielder), F (Forward). Multi-position players (D,M or M,F) use primary position for calculations.'
+      },
+      price: {
+        title: 'Price',
+        description: 'Current fantasy price in millions (£)',
+        formula: 'Set by Fantrax based on player demand and performance'
+      },
+      total_fpts: {
+        title: 'Total Fantasy Points',
+        description: 'Cumulative fantasy points for current season (2025-26)',
+        interpretation: 'Higher values indicate consistent scoring across multiple gameweeks.'
+      },
+      ppg: {
+        title: 'Points Per Game',
+        description: 'Average fantasy points per game for current season (2025-26)',
+        formula: 'Total Points ÷ Games Played',
+        interpretation: 'Current season form indicator. Compare with Dynamic PPG to see historical context.'
+      },
+      blended_ppg: {
+        title: 'Dynamic PPG (V2.0)',
+        description: 'Enhanced PPG blending current season with historical data',
+        formula: 'Blended_PPG = (Current_PPG × Games_Weight) + (Previous_PPG × Carryover_Weight)',
+        details: 'Adjustable via "Adaptation GW" in parameter panel - controls adaptation speed to current season.'
+      },
+      games_played_historical: {
+        title: '24-25 Games',
+        description: 'Total games played in 2024-25 season (historical data)',
+        interpretation: 'Green (≥10): Reliable • Yellow (5-9): Moderate • Red (<5): Limited historical data'
+      },
+      games_played: {
+        title: '25-26 Games',
+        description: 'Total games played in current season (2025-26)',
+        interpretation: 'Green (≥5): Regular starter • Yellow (2-4): Some starts • Red (0-1): Limited appearances'
       },
       true_value: {
         title: 'True Value (V2.0)',
-        description: 'V2.0 Enhanced prediction of expected points per game',
-        formula: 'True Value = Blended_PPG × Form × Fixture × Starter × xGI',
-        interpretation: 'Deep Green (≥20): Elite • Green (15-20): Excellent • Yellow (10-15): Good • Orange (5-10): Average • Red (<5): Poor'
+        description: 'Advanced prediction using 5-factor model',
+        formula: 'True Value = Dynamic_PPG × Form × Fixture × Starter × xGI',
+        interpretation: 'Deep Green (≥20): Elite • Green (15-20): Excellent • Yellow (10-15): Good • Red (<5): Poor'
       },
       roi: {
         title: 'ROI - Return on Investment (V2.0)',
-        description: 'Value efficiency metric - how many points per £1 spent',
+        description: 'Value efficiency metric - expected points per £1 spent',
         formula: 'ROI = True Value ÷ Player Price',
-        interpretation: 'Deep Green (≥3): Exceptional value • Green (2-3): Great value • Yellow (1-2): Fair value • Red (<1): Poor value'
+        interpretation: 'Deep Green (≥3): Exceptional • Green (2-3): Great • Yellow (1-2): Fair • Red (<1): Poor'
       },
       form_multiplier: {
         title: 'Form Multiplier (V2.0)',
-        description: 'EWMA weighted recent performance multiplier',
-        formula: 'Exponential Weighted Moving Average (α=0.87)',
-        interpretation: 'Purple (≥1.5): Hot form • Blue (1.2-1.5): Good form • Green (1.0-1.2): Average • Orange (0.8-1.0): Poor form • Red (<0.8): Very poor'
+        description: 'Recent performance trend using exponential weighting',
+        formula: 'EWMA (α=0.87) of last 6 games',
+        interpretation: 'Purple (≥1.5): Hot • Blue (1.2-1.5): Good • Green (1.0-1.2): Average • Red (<0.8): Poor',
+        details: 'Alpha adjustable via "EWMA α" in parameter panel. Use 0.5-0.7 early season.'
       },
       fixture_multiplier: {
         title: 'Fixture Difficulty (V2.0)',
-        description: 'Upcoming fixture difficulty adjustment',
-        formula: 'base^(-difficulty) using betting odds',
-        interpretation: 'Higher values indicate easier fixtures ahead'
+        description: 'Upcoming fixture difficulty from betting odds',
+        formula: 'Position-weighted difficulty from betting markets',
+        interpretation: 'Higher = easier fixtures. Weights: G(1.1), D(1.2), M(1.0), F(1.05)'
       },
       starter_multiplier: {
         title: 'Starter Prediction (V2.0)',
-        description: 'Confidence-based starting eleven prediction (5 categories)',
-        interpretation: '1.0x: Definite starter (≥90%) • 0.90x: Likely starter (70-89%) • 0.75x: Rotation risk (50-69%) • 0.50x: Unlikely starter (30-49%) • 0.35x: Bench (<30%)'
+        description: 'Confidence-based starting probability (5 categories)',
+        interpretation: '1.0x: Nailed (≥90%) • 0.90x: Likely (70-89%) • 0.75x: Rotation (50-69%) • 0.50x: Unlikely (30-49%) • 0.35x: Bench (<30%)',
+        details: 'From Fantasy Football Pundit. Multipliers adjustable in parameter panel. Override using buttons.'
+      },
+      starter_override: {
+        title: 'Starter Override',
+        description: 'Manual controls for starter predictions',
+        interpretation: 'S=Starter (1.0x) • L=Likely (0.90x) • R=Rotation (0.75x) • U=Unlikely (0.50x) • B=Bench (0.35x) • O=Out (0.0x) • A=Auto',
+        details: 'Click to override automatic predictions. Values adjustable in parameter panel.'
       },
       xgi_multiplier: {
         title: 'xGI Multiplier (V2.0)',
-        description: 'Expected Goals Involvement normalized to position',
-        formula: 'Current xGI ÷ 2024-25 Position Baseline',
-        interpretation: 'Measures attacking threat relative to position peers'
+        description: 'Expected Goals Involvement vs position baseline',
+        formula: 'Current xGI per 90min ÷ 2024-25 Position Average',
+        interpretation: '>1.0 = above average attacking threat for position'
+      },
+      xgi90: {
+        title: 'xGI per 90',
+        description: 'Expected Goals Involvement per 90 minutes',
+        interpretation: 'Position-specific color coding shows total attacking contribution'
+      },
+      xg90: {
+        title: 'xG per 90',
+        description: 'Expected Goals per 90 minutes',
+        interpretation: 'Position-specific color coding shows goal threat level'
+      },
+      xa90: {
+        title: 'xA per 90',
+        description: 'Expected Assists per 90 minutes',
+        interpretation: 'Position-specific color coding shows creative output'
+      },
+      minutes: {
+        title: 'Minutes Played',
+        description: 'Total minutes in current season (2025-26)',
+        interpretation: 'Use "Min Minutes" filter to exclude limited game time players',
+        details: 'Higher minutes = regular playing time and fitness'
       }
     };
 
@@ -443,14 +515,6 @@ const PlayerTable = ({ playersData, gameweekInfo, onDataRefresh }) => {
       field: 'name',
       headerName: 'Name',
       width: 180,
-      renderHeader: (params) => (
-        <Box sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
-          <Typography variant="subtitle2" fontWeight={600}>Name</Typography>
-          <Tooltip title={getColumnTooltip('name').description}>
-            <Info fontSize="small" sx={{ opacity: 0.7, cursor: 'help' }} />
-          </Tooltip>
-        </Box>
-      ),
       renderCell: (params) => (
         <Typography variant="body2" fontWeight={500}>
           {params.value}
@@ -461,27 +525,11 @@ const PlayerTable = ({ playersData, gameweekInfo, onDataRefresh }) => {
       field: 'team',
       headerName: 'Team',
       width: 80,
-      renderHeader: (params) => (
-        <Box sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
-          <Typography variant="subtitle2" fontWeight={600}>Team</Typography>
-          <Tooltip title={getColumnTooltip('team').description}>
-            <Info fontSize="small" sx={{ opacity: 0.7, cursor: 'help' }} />
-          </Tooltip>
-        </Box>
-      ),
     },
     {
       field: 'position',
       headerName: 'Pos',
       width: 80,
-      renderHeader: (params) => (
-        <Box sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
-          <Typography variant="subtitle2" fontWeight={600}>Pos</Typography>
-          <Tooltip title={getColumnTooltip('position').description}>
-            <Info fontSize="small" sx={{ opacity: 0.7, cursor: 'help' }} />
-          </Tooltip>
-        </Box>
-      ),
       renderCell: (params) => {
         const positions = params.value ? params.value.split(',').map(p => p.trim()) : [];
         const getPositionColor = (pos) => {
@@ -514,14 +562,6 @@ const PlayerTable = ({ playersData, gameweekInfo, onDataRefresh }) => {
       headerName: 'Price',
       width: 80,
       type: 'number',
-      renderHeader: (params) => (
-        <Box sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
-          <Typography variant="subtitle2" fontWeight={600}>Price</Typography>
-          <Tooltip title={getColumnTooltip('price').description}>
-            <Info fontSize="small" sx={{ opacity: 0.7, cursor: 'help' }} />
-          </Tooltip>
-        </Box>
-      ),
       renderCell: (params) => `£${params.value}`,
     },
     {
@@ -529,14 +569,6 @@ const PlayerTable = ({ playersData, gameweekInfo, onDataRefresh }) => {
       headerName: 'TFPts',
       width: 70,
       type: 'number',
-      renderHeader: (params) => (
-        <Box sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
-          <Typography variant="subtitle2" fontWeight={600}>TFPts</Typography>
-          <Tooltip title="Total Fantasy Points - Cumulative fantasy points across all gameweeks played">
-            <Info fontSize="small" sx={{ opacity: 0.7, cursor: 'help' }} />
-          </Tooltip>
-        </Box>
-      ),
       renderCell: (params) => {
         const value = parseFloat(params.value);
         return isNaN(value) ? '0.0' : value.toFixed(1);
@@ -547,14 +579,6 @@ const PlayerTable = ({ playersData, gameweekInfo, onDataRefresh }) => {
       headerName: 'PPG',
       width: 80,
       type: 'number',
-      renderHeader: (params) => (
-        <Box sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
-          <Typography variant="subtitle2" fontWeight={600}>PPG</Typography>
-          <Tooltip title={getColumnTooltip('ppg').description}>
-            <Info fontSize="small" sx={{ opacity: 0.7, cursor: 'help' }} />
-          </Tooltip>
-        </Box>
-      ),
       renderCell: (params) => {
         const value = parseFloat(params.value);
         return isNaN(value) ? '0.0' : value.toFixed(1);
@@ -565,14 +589,6 @@ const PlayerTable = ({ playersData, gameweekInfo, onDataRefresh }) => {
       headerName: 'Dynamic PPG',
       width: 120,
       type: 'number',
-      renderHeader: (params) => (
-        <Box sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
-          <Typography variant="subtitle2" fontWeight={600}>Dynamic PPG</Typography>
-          <Tooltip title="Blended PPG used in True Value calculation. Smoothly transitions from historical (24-25) to current season data. Shows the actual baseline used in the formula.">
-            <Info fontSize="small" sx={{ opacity: 0.7, cursor: 'help' }} />
-          </Tooltip>
-        </Box>
-      ),
       renderCell: (params) => {
         const value = parseFloat(params.value);
         const weight = parseFloat(params.row.current_season_weight || 0);
@@ -604,14 +620,6 @@ const PlayerTable = ({ playersData, gameweekInfo, onDataRefresh }) => {
       field: 'games_played_historical',
       headerName: '24-25',
       width: 80,
-      renderHeader: (params) => (
-        <Box sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
-          <Typography variant="subtitle2" fontWeight={600}>24-25</Typography>
-          <Tooltip title="Games played in 2024-25 season (historical data)">
-            <Info fontSize="small" sx={{ opacity: 0.7, cursor: 'help' }} />
-          </Tooltip>
-        </Box>
-      ),
       renderCell: (params) => {
         const historical = params.row.games_played_historical || 0;
         const color = historical >= 10 ? '#28a745' : historical >= 5 ? '#ffc107' : '#dc3545';
@@ -631,14 +639,6 @@ const PlayerTable = ({ playersData, gameweekInfo, onDataRefresh }) => {
       field: 'games_played',
       headerName: '25-26',
       width: 80,
-      renderHeader: (params) => (
-        <Box sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
-          <Typography variant="subtitle2" fontWeight={600}>25-26</Typography>
-          <Tooltip title="Games played in current season (2025-26)">
-            <Info fontSize="small" sx={{ opacity: 0.7, cursor: 'help' }} />
-          </Tooltip>
-        </Box>
-      ),
       renderCell: (params) => {
         const current = params.row.games_played || 0;
         const color = current >= 5 ? '#28a745' : current >= 2 ? '#ffc107' : current === 0 ? '#dc3545' : '#ff9800';
@@ -659,27 +659,6 @@ const PlayerTable = ({ playersData, gameweekInfo, onDataRefresh }) => {
       headerName: 'True Value',
       width: 110,
       type: 'number',
-      renderHeader: (params) => (
-        <Box
-          sx={{
-            display: 'flex',
-            alignItems: 'center',
-            gap: 1,
-            background: 'linear-gradient(135deg, #28a745, #20c997)',
-            color: 'white',
-            px: 1,
-            py: 0.5,
-            borderRadius: 1,
-            fontWeight: 700
-          }}
-        >
-          <Typography variant="subtitle2" fontWeight={700}>True Value</Typography>
-          <Tooltip title={getColumnTooltip('true_value').description}>
-            <Info fontSize="small" sx={{ color: 'white', cursor: 'help' }} />
-          </Tooltip>
-          <Chip label="V2.0" size="small" sx={{ bgcolor: 'rgba(255,255,255,0.2)', color: 'white', fontSize: '0.6rem' }} />
-        </Box>
-      ),
       renderCell: (params) => renderValueCell(params, getTrueValueColor),
     },
     {
@@ -687,27 +666,6 @@ const PlayerTable = ({ playersData, gameweekInfo, onDataRefresh }) => {
       headerName: 'ROI',
       width: 100,
       type: 'number',
-      renderHeader: (params) => (
-        <Box
-          sx={{
-            display: 'flex',
-            alignItems: 'center',
-            gap: 1,
-            background: 'linear-gradient(135deg, #17a2b8, #138496)',
-            color: 'white',
-            px: 1,
-            py: 0.5,
-            borderRadius: 1,
-            fontWeight: 700
-          }}
-        >
-          <Typography variant="subtitle2" fontWeight={700}>ROI</Typography>
-          <Tooltip title={getColumnTooltip('roi').description}>
-            <Info fontSize="small" sx={{ color: 'white', cursor: 'help' }} />
-          </Tooltip>
-          <Chip label="V2.0" size="small" sx={{ bgcolor: 'rgba(255,255,255,0.2)', color: 'white', fontSize: '0.6rem' }} />
-        </Box>
-      ),
       renderCell: (params) => renderValueCell(params, getROIColor),
     },
     {
@@ -715,14 +673,6 @@ const PlayerTable = ({ playersData, gameweekInfo, onDataRefresh }) => {
       headerName: 'Form',
       width: 90,
       type: 'number',
-      renderHeader: (params) => (
-        <Box sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
-          <Typography variant="subtitle2" fontWeight={600}>Form</Typography>
-          <Tooltip title={getColumnTooltip('form_multiplier').description}>
-            <Info fontSize="small" sx={{ opacity: 0.7, cursor: 'help' }} />
-          </Tooltip>
-        </Box>
-      ),
       renderCell: (params) => renderValueCell(params, getMultiplierColor),
       valueFormatter: (params) => params.value ? `${params.value.toFixed(2)}x` : '--',
     },
@@ -731,14 +681,6 @@ const PlayerTable = ({ playersData, gameweekInfo, onDataRefresh }) => {
       headerName: 'Fixture',
       width: 90,
       type: 'number',
-      renderHeader: (params) => (
-        <Box sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
-          <Typography variant="subtitle2" fontWeight={600}>Fixture</Typography>
-          <Tooltip title={getColumnTooltip('fixture_multiplier').description}>
-            <Info fontSize="small" sx={{ opacity: 0.7, cursor: 'help' }} />
-          </Tooltip>
-        </Box>
-      ),
       renderCell: (params) => renderValueCell(params, getMultiplierColor),
       valueFormatter: (params) => params.value ? `${params.value.toFixed(2)}x` : '--',
     },
@@ -747,14 +689,6 @@ const PlayerTable = ({ playersData, gameweekInfo, onDataRefresh }) => {
       headerName: 'Starter',
       width: 90,
       type: 'number',
-      renderHeader: (params) => (
-        <Box sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
-          <Typography variant="subtitle2" fontWeight={600}>Starter</Typography>
-          <Tooltip title={getColumnTooltip('starter_multiplier').description}>
-            <Info fontSize="small" sx={{ opacity: 0.7, cursor: 'help' }} />
-          </Tooltip>
-        </Box>
-      ),
       renderCell: (params) => renderValueCell(params, getMultiplierColor),
       valueFormatter: (params) => params.value ? `${params.value.toFixed(2)}x` : '--',
     },
@@ -763,14 +697,6 @@ const PlayerTable = ({ playersData, gameweekInfo, onDataRefresh }) => {
       headerName: 'Override',
       width: 180,
       sortable: false,
-      renderHeader: (params) => (
-        <Box sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
-          <Typography variant="subtitle2" fontWeight={600}>Override</Typography>
-          <Tooltip title="Manual starter override controls: S=Starter (1.0x), L=Likely (0.90x), R=Rotation (0.75x), U=Unlikely (0.50x), B=Bench (0.35x), O=Out (0.0x), A=Auto">
-            <Info fontSize="small" sx={{ opacity: 0.7, cursor: 'help' }} />
-          </Tooltip>
-        </Box>
-      ),
       renderCell: (params) => {
         const playerId = params.row.id;
         const currentOverride = params.row.starter_override || 'auto';
@@ -861,14 +787,6 @@ const PlayerTable = ({ playersData, gameweekInfo, onDataRefresh }) => {
       headerName: 'xGI',
       width: 90,
       type: 'number',
-      renderHeader: (params) => (
-        <Box sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
-          <Typography variant="subtitle2" fontWeight={600}>xGI</Typography>
-          <Tooltip title={getColumnTooltip('xgi_multiplier').description}>
-            <Info fontSize="small" sx={{ opacity: 0.7, cursor: 'help' }} />
-          </Tooltip>
-        </Box>
-      ),
       renderCell: (params) => renderValueCell(params, getMultiplierColor),
       valueFormatter: (params) => params.value ? `${params.value.toFixed(2)}x` : '--',
     },
@@ -877,14 +795,6 @@ const PlayerTable = ({ playersData, gameweekInfo, onDataRefresh }) => {
       headerName: 'xGI90',
       width: 80,
       type: 'number',
-      renderHeader: (params) => (
-        <Box sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
-          <Typography variant="subtitle2" fontWeight={600}>xGI90</Typography>
-          <Tooltip title="Expected Goals Involvement per 90 minutes - Color based on position-specific performance tiers">
-            <Info fontSize="small" sx={{ opacity: 0.7, cursor: 'help' }} />
-          </Tooltip>
-        </Box>
-      ),
       renderCell: renderXGI90Cell,
     },
     {
@@ -892,14 +802,6 @@ const PlayerTable = ({ playersData, gameweekInfo, onDataRefresh }) => {
       headerName: 'xG90',
       width: 80,
       type: 'number',
-      renderHeader: (params) => (
-        <Box sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
-          <Typography variant="subtitle2" fontWeight={600}>xG90</Typography>
-          <Tooltip title="Expected Goals per 90 minutes - Color based on position-specific performance tiers">
-            <Info fontSize="small" sx={{ opacity: 0.7, cursor: 'help' }} />
-          </Tooltip>
-        </Box>
-      ),
       renderCell: renderXG90Cell,
     },
     {
@@ -907,14 +809,6 @@ const PlayerTable = ({ playersData, gameweekInfo, onDataRefresh }) => {
       headerName: 'xA90',
       width: 80,
       type: 'number',
-      renderHeader: (params) => (
-        <Box sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
-          <Typography variant="subtitle2" fontWeight={600}>xA90</Typography>
-          <Tooltip title="Expected Assists per 90 minutes - Color based on position-specific performance tiers">
-            <Info fontSize="small" sx={{ opacity: 0.7, cursor: 'help' }} />
-          </Tooltip>
-        </Box>
-      ),
       renderCell: renderXA90Cell,
     },
     {
@@ -922,14 +816,6 @@ const PlayerTable = ({ playersData, gameweekInfo, onDataRefresh }) => {
       headerName: 'Min',
       width: 70,
       type: 'number',
-      renderHeader: (params) => (
-        <Box sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
-          <Typography variant="subtitle2" fontWeight={600}>Min</Typography>
-          <Tooltip title="Total minutes played this season">
-            <Info fontSize="small" sx={{ opacity: 0.7, cursor: 'help' }} />
-          </Tooltip>
-        </Box>
-      ),
     },
   ];
 
@@ -1024,6 +910,107 @@ const PlayerTable = ({ playersData, gameweekInfo, onDataRefresh }) => {
           Export CSV
         </Button>
       </Box>
+
+      {/* Help Panel */}
+      <Card sx={{
+        mb: 2,
+        bgcolor: isDark ? 'rgba(255,255,255,0.02)' : 'rgba(0,0,0,0.02)',
+        border: `1px solid ${isDark ? 'rgba(255,255,255,0.1)' : 'rgba(0,0,0,0.1)'}`
+      }}>
+        <Box
+          sx={{
+            p: 2,
+            cursor: 'pointer',
+            display: 'flex',
+            alignItems: 'center',
+            justifyContent: 'space-between',
+            '&:hover': {
+              bgcolor: isDark ? 'rgba(255,255,255,0.05)' : 'rgba(0,0,0,0.05)'
+            }
+          }}
+          onClick={() => setHelpPanelOpen(!helpPanelOpen)}
+        >
+          <Box sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
+            <Help sx={{ color: isDark ? '#fff' : '#000' }} />
+            <Typography variant="h6" sx={{ color: isDark ? '#fff' : '#000' }}>
+              Column Explanations & Formulas
+            </Typography>
+          </Box>
+          <ExpandMore
+            sx={{
+              color: isDark ? '#fff' : '#000',
+              transform: helpPanelOpen ? 'rotate(180deg)' : 'rotate(0deg)',
+              transition: 'transform 0.2s'
+            }}
+          />
+        </Box>
+
+        <Collapse in={helpPanelOpen}>
+          <CardContent sx={{ pt: 0 }}>
+            <Grid container spacing={1.5}>
+              {[
+                'name', 'team', 'position', 'price', 'total_fpts', 'ppg', 'blended_ppg',
+                'games_played_historical', 'games_played', 'true_value', 'roi',
+                'form_multiplier', 'fixture_multiplier', 'starter_multiplier', 'starter_override',
+                'xgi_multiplier', 'xgi90', 'xg90', 'xa90', 'minutes'
+              ].map(field => {
+                const tooltip = getColumnTooltip(field);
+                return (
+                  <Grid item xs={12} sm={6} md={4} lg={3} key={field}>
+                    <Paper sx={{ p: 1.5, minHeight: 'auto',
+                      bgcolor: isDark ? 'rgba(255,255,255,0.05)' : 'rgba(0,0,0,0.03)',
+                      border: `1px solid ${isDark ? 'rgba(255,255,255,0.1)' : 'rgba(0,0,0,0.1)'}`
+                    }}>
+                      <Typography variant="subtitle2" sx={{ fontWeight: 'bold', mb: 0.5,
+                        color: isDark ? '#4fc3f7' : '#1976d2'
+                      }}>
+                        {tooltip.title}
+                      </Typography>
+                      <Typography variant="body2" sx={{ mb: 0.5,
+                        color: isDark ? '#fff' : '#000',
+                        fontSize: '0.875rem'
+                      }}>
+                        {tooltip.description}
+                      </Typography>
+                      {tooltip.formula && (
+                        <Typography variant="caption" sx={{
+                          display: 'block',
+                          fontFamily: 'monospace',
+                          bgcolor: isDark ? 'rgba(255,255,255,0.1)' : 'rgba(0,0,0,0.1)',
+                          p: 1,
+                          borderRadius: 1, mb: 0.5,
+                          color: isDark ? '#90caf9' : '#1565c0'
+                        }}>
+                          <strong>Formula:</strong> {tooltip.formula}
+                        </Typography>
+                      )}
+                      {tooltip.interpretation && (
+                        <Typography variant="caption" sx={{
+                          display: 'block',
+                          color: isDark ? '#a5d6a7' : '#2e7d32',
+                          fontSize: '0.75rem'
+                        }}>
+                          <strong>Guide:</strong> {tooltip.interpretation}
+                        </Typography>
+                      )}
+                      {tooltip.details && (
+                        <Typography variant="caption" sx={{
+                          display: 'block',
+                          color: isDark ? '#ffcc80' : '#f57c00',
+                          fontSize: '0.75rem',
+                          mt: 0.5
+                        }}>
+                          <strong>Details:</strong> {tooltip.details}
+                        </Typography>
+                      )}
+                    </Paper>
+                  </Grid>
+                );
+              })}
+            </Grid>
+          </CardContent>
+        </Collapse>
+      </Card>
 
       {/* Filters */}
       <Box sx={{ p: 2, bgcolor: isDark ? 'rgba(255,255,255,0.05)' : 'rgba(0,0,0,0.03)' }}>
