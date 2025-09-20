@@ -39,8 +39,30 @@ class FormulaEngineV2:
         self.v2_config = parameters.get('formula_optimization_v2', {})
         self.current_gameweek = self._get_current_gameweek()
         
-        logger.info(f"FormulaEngineV2 initialized - GW{self.current_gameweek}")
-        
+        logger.info(f"FormulaEngineV2 initialized - GW{self.current_gameweek}")  
+    def _get_primary_position(self, position: str) -> str:
+        """
+        Get primary position from multi-position string
+        D,M -> D (defensive priority)
+        M,F -> M (midfield priority)
+        """
+        if not position:
+            return 'M'
+
+        positions = [p.strip() for p in position.split(',')]
+
+        # Priority order: G > D > M > F
+        if 'G' in positions:
+            return 'G'
+        elif 'D' in positions:
+            return 'D'
+        elif 'M' in positions:
+            return 'M'
+        elif 'F' in positions or 'A' in positions:
+            return 'F'
+
+        return positions[0] if positions else 'M'
+
     def calculate_player_value(self, player_data: Dict[str, Any]) -> Dict[str, Any]:
         """
         Main calculation function implementing v2.0 improvements
@@ -303,7 +325,7 @@ class FormulaEngineV2:
         """
         try:
             difficulty_score = player_data.get('fixture_difficulty', 0)
-            position = player_data.get('position', 'M')
+            position = self._get_primary_position(player_data.get('position', 'M'))
             
             # Handle None values
             if difficulty_score is None:
@@ -336,7 +358,7 @@ class FormulaEngineV2:
         """Raw calculation without caps for metadata tracking"""
         try:
             difficulty_score = player_data.get('fixture_difficulty', 0)
-            position = player_data.get('position', 'M')
+            position = self._get_primary_position(player_data.get('position', 'M'))
             base = self.v2_config.get('exponential_fixture', {}).get('base', 1.05)
             position_weights = self.v2_config.get('exponential_fixture', {}).get('position_weights', {
                 'G': 1.1, 'D': 1.2, 'M': 1.0, 'F': 1.05
@@ -367,7 +389,7 @@ class FormulaEngineV2:
             # Get current and baseline xGI values
             current_xgi = float(player_data.get('xgi90', 0.0) or 0.0)
             baseline_xgi = float(player_data.get('baseline_xgi', 0.0) or 0.0)
-            position = player_data.get('position', 'M')
+            position = self._get_primary_position(player_data.get('position', 'M'))
             
             # Position-specific logic for xGI relevance
             if position == 'G':
@@ -403,7 +425,7 @@ class FormulaEngineV2:
         try:
             current_xgi = float(player_data.get('xgi90', 0.0) or 0.0)
             baseline_xgi = float(player_data.get('baseline_xgi', 0.0) or 0.0)
-            position = player_data.get('position', 'M')
+            position = self._get_primary_position(player_data.get('position', 'M'))
             
             if position == 'G' or baseline_xgi <= 0.1:
                 return 1.0

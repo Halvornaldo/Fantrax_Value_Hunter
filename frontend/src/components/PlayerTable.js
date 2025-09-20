@@ -107,7 +107,16 @@ const PlayerTable = ({ playersData, gameweekInfo, onDataRefresh }) => {
   const getXG90Tier = (position, xg90) => {
     if (!xg90 || xg90 === 0) return 'Poor';
 
-    const pos = position?.toUpperCase();
+    // Handle multi-position players
+    let pos = position?.toUpperCase();
+    if (pos?.includes(',')) {
+      const positions = pos.split(',').map(p => p.trim());
+      // Priority: G > D > M > F
+      if (positions.includes('G')) pos = 'G';
+      else if (positions.includes('D')) pos = 'D';
+      else if (positions.includes('M')) pos = 'M';
+      else if (positions.includes('F') || positions.includes('A')) pos = 'F';
+    }
 
     // Attackers/Forwards (F)
     if (pos === 'F') {
@@ -142,7 +151,16 @@ const PlayerTable = ({ playersData, gameweekInfo, onDataRefresh }) => {
   const getXA90Tier = (position, xa90) => {
     if (!xa90 || xa90 === 0) return 'Poor';
 
-    const pos = position?.toUpperCase();
+    // Handle multi-position players
+    let pos = position?.toUpperCase();
+    if (pos?.includes(',')) {
+      const positions = pos.split(',').map(p => p.trim());
+      // Priority: G > D > M > F
+      if (positions.includes('G')) pos = 'G';
+      else if (positions.includes('D')) pos = 'D';
+      else if (positions.includes('M')) pos = 'M';
+      else if (positions.includes('F') || positions.includes('A')) pos = 'F';
+    }
 
     // Attackers/Forwards (F)
     if (pos === 'F') {
@@ -190,7 +208,16 @@ const PlayerTable = ({ playersData, gameweekInfo, onDataRefresh }) => {
   const getXGI90Tier = (position, xgi90) => {
     if (!xgi90 || xgi90 === 0) return 'Poor';
 
-    const pos = position?.toUpperCase();
+    // Handle multi-position players
+    let pos = position?.toUpperCase();
+    if (pos?.includes(',')) {
+      const positions = pos.split(',').map(p => p.trim());
+      // Priority: G > D > M > F
+      if (positions.includes('G')) pos = 'G';
+      else if (positions.includes('D')) pos = 'D';
+      else if (positions.includes('M')) pos = 'M';
+      else if (positions.includes('F') || positions.includes('A')) pos = 'F';
+    }
 
     // Attackers/Forwards (F)
     if (pos === 'F') {
