@@ -108,3 +108,15 @@ docs/_build/
 *token*
 *api_key*
 *password*
+# Backup and temporary files (enhanced)
+*_backup_*
+*_backup.py
+*_backup.js
+*_old.py
+*_old.js
+*backup.py
+*backup.js
+*.csv
+frontend_updates.txt
+*_working_*.js
+*_working_*.py

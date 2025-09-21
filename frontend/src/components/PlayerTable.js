@@ -53,6 +53,7 @@ const PlayerTable = ({ playersData, gameweekInfo, onDataRefresh }) => {
   const [minutesFilterEnabled, setMinutesFilterEnabled] = useState(false);
   const [minutesThreshold, setMinutesThreshold] = useState(180);
   const [overrideFilter, setOverrideFilter] = useState('All');
+  const [includeAllPlayers, setIncludeAllPlayers] = useState(false);
 
   // Table states
   const [sortModel, setSortModel] = useState([{ field: 'true_value', sort: 'desc' }]);
@@ -869,7 +870,8 @@ const PlayerTable = ({ playersData, gameweekInfo, onDataRefresh }) => {
         priceMin,
         priceMax,
         team: teamFilter,
-        search: searchTerm
+        search: searchTerm,
+        include_all: includeAllPlayers
       });
     } catch (error) {
       console.error('Export failed:', error);
@@ -901,14 +903,28 @@ const PlayerTable = ({ playersData, gameweekInfo, onDataRefresh }) => {
             />
           )}
         </Box>
-        <Button
-          startIcon={<Download />}
-          onClick={handleExportCSV}
-          sx={{ color: 'white', borderColor: 'white' }}
-          variant="outlined"
-        >
-          Export CSV
-        </Button>
+        <Box sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
+          <FormControlLabel
+            control={
+              <Checkbox
+                checked={includeAllPlayers}
+                onChange={(e) => setIncludeAllPlayers(e.target.checked)}
+                size="small"
+                sx={{ color: "white" }}
+              />
+            }
+            label={`Include all (${includeAllPlayers ? playersData.length : filteredData.length} total)`}
+            sx={{ color: "white", fontSize: "0.9rem" }}
+          />
+          <Button
+            startIcon={<Download />}
+            onClick={handleExportCSV}
+            sx={{ color: "white", borderColor: "white" }}
+            variant="outlined"
+          >
+            Export CSV
+          </Button>
+        </Box>
       </Box>
 
       {/* Help Panel */}
@@ -1188,7 +1204,7 @@ const PlayerTable = ({ playersData, gameweekInfo, onDataRefresh }) => {
           }}
         />
       </Box>
-n      {/* Build Version Footer */}
+      {/* Build Version Footer */}
       <Box sx={{
         mt: 2,
         textAlign: "center",
