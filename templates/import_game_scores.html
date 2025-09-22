@@ -373,7 +373,7 @@
                     // Show validation button after successful import
                     validateBtn.style.display = 'inline-block';
                     validateBtn.onclick = function() {
-                        window.open('/import-validation', '_blank');
+                        startValidation(data.game_number);
                     };
 
                 } else {
@@ -417,6 +417,234 @@
                 this.value = '';
             }
         });
-    </script>
-</body>
+        // Validation workflow functions
+        async function startValidation(gameNumber) {
+            const loading = document.getElementById('validation-loading');
+            const modal = document.getElementById('validation-modal');
+            const results = document.getElementById('validation-results');
+
+            // Show loading
+            loading.style.display = 'block';
+            results.style.display = 'none';
+
+            try {
+                // Step 1: Get Understat data and attempt automatic matching
+                const response = await fetch('/api/validate-game-scores', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ game_number: gameNumber })
+                });
+
+                const data = await response.json();
+
+                if (!data.success) {
+                    throw new Error(data.error);
+                }
+
+                loading.style.display = 'none';
+
+                // If there are unmatched players, show manual matching UI
+                if (data.need_manual_matching > 0) {
+                    showManualMatchingUI(data);
+                } else {
+                    // All players matched automatically, proceed with validation
+                    await applyValidation(gameNumber, data.matched_players, {});
+                }
+
+            } catch (error) {
+                loading.style.display = 'none';
+                alert(`Validation failed: ${error.message}`);
+            }
+        }
+
+        function showManualMatchingUI(validationData) {
+            const modal = document.getElementById('validation-modal');
+            const content = document.getElementById('manual-matching-content');
+
+            let html = `
+                <h3>🔍 Manual Player Matching Required</h3>
+                <p><strong>Found:</strong> ${validationData.understat_players_found} players who played in Game ${validationData.game_number}</p>
+                <p><strong>Matched automatically:</strong> ${validationData.matched_automatically}</p>
+                <p><strong>Need manual matching:</strong> ${validationData.need_manual_matching}</p>
+
+                <div class="unmatched-players">
+                    <h4>Please match the following Understat players to Fantrax players:</h4>
+            `;
+
+            validationData.unmatched_players.forEach((player, index) => {
+                html += `
+                    <div class="player-match" data-understat-name="${player.understat_name}">
+                        <strong>${player.understat_name}</strong>
+                        <select id="match-${index}" data-understat="${player.understat_name}">
+                            <option value="">-- Skip this player --</option>
+                `;
+
+                player.suggestions.forEach(suggestion => {
+                    html += `<option value="${suggestion.fantrax_id}">${suggestion.fantrax_name} (${suggestion.confidence}% match)</option>`;
+                });
+
+                html += `
+                        </select>
+                    </div>
+                `;
+            });
+
+            html += `
+                </div>
+                <div class="modal-buttons">
+                    <button onclick="completeValidation(${validationData.game_number}, ${JSON.stringify(validationData.matched_players).replace(/"/g, '&quot;')})">
+                        Apply Validation
+                    </button>
+                    <button onclick="closeValidationModal()">Cancel</button>
+                </div>
+            `;
+
+            content.innerHTML = html;
+            modal.style.display = 'block';
+        }
+
+        async function completeValidation(gameNumber, matchedPlayers) {
+            // Collect manual mappings
+            const confirmedMappings = {};
+            const selects = document.querySelectorAll('#manual-matching-content select');
+
+            selects.forEach(select => {
+                const understatName = select.getAttribute('data-understat');
+                const fantraxId = select.value;
+                if (fantraxId) {
+                    confirmedMappings[understatName] = fantraxId;
+                }
+            });
+
+            await applyValidation(gameNumber, matchedPlayers, confirmedMappings);
+        }
+
+        async function applyValidation(gameNumber, matchedPlayers, confirmedMappings) {
+            try {
+                const response = await fetch('/api/apply-game-validation', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({
+                        game_number: gameNumber,
+                        matched_players: matchedPlayers,
+                        confirmed_mappings: confirmedMappings
+                    })
+                });
+
+                const data = await response.json();
+
+                if (!data.success) {
+                    throw new Error(data.error);
+                }
+
+                // Show success message
+                const stats = data.validation_stats;
+                const message = `
+                    ✅ Validation Complete for Game ${gameNumber}!
+
+                    📊 Results:
+                    • ${stats.players_played} players marked as played
+                    • ${stats.players_benched} players marked as benched
+                    • ${stats.legitimate_zeros} legitimate zero-scores preserved
+                    • ${stats.excluded_zeros} false zero-scores excluded
+
+                    💾 Saved ${data.mappings_saved} new player mappings for future use
+                `;
+
+                alert(message);
+                closeValidationModal();
+
+                // Refresh the page to show updated import status
+                window.location.reload();
+
+            } catch (error) {
+                alert(`Failed to apply validation: ${error.message}`);
+            }
+        }
+
+        function closeValidationModal() {
+            const modal = document.getElementById('validation-modal');
+            modal.style.display = 'none';
+        }    </script>
+    <!-- Validation Loading Indicator -->
+    <div class="loading" id="validation-loading" style="display: none;">
+        <div class="loading-spinner"></div>
+        <div>Fetching Understat data and matching players...</div>
+    </div>
+
+    <!-- Validation Modal -->
+    <div id="validation-modal" style="display: none; position: fixed; top: 0; left: 0; width: 100%; height: 100%; background: rgba(0,0,0,0.5); z-index: 1000;">
+        <div style="position: relative; margin: 5% auto; width: 80%; max-width: 700px; background: white; border-radius: 10px; padding: 30px;">
+            <div id="manual-matching-content">
+                <!-- Manual matching content will be inserted here -->
+            </div>
+            <div id="validation-results" style="display: none;">
+                <!-- Validation results will be shown here -->
+            </div>
+        </div>
+    </div>
+
+    <style>
+        .unmatched-players {
+            margin: 20px 0;
+        }
+
+        .player-match {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            padding: 15px;
+            margin-bottom: 10px;
+            background: #f8f9fa;
+            border-radius: 6px;
+            border: 1px solid #dee2e6;
+        }
+
+        .player-match strong {
+            flex: 1;
+            margin-right: 15px;
+        }
+
+        .player-match select {
+            flex: 2;
+            padding: 8px 12px;
+            border: 1px solid #ced4da;
+            border-radius: 4px;
+            font-size: 14px;
+        }
+
+        .modal-buttons {
+            margin-top: 25px;
+            text-align: center;
+        }
+
+        .modal-buttons button {
+            margin: 0 10px;
+            padding: 12px 25px;
+            border: none;
+            border-radius: 6px;
+            font-size: 14px;
+            cursor: pointer;
+            transition: all 0.3s ease;
+        }
+
+        .modal-buttons button:first-child {
+            background: linear-gradient(135deg, #28a745, #20c997);
+            color: white;
+        }
+
+        .modal-buttons button:first-child:hover {
+            transform: translateY(-2px);
+            box-shadow: 0 5px 15px rgba(40, 167, 69, 0.4);
+        }
+
+        .modal-buttons button:last-child {
+            background: #6c757d;
+            color: white;
+        }
+
+        .modal-buttons button:last-child:hover {
+            background: #5a6268;
+        }
+    </style></body>
 </html>

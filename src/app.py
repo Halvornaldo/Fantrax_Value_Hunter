@@ -5262,6 +5262,254 @@ def serve_react_assets():
         filename
     )
 
+@app.route('/api/validate-game-scores', methods=['POST'])
+def validate_game_scores():
+    """
+    Validate game scores using Understat participation data
+    Fetches players who actually played in the gameweek and matches them to Fantrax IDs
+    """
+    try:
+        data = request.get_json()
+
+        if not data or 'game_number' not in data:
+            return jsonify({'error': 'game_number is required'}), 400
+
+        game_number = int(data['game_number'])
+
+        # Check if integration package is available
+        if not INTEGRATION_AVAILABLE:
+            return jsonify({
+                'error': 'Integration package not available in production mode',
+                'message': 'Understat validation requires development environment'
+            }), 503
+
+        print(f"Starting validation for Game {game_number}...")
+
+        # Step 1: Extract Understat players who played in this gameweek
+        import ScraperFC as sfc
+        understat = sfc.Understat()
+
+        # Get match links for the season
+        match_links = understat.get_match_links("2025/2026", "EPL")
+
+        # Calculate match range for this gameweek (10 matches per gameweek)
+        start_match = (game_number - 1) * 10
+        end_match = start_match + 10
+
+        if end_match > len(match_links):
+            return jsonify({
+                'error': f'Game {game_number} not available yet',
+                'message': f'Only {len(match_links) // 10} gameweeks available'
+            }), 400
+
+        gameweek_matches = match_links[start_match:end_match]
+        players_who_played = set()
+
+        print(f"Processing {len(gameweek_matches)} matches for Game {game_number}...")
+
+        # Extract players from each match
+        for i, match_link in enumerate(gameweek_matches):
+            try:
+                match_data = understat.scrape_match(match_link)
+                lineup_data = match_data[2]  # Element 2 contains lineup data
+
+                # Extract players from both teams
+                for team_key in ['h', 'a']:  # home and away
+                    team_data = lineup_data[team_key]
+                    for player_id, player_data in team_data.items():
+                        player_name = player_data.get('player')
+                        minutes = player_data.get('time', 0)
+
+                        # Only include players who actually played (minutes > 0)
+                        if player_name and int(minutes) > 0:
+                            players_who_played.add(player_name)
+
+            except Exception as e:
+                print(f"Warning: Error processing match {i+1}: {e}")
+                continue
+
+        print(f"Found {len(players_who_played)} players who played in Game {game_number}")
+
+        # Step 2: Match Understat players to Fantrax IDs using UnifiedNameMatcher
+        matcher = UnifiedNameMatcher(DB_CONFIG)
+        matched_players = []
+        unmatched_players = []
+
+        for understat_name in players_who_played:
+            match_result = matcher.match_player(
+                source_name=understat_name,
+                source_system='understat',
+                team=None,
+                position=None
+            )
+
+            if match_result['fantrax_id'] is not None and match_result['confidence'] >= 70:
+                # High confidence match
+                matched_players.append({
+                    'understat_name': understat_name,
+                    'fantrax_id': match_result['fantrax_id'],
+                    'fantrax_name': match_result['fantrax_name'],
+                    'confidence': match_result['confidence']
+                })
+            else:
+                # Low confidence or no match - needs manual review
+                unmatched_players.append({
+                    'understat_name': understat_name,
+                    'suggestions': match_result.get('suggested_matches', []),
+                    'confidence': match_result.get('confidence', 0)
+                })
+
+        print(f"Matched {len(matched_players)}/{len(players_who_played)} players automatically")
+
+        # Step 3: Get current game scores for this gameweek
+        conn = get_db_connection()
+        cursor = conn.cursor(cursor_factory=psycopg2.extras.RealDictCursor)
+
+        cursor.execute("""
+            SELECT pgs.id, pgs.player_id, pgs.points_scored, pgs.did_play,
+                   p.name as player_name
+            FROM player_game_scores pgs
+            JOIN players p ON pgs.player_id = p.id
+            WHERE pgs.game_number = %s
+        """, (game_number,))
+
+        game_scores = cursor.fetchall()
+        cursor.close()
+        conn.close()
+
+        print(f"Found {len(game_scores)} game score records for Game {game_number}")
+
+        # Return validation data for frontend processing
+        return jsonify({
+            'success': True,
+            'game_number': game_number,
+            'understat_players_found': len(players_who_played),
+            'matched_automatically': len(matched_players),
+            'need_manual_matching': len(unmatched_players),
+            'matched_players': matched_players,
+            'unmatched_players': unmatched_players,
+            'game_scores_total': len(game_scores),
+            'message': f'Found {len(players_who_played)} players who played in Game {game_number}'
+        })
+
+    except Exception as e:
+        print(f"Error in validate_game_scores: {str(e)}")
+        import traceback
+        traceback.print_exc()
+        return jsonify({'error': f'Validation failed: {str(e)}'}), 500
+
+@app.route('/api/apply-game-validation', methods=['POST'])
+def apply_game_validation():
+    """
+    Apply the validation results to update did_play field and save new mappings
+    """
+    try:
+        data = request.get_json()
+
+        if not data or 'game_number' not in data:
+            return jsonify({'error': 'game_number is required'}), 400
+
+        game_number = int(data['game_number'])
+        confirmed_mappings = data.get('confirmed_mappings', {})
+        matched_players = data.get('matched_players', [])
+
+        print(f"Applying validation for Game {game_number}...")
+        print(f"Received {len(confirmed_mappings)} manual mappings")
+        print(f"Received {len(matched_players)} automatic matches")
+
+        # Combine automatic and manual mappings
+        all_mappings = {}
+
+        # Add automatic matches
+        for match in matched_players:
+            all_mappings[match['understat_name']] = match['fantrax_id']
+
+        # Add manual confirmations (these override automatic matches)
+        for understat_name, fantrax_id in confirmed_mappings.items():
+            if fantrax_id:  # Only if user selected a mapping
+                all_mappings[understat_name] = fantrax_id
+
+        print(f"Total mappings to apply: {len(all_mappings)}")
+
+        # Get all players who played according to Understat
+        played_fantrax_ids = set(all_mappings.values())
+
+        conn = get_db_connection()
+        cursor = conn.cursor()
+
+        # Step 1: Save new mappings to name_mappings table
+        saved_mappings = 0
+        for understat_name, fantrax_id in confirmed_mappings.items():
+            if fantrax_id:  # Only save if user made a selection
+                try:
+                    cursor.execute("""
+                        INSERT INTO name_mappings (source_name, fantrax_id, source_system, confidence_score, verified, created_at)
+                        VALUES (%s, %s, 'understat', 100, true, NOW())
+                        ON CONFLICT (source_name, source_system)
+                        DO UPDATE SET
+                            fantrax_id = EXCLUDED.fantrax_id,
+                            confidence_score = 100,
+                            verified = true,
+                            updated_at = NOW(),
+                            usage_count = name_mappings.usage_count + 1
+                    """, [understat_name, fantrax_id])
+                    saved_mappings += 1
+                except Exception as e:
+                    print(f"Warning: Error saving mapping {understat_name} -> {fantrax_id}: {e}")
+
+        print(f"Saved {saved_mappings} new/updated mappings")
+
+        # Step 2: Update did_play field in player_game_scores
+        cursor.execute("""
+            UPDATE player_game_scores
+            SET did_play = CASE
+                WHEN player_id = ANY(%s) THEN true
+                ELSE false
+            END
+            WHERE game_number = %s
+        """, [list(played_fantrax_ids), game_number])
+
+        updated_scores = cursor.rowcount
+
+        # Step 3: Get validation statistics
+        cursor.execute("""
+            SELECT
+                COUNT(*) as total_scores,
+                COUNT(CASE WHEN did_play = true THEN 1 END) as players_played,
+                COUNT(CASE WHEN did_play = false THEN 1 END) as players_benched,
+                COUNT(CASE WHEN did_play = true AND points_scored = 0 THEN 1 END) as legitimate_zeros,
+                COUNT(CASE WHEN did_play = false AND points_scored = 0 THEN 1 END) as excluded_zeros
+            FROM player_game_scores
+            WHERE game_number = %s
+        """, (game_number,))
+
+        stats = cursor.fetchone()
+
+        conn.commit()
+        cursor.close()
+        conn.close()
+
+        return jsonify({
+            'success': True,
+            'game_number': game_number,
+            'mappings_saved': saved_mappings,
+            'scores_updated': updated_scores,
+            'validation_stats': {
+                'total_scores': stats[0],
+                'players_played': stats[1],
+                'players_benched': stats[2],
+                'legitimate_zeros': stats[3],
+                'excluded_zeros': stats[4]
+            },
+            'message': f'Validation complete: {stats[1]} players marked as played, {stats[2]} as benched'
+        })
+
+    except Exception as e:
+        print(f"Error in apply_game_validation: {str(e)}")
+        import traceback
+        traceback.print_exc()
+
+        return jsonify({'error': f'Failed to apply validation: {str(e)}'}), 500
 @app.route('/')
 @app.route('/<path:path>')
 def serve_react_app(path=''):
@@ -5284,6 +5532,7 @@ def serve_react_app(path=''):
                 '3. Restart the Flask server'
             ]
         }), 404
+
 
 
 if __name__ == '__main__':
@@ -5336,5 +5585,5 @@ if __name__ == '__main__':
     # DEVELOPMENT: Enable auto-reload for code changes
     # Set debug=True to auto-restart server when Python files change
     development_mode = False  # Production mode
-
     app.run(debug=development_mode, host='0.0.0.0', port=port, use_reloader=development_mode)
+

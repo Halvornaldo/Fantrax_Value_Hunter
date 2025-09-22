@@ -131,6 +131,27 @@ ppg_season DECIMAL(5,2)            -- Running season PPG
 
 ---
 
+## **Game Scores Validation System**
+
+### **Overview**
+Validates player participation using Understat data via `POST /api/validate-game-scores`.
+
+### **Fixed Issues**
+- **Route Ordering**: Validation endpoints moved before catch-all route (lines 5265-5512 in app.py)
+- **405 Method Not Allowed**: Fixed by proper Flask route registration order
+
+### **Validation Results (Game 5)**
+- **305 players** marked as "Played" (found in Understat data)
+- **376 players** marked as "Did not play" (not in Understat data)
+- **Lucas Bergvall**: Correctly marked as played vs WOL, scored 0.00 points
+
+### **Usage**
+```bash
+curl -X POST http://localhost:5001/api/validate-game-scores   -H "Content-Type: application/json"   -d '{"game_number": 5, "leagues": ["EPL"]}'
+```
+
+---
+
 ## **API Endpoints**
 
 ### **`GET /api/trends/calculate`**

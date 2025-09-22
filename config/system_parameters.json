@@ -27,20 +27,20 @@
       "form_enabled": true,
       "fixture_enabled": true,
       "starter_enabled": true,
-      "xgi_enabled": false
+      "xgi_enabled": true
     },
     "exponential_form": {
       "enabled": true,
-      "alpha": 0.58
+      "alpha": 0.34
     },
     "dynamic_blending": {
       "enabled": true,
-      "full_adaptation_gw": 10,
+      "full_adaptation_gw": 9,
       "transition_period": 12,
       "description": "MAX(games_ratio, transition_ratio) blending formula - transition_period controls pace of adaptation"
     },
     "normalized_xgi": {
-      "enabled": false,
+      "enabled": true,
       "normalization_strength": 1,
       "position_adjustments": {
         "defenders": true,
@@ -96,13 +96,13 @@
       "description": "Progressive form ranges based on sample size for balanced multiplier impact"
     },
     "multiplier_caps": {
-      "form": 1.1,
+      "form": 1.5,
       "fixture": 1.8,
       "xgi": 2.5,
       "global": 3
     },
     "ewma_form": {
-      "alpha": 0.58
+      "alpha": 0.34
     }
   },
   "candidate_pools": {
