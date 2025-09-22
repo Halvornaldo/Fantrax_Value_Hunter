@@ -78,5 +78,12 @@ python check_current_state.py
 - **Database**: PostgreSQL at `centerbeam.proxy.rlwy.net:16207`
 - **Features**: Full data access with parameter adjustments disabled for stability
 
+### 🚨 CRITICAL Railway Setting
+**Environment Variable**: `NO_CACHE=1` **MUST BE ENABLED**
+- **Location**: Railway Dashboard → Service → Variables
+- **Purpose**: Disables Railway's build cache to ensure weekly updates deploy
+- **Without this**: New data won't update due to aggressive caching
+- **Status**: ✅ Currently enabled (September 2025)
+
 ## Current Status
 Production-ready V2.0 system processing 714 Premier League players with advanced mathematical formulas for live fantasy optimization. Uses single live table approach for real-time data updates. No snapshot tables needed - all data is live and continuously updated.

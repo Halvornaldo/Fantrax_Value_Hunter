@@ -6,6 +6,7 @@ Provides API endpoints for parameter adjustment and True Value recalculation
 from flask import Flask, request, jsonify, render_template, send_from_directory, send_file
 from flask_cors import CORS
 from flask_caching import Cache
+from whitenoise import WhiteNoise
 import psycopg2
 import psycopg2.extras
 import json
@@ -57,6 +58,23 @@ app.config['CACHE_TYPE'] = 'simple'  # Simple in-memory cache
 app.config['CACHE_DEFAULT_TIMEOUT'] = 60  # Cache for 60 seconds
 cache = Cache(app)
 
+# Configure WhiteNoise to serve React build files in production
+app.wsgi_app = WhiteNoise(
+    app.wsgi_app,
+    root=os.path.join(os.path.dirname(__file__), 'static', 'react-build'),
+    prefix='/',
+    index_file='index.html',
+    autorefresh=True  # Enable file change detection for deployments
+)
+
+# Configure WhiteNoise to serve React static assets
+app.wsgi_app = WhiteNoise(
+    app.wsgi_app,
+    root=os.path.join(os.path.dirname(__file__), 'static', 'react-build', 'static'),
+    prefix='/static/',
+    autorefresh=True  # Enable file change detection for deployments
+)
+
 # Database configuration - supports both local and production environments
 DB_CONFIG = {
     'host': os.getenv('PGHOST', 'localhost'),
@@ -81,12 +99,41 @@ if DATABASE_URL:
     }
 
 def get_db_connection():
-    """Get database connection with error handling"""
+    """Get database connection with error handling and Railway optimizations"""
     try:
-        conn = psycopg2.connect(**DB_CONFIG)
+        # Add Railway-specific connection parameters
+        connection_params = DB_CONFIG.copy()
+
+        # Check if we're running on Railway
+        is_railway = os.getenv('RAILWAY_ENVIRONMENT') is not None
+
+        if is_railway or os.getenv('DATABASE_URL'):
+            # Railway requires specific connection settings
+            connection_params.update({
+                'connect_timeout': 10,  # 10 second connection timeout
+                'sslmode': 'require',   # Railway proxy requires SSL
+                'options': '-c statement_timeout=30000',  # 30 second query timeout
+                'application_name': 'fantrax_value_hunter'
+            })
+        else:
+            # Local development settings
+            connection_params.update({
+                'connect_timeout': 5,
+                'sslmode': 'prefer'
+            })
+
+        conn = psycopg2.connect(**connection_params)
+
+        # Set connection encoding and timezone
+        conn.set_client_encoding('UTF8')
+
         return conn
-    except Exception as e:
+    except psycopg2.OperationalError as e:
         print(f"Database connection error: {e}")
+        print(f"Connection params: host={connection_params.get('host')}, port={connection_params.get('port')}, db={connection_params.get('database')}")
+        raise
+    except Exception as e:
+        print(f"Unexpected database error: {e}")
         raise
 
 def load_system_parameters():
@@ -372,12 +419,13 @@ def recalculate_true_values(gameweek: int = None):
                 pm.price, 
                 COALESCE(pf.total_points, 0) as total_fpts,
                 CASE 
-                    WHEN COALESCE(pgd.games_played_current, 0) > 0 
-                    THEN COALESCE(pf.total_points, 0) / pgd.games_played_current
+                    WHEN COALESCE(p.games_current_season, 0) > 0 
+                    THEN COALESCE(pf.total_points, 0) / p.games_current_season
                     ELSE 0 
                 END as ppg, 
                 pm.form_multiplier, pm.fixture_multiplier, pm.starter_multiplier,
                 p.xgi90, p.baseline_xgi,
+                p.games_current_season,
                 pgd.total_points_historical, pgd.games_played_historical,
                 pgd.total_points_current, pgd.games_played_current,
                 tf.difficulty_score as fixture_difficulty
@@ -422,15 +470,16 @@ def recalculate_true_values(gameweek: int = None):
                 # Historical data for dynamic blending
                 'total_points_historical': float(player['total_points_historical']) if player['total_points_historical'] else 0.0,
                 'games_played_historical': int(player['games_played_historical']) if player['games_played_historical'] else 0,
+                'games_historical': int(player['games_played_historical']) if player['games_played_historical'] else 0,  # NEW: For blending formula
                 'total_points_current': float(player['total_points_current']) if player['total_points_current'] else 0.0,
-                'games_played_current': int(player['games_played_current']) if player['games_played_current'] else 0,
+                'games_current': int(player['games_current_season']) if player['games_current_season'] else 0,
             }
             
             # Calculate historical PPG for blending
             if player_data['games_played_historical'] > 0:
                 player_data['historical_ppg'] = player_data['total_points_historical'] / player_data['games_played_historical']
             else:
-                player_data['historical_ppg'] = 0.0
+                player_data['historical_ppg'] = None  # Changed from 0.0 to None for proper handling
             
             # Use v2.0 engine for calculation
             v2_result = v2_engine.calculate_player_value(player_data)
@@ -495,6 +544,18 @@ def recalculate_true_values(gameweek: int = None):
         if 'conn' in locals():
             conn.close()
 
+# Add cache-control headers to prevent stale content
+@app.after_request
+def after_request(response):
+    """Add cache control headers to ensure fresh content for index.html"""
+    # Check if this is serving the main page or index.html
+    if (request.path == "/" or
+        "index.html" in request.path or
+        request.path.endswith(".html")):
+        response.headers["Cache-Control"] = "no-cache, no-store, must-revalidate"
+        response.headers["Pragma"] = "no-cache"
+        response.headers["Expires"] = "0"
+    return response
 @app.route('/api/status')
 def api_status():
     """API Status endpoint for production"""
@@ -565,7 +626,7 @@ def get_players():
         'position': 'p.position',
         'price': 'pm.price',
         'total_fpts': 'COALESCE(pf.total_points, 0)',
-        'ppg': 'CASE WHEN COALESCE(pgd.games_played, 0) > 0 THEN COALESCE(pf.total_points, 0) / pgd.games_played ELSE 0 END',
+        'ppg': 'CASE WHEN COALESCE(p.games_current_season, 0) > 0 THEN COALESCE(pf.total_points, 0) / p.games_current_season ELSE 0 END',
         'value_score': 'pm.value_score',
         'true_value': 'pm.true_value',
         'roi': 'p.roi',
@@ -597,12 +658,13 @@ def get_players():
             SELECT 
                 p.id, p.name, p.team, p.position,
                 p.minutes, p.xg90, p.xa90, p.xgi90, p.baseline_xgi,
+                p.games_current_season,
                 pm.price, 
                 COALESCE(pf.total_points, 0) as total_fpts,
-                CASE 
-                    WHEN COALESCE(pgd.games_played, 0) > 0 
-                    THEN COALESCE(pf.total_points, 0) / pgd.games_played
-                    ELSE 0 
+                CASE
+                    WHEN COALESCE(p.games_current_season, 0) > 0
+                    THEN COALESCE(pf.total_points, 0) / p.games_current_season
+                    ELSE 0
                 END as ppg,
                 pm.value_score, pm.true_value,
                 p.roi,
@@ -669,6 +731,7 @@ def get_players():
             
         if team:
             teams = [t.strip() for t in team.split(',')]
+            placeholders = ', '.join(['%s'] * len(teams))
             conditions.append(f"p.team IN ({placeholders})")
             params.extend(teams)
             
@@ -707,17 +770,19 @@ def get_players():
                 player_dict['last_updated'] = player_dict['last_updated'].isoformat()
             
             # Send games data separately for frontend to handle display
-            games_current = player_dict.get('games_played', 0)
+            games_current = player_dict.get('games_played_current', 0)
             games_historical = player_dict.get('games_played_historical', 0)
             
             # Ensure games data is properly typed and handle None values
             player_dict['games_current'] = int(games_current) if games_current is not None else 0
             player_dict['games_historical'] = int(games_historical) if games_historical is not None else 0
             player_dict['games_total'] = player_dict['games_current'] + player_dict['games_historical']
+            player_dict['has_historical_data'] = player_dict['games_historical'] > 0  # NEW: Flag for frontend visual indicators
             players_list.append(player_dict)
         
         # V2.0 calculations are pre-calculated in database - no need for live calculation
         # Mark all players as using V2.0 calculations since they're pre-populated
+        manual_overrides = parameters.get('starter_prediction', {}).get('manual_overrides', {})
         for player_dict in players_list:
             player_dict['v2_calculation'] = True
             # Convert string numbers to floats for proper JSON serialization
@@ -727,6 +792,15 @@ def get_players():
                 player_dict['ppg'] = float(player_dict['ppg'])
             # ROI and true_value are already loaded from database
             # All multipliers are already loaded from database
+
+            # Add override status
+            player_id = player_dict.get('id')
+            if player_id in manual_overrides:
+                player_dict['has_override'] = True
+                player_dict['override_type'] = manual_overrides[player_id].get('type', 'unknown')
+            else:
+                player_dict['has_override'] = False
+                player_dict['override_type'] = 'auto'
         
         # DEBUG: Check final state before JSON response
         semenyo_player = next((p for p in players_list if 'semenyo' in p.get('name', '').lower()), None)
@@ -862,7 +936,10 @@ def update_parameters():
             }), 500
         
         # Clear the cache so frontend gets fresh data immediately
-        cache.clear()
+        # Clear only this player's cache entries for efficiency
+        cache_keys_to_delete = [key for key in cache.cache._cache.keys() if str(player_id) in str(key)]
+        for key in cache_keys_to_delete:
+            cache.delete(key)
         
         return jsonify({
             'success': True,
@@ -963,6 +1040,10 @@ def manual_override():
         bench_penalty = starter_config.get('force_bench_penalty', 0.35)
         out_penalty = starter_config.get('force_out_penalty', 0.0)
         
+        # Establish database connection
+        conn = get_db_connection()
+        cursor = conn.cursor()
+
         # Calculate multiplier based on override type (5-category system)
         if override_type == 'starter':
             multiplier = 1.0
@@ -977,20 +1058,14 @@ def manual_override():
         elif override_type == 'out':
             multiplier = out_penalty
         elif override_type == 'auto':
-            # Remove override - will use default CSV prediction or rotation penalty
-            multiplier = None  # Will be calculated based on CSV data
-        else:
-            return jsonify({'error': 'Invalid override_type. Valid types: starter, likely, rotation, unlikely, bench, out, auto'}), 400
-        
-        # Update database immediately
-        conn = get_db_connection()
-        cursor = conn.cursor()
-        
-        if override_type == 'auto':
-            # Remove manual override - use default rotation penalty
-            # (CSV starter logic is handled in bulk operations, not individual overrides)
-            rotation_penalty = params.get('starter_prediction', {}).get('auto_rotation_penalty', 0.75)
-            multiplier = rotation_penalty
+            # Remove manual override - restore original CSV confidence multiplier
+            cursor.execute("""
+                SELECT csv_confidence_multiplier
+                FROM player_metrics
+                WHERE player_id = %s AND gameweek = %s
+            """, [player_id, gameweek])
+            result = cursor.fetchone()
+            multiplier = result[0] if result else 0.75  # fallback to rotation if no CSV value
         
         # Update player's starter multiplier
         cursor.execute("""
@@ -1002,9 +1077,15 @@ def manual_override():
         # Recalculate True Value for this player
         cursor.execute("""
             UPDATE player_metrics 
-            SET true_value = (ppg / NULLIF(price, 0)) * form_multiplier * fixture_multiplier * starter_multiplier
+            SET true_value = (
+                SELECT p.blended_ppg * pm2.form_multiplier * pm2.fixture_multiplier * pm2.starter_multiplier * pm2.xgi_multiplier
+                FROM players p, player_metrics pm2
+                WHERE p.id = pm2.player_id
+                AND pm2.player_id = %s
+                AND pm2.gameweek = %s
+            )
             WHERE player_id = %s AND gameweek = %s
-        """, [player_id, gameweek])
+        """, [player_id, gameweek, player_id, gameweek])
         
         # Get updated player data
         cursor.execute("""
@@ -1043,7 +1124,7 @@ def manual_override():
             'player_id': player_id,
             'override_type': override_type,
             'new_multiplier': multiplier,
-            'new_true_value': float(updated_player[0]) if updated_player else 0,
+            'new_true_value': round(float(updated_player[0]), 3) if updated_player else 0,
             'player_name': updated_player[2] if updated_player else 'Unknown'
         })
         
@@ -1395,6 +1476,19 @@ def health_check():
 @app.route('/api/import-lineups', methods=['POST'])
 def import_lineups():
     """
+    FFP CSV Import - Working Implementation
+
+    IMPORTANT: Only use the main dashboard football icon button for FFP imports:
+    ✅ WORKING: Main dashboard → Football icon button → "Import lineup CSV" (hover text)
+    ❌ NOT WORKING: Top menu "Upload & Sync" → "Import Lineup CSV"
+
+    Features:
+    - Confidence-based multiplier assignment using configurable frontend parameters
+    - Name mapping persistence (no repeated validations)
+    - Automatic true value recalculation after multiplier application
+    - Source system consistency ('ffp' for Fantasy Football Pundit)
+    """
+    """
     Import starter predictions from CSV file
     Updates starter_multiplier for players based on CSV data
     """
@@ -1487,8 +1581,15 @@ def import_lineups():
         conn = get_db_connection()
         cursor = conn.cursor(cursor_factory=psycopg2.extras.RealDictCursor)
         
-        # Get system parameters for multipliers
+        # Clear all manual overrides before processing new CSV import
+        # User requested that overrides be reset to Auto on new file imports
         params = load_system_parameters()
+        if 'starter_prediction' in params and 'manual_overrides' in params['starter_prediction']:
+            params['starter_prediction']['manual_overrides'] = {}
+            save_system_parameters(params)
+            print("Cleared all manual overrides - all players reset to Auto")
+        
+        # Get system parameters for multipliers
         rotation_penalty = params.get('starter_prediction', {}).get('auto_rotation_penalty', 0.75)
         
         # Initialize UnifiedNameMatcher for improved name matching
@@ -1509,7 +1610,8 @@ def import_lineups():
             if is_ffp_formation:
                 # Process FFP format (team rows with multiple players and percentages)
                 # Pass all lines since the function will find Arsenal Predicted Lineup as starting point
-                players_to_process = parse_ffp_formation_csv(lines, cursor)
+                starter_params = params.get('starter_prediction', {})
+                players_to_process = parse_ffp_formation_csv(lines, cursor, starter_params)
             else:
                 # Process formation matrix format (FFS scraping)
                 players_to_process = parse_formation_csv(lines[1:], cursor)  # Skip header
@@ -1538,10 +1640,14 @@ def import_lineups():
                 })
                 continue
             
-            # Use UnifiedNameMatcher for improved matching  
-            # Note: Use 'ffs' for all imports since name format is identical
-            # The 'ffp' vs 'ffs' distinction is only for tracking import source
-            source_system = 'ffs'
+            # Use UnifiedNameMatcher for improved matching
+            # Determine source system based on format type
+            # FFP = Fantasy Football Pundit (current system)
+            # FFS = Fantasy Football Scout (legacy system)
+            if is_ffp_formation:
+                source_system = 'ffp'  # Fantasy Football Pundit format
+            else:
+                source_system = 'ffs'  # Legacy FFS format (if still used)
             match_result = matcher.match_player(
                 source_name=player_name,
                 source_system=source_system,
@@ -1634,10 +1740,11 @@ def import_lineups():
             # This aligns with the weekly archive workflow where we start fresh each week
             lowest_multiplier = 0.35
             cursor.execute("""
-                UPDATE player_metrics 
-                SET starter_multiplier = %s
+                UPDATE player_metrics
+                SET starter_multiplier = %s,
+                    csv_confidence_multiplier = %s
                 WHERE gameweek = %s
-            """, [lowest_multiplier, gameweek])
+            """, [lowest_multiplier, lowest_multiplier, gameweek])
             
             all_players_updated = cursor.rowcount
             print(f"Set {all_players_updated} players to lowest category ({lowest_multiplier}x - bench level)")
@@ -1653,9 +1760,10 @@ def import_lineups():
                 if player['player_id'] not in manual_overrides:
                     cursor.execute("""
                         UPDATE player_metrics 
-                        SET starter_multiplier = %s
+                        SET starter_multiplier = %s,
+                            csv_confidence_multiplier = %s
                         WHERE player_id = %s AND gameweek = %s
-                    """, [player['multiplier'], player['player_id'], gameweek])
+                    """, [player['multiplier'], player['multiplier'], player['player_id'], gameweek])
                     rows_affected = cursor.rowcount
                     starter_ids.append(player['player_id'])
                     updated_count += 1
@@ -1808,13 +1916,14 @@ def export_players():
         base_query = """
             SELECT 
                 p.name, p.team, p.position,
-                pm.price, pm.ppg, p.blended_ppg, pm.value_score, pm.true_value, p.roi,
+                pm.price, pm.ppg, p.blended_ppg, COALESCE(pf.total_points, 0) as total_fpts, pm.true_value, p.roi,
                 pm.form_multiplier, pm.fixture_multiplier, pm.starter_multiplier, pm.xgi_multiplier,
                 p.current_season_weight,
                 p.minutes, p.xg90, p.xa90, p.xgi90,
                 (COALESCE(p.xg90, 0) + COALESCE(p.xa90, 0)) as xgi
             FROM players p
             JOIN player_metrics pm ON p.id = pm.player_id
+            LEFT JOIN player_form pf ON p.id = pf.player_id
             WHERE pm.gameweek = %s
         """
         
@@ -1841,6 +1950,7 @@ def export_players():
             
         if team:
             teams = [t.strip() for t in team.split(',')]
+            placeholders = ', '.join(['%s'] * len(teams))
             conditions.append(f"p.team IN ({placeholders})")
             params.extend(teams)
             
@@ -1860,7 +1970,7 @@ def export_players():
         # Generate CSV content with gameweek metadata
         csv_lines = []
         csv_lines.append(f"# Fantrax Value Hunter Export - Gameweek {gameweek} - Generated: {datetime.now().strftime('%Y-%m-%d %H:%M:%S')}")
-        csv_lines.append("Name,Team,Position,Price,PPG,Blended PPG,Value Score,True Value,ROI,Form Multiplier,Fixture Multiplier,Starter Multiplier,xGI Multiplier,Current Season Weight,Minutes,xG90,xA90,xGI90,xGI")
+        csv_lines.append("Name,Team,Position 1,Position 2,Price,PPG,Blended PPG,Total FPts,True Value,ROI,Form Multiplier,Fixture Multiplier,Starter Multiplier,xGI Multiplier,Current Season Weight,Minutes,xG90,xA90,xGI90,xGI")
         
         for player in players:
             current_weight = float(player['current_season_weight']) if player['current_season_weight'] else 0.0
@@ -1869,7 +1979,11 @@ def export_players():
             xa90 = float(player['xa90']) if player['xa90'] else 0.0
             xgi90 = float(player['xgi90']) if player['xgi90'] else 0.0
             xgi = float(player['xgi']) if player['xgi'] else 0.0
-            csv_lines.append(f"{player['name']},{player['team']},{player['position']},{player['price']},{player['ppg']},{player['blended_ppg']:.2f},{player['value_score']:.3f},{player['true_value']:.3f},{player['roi']:.3f},{player['form_multiplier']:.2f},{player['fixture_multiplier']:.2f},{player['starter_multiplier']:.2f},{player['xgi_multiplier']:.2f},{current_weight:.3f},{minutes},{xg90:.3f},{xa90:.3f},{xgi90:.3f},{xgi:.3f}")
+            # Split positions to prevent Excel data shifting
+            positions = player['position'].split(',') if player['position'] else ['']
+            position1 = positions[0].strip() if len(positions) > 0 else ''
+            position2 = positions[1].strip() if len(positions) > 1 else ''
+            csv_lines.append(f"{player['name']},{player['team']},{position1},{position2},{player['price']},{player['ppg']},{player['blended_ppg']:.2f},{player['total_fpts']:.3f},{player['true_value']:.3f},{player['roi']:.3f},{player['form_multiplier']:.2f},{player['fixture_multiplier']:.2f},{player['starter_multiplier']:.2f},{player['xgi_multiplier']:.2f},{current_weight:.3f},{minutes},{xg90:.3f},{xa90:.3f},{xgi90:.3f},{xgi:.3f}")
         
         csv_content = '\n'.join(csv_lines)
         
@@ -2098,10 +2212,13 @@ def apply_import():
         user_id = data.get('user_id', 'web_user')
         dry_run = data.get('dry_run', False)
         players = data.get('players', [])
-        
-        print(f"confirmed_mappings count: {len(confirmed_mappings)}")
-        print(f"players count: {len(players)}")
-        print(f"dry_run: {dry_run}")
+
+        print(f"[DEBUG] Apply import called with:")
+        print(f"  confirmed_mappings count: {len(confirmed_mappings)}")
+        print(f"  source_system: '{source_system}'")
+        print(f"  players count: {len(players)}")
+        print(f"  dry_run: {dry_run}")
+        print(f"  user_id: {user_id}")
         
         # Handle dry run case - just count confirmed mappings
         if dry_run:
@@ -2149,7 +2266,7 @@ def apply_import():
         # Count how many players would be imported
         for player in players:
             player_name = player.get('name', '')
-            
+
             # Check if this player would be successfully imported
             if player_name in confirmed_mappings:
                 import_count += 1
@@ -2163,13 +2280,88 @@ def apply_import():
                 )
                 if match_result['fantrax_id'] and not match_result['needs_review']:
                     import_count += 1
-        
+
+        # Apply starter multipliers for FFP imports
+        multipliers_applied = 0
+        print(f"[DEBUG] Source system: '{source_system}', checking for FFP multiplier application...")
+        if source_system == 'ffp':
+            print(f"[DEBUG] Starting FFP multiplier application...")
+            try:
+                # Load system parameters for starter predictions
+                cursor = get_db_connection().cursor()
+                cursor.execute("SELECT parameters FROM system_parameters WHERE id = 1")
+                params_row = cursor.fetchone()
+
+                if params_row:
+                    params = json.loads(params_row[0])
+                    starter_params = params.get('starter_prediction', {})
+
+                    # Load FFP data from temp file
+                    ffp_unmatched_path = os.path.join('temp', 'ffp_unmatched.json')
+                    if os.path.exists(ffp_unmatched_path):
+                        with open(ffp_unmatched_path, 'r', encoding='utf-8') as f:
+                            ffp_data = json.load(f)
+                            ffp_players = ffp_data.get('unmatched_players', [])
+                    else:
+                        ffp_players = players
+
+                    # Apply multipliers for successfully mapped players
+                    for player in ffp_players:
+                        player_name = player.get('name', '')
+                        confidence = player.get('confidence', 0.0)
+
+                        # Check if player has a mapping (either new or existing)
+                        fantrax_id = None
+                        if player_name in confirmed_mappings:
+                            fantrax_id = confirmed_mappings[player_name]['fantrax_id']
+                        else:
+                            match_result = matcher.match_player(
+                                source_name=player_name,
+                                source_system=source_system,
+                                team=player.get('team', ''),
+                                position=player.get('position', '')
+                            )
+                            if match_result['fantrax_id'] and not match_result['needs_review']:
+                                fantrax_id = match_result['fantrax_id']
+
+                        if fantrax_id and confidence > 0:
+                            # Calculate multiplier using system parameters
+                            from convert_ffp_csv import confidence_to_multiplier
+                            multiplier = confidence_to_multiplier(confidence, starter_params)
+
+                            # Update player_metrics with new starter multiplier
+                            cursor.execute("""
+                                UPDATE player_metrics
+                                SET starter_multiplier = %s,
+                                    last_updated = CURRENT_TIMESTAMP
+                                WHERE fantrax_id = %s
+                            """, (multiplier, fantrax_id))
+
+                            if cursor.rowcount > 0:
+                                multipliers_applied += 1
+                                print(f"Applied {multiplier:.2f}x multiplier to player {player_name} ({fantrax_id}) based on {confidence}% confidence")
+
+                    # Commit multiplier updates
+                    cursor.connection.commit()
+
+                    # Trigger true value recalculation for updated players
+                    if multipliers_applied > 0:
+                        print(f"Triggering true value recalculation for {multipliers_applied} players...")
+                        cursor.execute("SELECT trigger_true_value_calculation()")
+                        cursor.connection.commit()
+
+                cursor.close()
+
+            except Exception as e:
+                print(f"Error applying starter multipliers: {e}")
+
         return jsonify({
             'success': True,
             'import_count': import_count,
             'mappings_saved': saved_count,
+            'multipliers_applied': multipliers_applied,
             'failed_mappings': failed_mappings,
-            'message': f'Successfully imported {import_count} players with {saved_count} new mappings'
+            'message': f'Successfully imported {import_count} players with {saved_count} new mappings and {multipliers_applied} starter multipliers applied'
         })
         
     except Exception as e:
@@ -2452,7 +2644,7 @@ def import_form_data():
             SET ppg = (
                 SELECT 
                     CASE 
-                        WHEN COALESCE(pgd.games_played_current, 0) > 0 
+                        WHEN COALESCE(p.games_current_season, 0) > 0 
                         THEN COALESCE(pf_max.total_points, 0) / pgd.games_played_current
                         ELSE 0 
                     END
@@ -2488,6 +2680,7 @@ def import_form_data():
                 SELECT 
                     p.id as player_id, p.name, p.team, p.position,
                     p.xgi90, p.baseline_xgi, pm.price,
+                p.games_current_season,
                     -- Calculate fresh PPG using same logic as form import
                     CASE 
                         WHEN COALESCE(pgd.games_played, 0) > 0 
@@ -2921,6 +3114,129 @@ def import_odds():
         }), 500
 
 # ===============================
+# INDIVIDUAL GAME SCORES IMPORT
+# ===============================
+
+@app.route('/api/import-game-scores', methods=['POST'])
+def import_game_scores():
+    """
+    Import individual game scores from Fantrax CSV export
+    Expects CSV with columns: ID, Player, Team, Position, RkOv, Opponent, Salary, FPts, etc.
+    Stores individual game scores in player_game_scores table for enhanced Form calculation
+    """
+    try:
+        # Check for uploaded file
+        if 'file' not in request.files:
+            return jsonify({
+                'success': False,
+                'error': 'No file uploaded'
+            }), 400
+
+        file = request.files['file']
+        if file.filename == '':
+            return jsonify({
+                'success': False,
+                'error': 'No file selected'
+            }), 400
+
+        # Get game number from form data
+        game_number = request.form.get('game_number')
+        if not game_number:
+            return jsonify({
+                'success': False,
+                'error': 'Game number is required'
+            }), 400
+
+        try:
+            game_number = int(game_number)
+        except ValueError:
+            return jsonify({
+                'success': False,
+                'error': 'Game number must be a valid integer'
+            }), 400
+
+        # Read CSV file
+        import pandas as pd
+        import io
+
+        # Read the CSV content
+        stream = io.StringIO(file.stream.read().decode("UTF8"), newline=None)
+        csv_input = pd.read_csv(stream)
+
+        # Validate required columns
+        required_columns = ['ID', 'Player', 'FPts', 'Opponent']
+        missing_columns = [col for col in required_columns if col not in csv_input.columns]
+        if missing_columns:
+            return jsonify({
+                'success': False,
+                'error': f'Missing required columns: {missing_columns}'
+            }), 400
+
+        # Process the data
+        conn = get_db_connection()
+        cursor = conn.cursor()
+
+        imported_count = 0
+        error_count = 0
+        errors = []
+
+        # Get all existing player IDs to check against
+        cursor.execute("SELECT id FROM players")
+        existing_player_ids = set(row[0] for row in cursor.fetchall())
+
+        for index, row in csv_input.iterrows():
+            try:
+                # Extract player ID (remove asterisks from ID column)
+                player_id = str(row['ID']).strip('*')
+                player_name = row.get('Player', 'Unknown')
+                opponent = row.get('Opponent', 'Unknown')
+
+                # Skip if player not in our database
+                if player_id not in existing_player_ids:
+                    continue
+
+                # Get fantasy points
+                fpts = float(row['FPts'])
+
+                # Insert/update game score data
+                cursor.execute("""
+                    INSERT INTO player_game_scores (player_id, game_number, points_scored, opponent, import_timestamp)
+                    VALUES (%s, %s, %s, %s, NOW())
+                    ON CONFLICT (player_id, game_number)
+                    DO UPDATE SET
+                        points_scored = EXCLUDED.points_scored,
+                        opponent = EXCLUDED.opponent,
+                        import_timestamp = NOW()
+                """, [player_id, game_number, fpts, opponent])
+
+                imported_count += 1
+
+            except Exception as e:
+                error_count += 1
+                player_name = row.get('Player', 'Unknown')
+                errors.append(f"Row {index + 1} ({player_name}): {str(e)}")
+                continue
+
+        # Commit all changes
+        conn.commit()
+        conn.close()
+
+        return jsonify({
+            'success': True,
+            'message': f'Game {game_number} scores imported successfully',
+            'imported_count': imported_count,
+            'error_count': error_count,
+            'errors': errors[:10],  # Limit errors shown
+            'game_number': game_number
+        })
+
+    except Exception as e:
+        return jsonify({
+            'success': False,
+            'error': f'Import failed: {str(e)}'
+        }), 500
+
+# ===============================
 # VALIDATION UI ROUTES
 # ===============================
 
@@ -2938,6 +3254,40 @@ def form_upload_ui():
 def odds_upload_ui():
     """Serve the fixture odds upload UI"""
     return render_template('odds_upload.html')
+
+@app.route('/import-games')
+def import_games_ui():
+    """Serve the game scores import UI"""
+    try:
+        # Get the last imported game number
+        conn = get_db_connection()
+        cursor = conn.cursor()
+        cursor.execute("SELECT MAX(game_number) FROM player_game_scores")
+        last_game = cursor.fetchone()[0] or 0
+        next_game = last_game + 1
+
+        # Get import statistics
+        cursor.execute("""
+            SELECT game_number, COUNT(DISTINCT player_id) as players,
+                   COUNT(*) as total_scores,
+                   COUNT(CASE WHEN did_play = true THEN 1 END) as validated_played
+            FROM player_game_scores
+            GROUP BY game_number
+            ORDER BY game_number DESC
+            LIMIT 5
+        """)
+        recent_imports = cursor.fetchall()
+        cursor.close()
+        conn.close()
+
+        return render_template('import_game_scores.html',
+                             next_game=next_game,
+                             recent_imports=recent_imports)
+    except Exception as e:
+        return render_template('import_game_scores.html',
+                             next_game=5,
+                             recent_imports=[],
+                             error=f"Error loading import data: {str(e)}")
 
 @app.route('/monitoring')
 def monitoring_ui():
@@ -3954,7 +4304,7 @@ def parse_formation_csv(lines, cursor):
     
     return players_to_process
 
-def parse_ffp_formation_csv(lines, cursor):
+def parse_ffp_formation_csv(lines, cursor, starter_params=None):
     """
     Parse FFP formation CSV format (scraped web data).
     Format: Team Name, Player1, %, Player2, %, Player3, %...
@@ -4061,7 +4411,7 @@ def parse_ffp_formation_csv(lines, cursor):
                 'position': predicted_position,
                 'status': status,
                 'confidence': confidence,
-                'multiplier': confidence_to_multiplier(confidence)  # Use proper 5-category system
+                'multiplier': confidence_to_multiplier(confidence, starter_params)  # Use proper 5-category system
             }
             
             players_to_process.append(player_info)
@@ -4229,10 +4579,10 @@ def calculate_values_v2():
                 p.baseline_xgi,
                 pm.price,
                 -- Calculate fresh PPG using same logic as form import
-                CASE 
-                    WHEN COALESCE(pgd.games_played, 0) > 0 
-                    THEN COALESCE(pf_max.total_points, 0) / pgd.games_played
-                    ELSE 0 
+                CASE
+                    WHEN COALESCE(p.games_current_season, 0) > 0
+                    THEN COALESCE(pf_max.total_points, 0) / p.games_current_season
+                    ELSE 0
                 END as ppg,
                 pm.form_multiplier,
                 pm.fixture_multiplier,
@@ -4387,12 +4737,12 @@ def verify_ppg():
                 p.name,
                 p.team,
                 pm.ppg as stored_ppg,
-                CASE 
-                    WHEN COALESCE(pgd.games_played, 0) > 0 
-                    THEN COALESCE(pf.total_points, 0) / pgd.games_played
-                    ELSE 0 
+                CASE
+                    WHEN COALESCE(p.games_current_season, 0) > 0
+                    THEN COALESCE(pf.total_points, 0) / p.games_current_season
+                    ELSE 0
                 END as calculated_ppg,
-                ROUND(ABS(pm.ppg - COALESCE(pf.total_points / NULLIF(pgd.games_played, 0), 0)), 2) as difference,
+                ROUND(ABS(pm.ppg - COALESCE(pf.total_points / NULLIF(p.games_current_season, 0), 0)), 2) as difference,
                 pf.total_points,
                 pgd.games_played,
                 pm.true_value,
@@ -4407,7 +4757,7 @@ def verify_ppg():
             WHERE pm.gameweek = %s
               AND p.team != 'TST'  -- Exclude test players
               AND COALESCE(pgd.games_played, 0) > 0  -- Only players with games played
-            ORDER BY ABS(pm.ppg - COALESCE(pf.total_points / NULLIF(pgd.games_played, 0), 0)) DESC
+            ORDER BY ABS(pm.ppg - COALESCE(pf.total_points / NULLIF(p.games_current_season, 0), 0)) DESC
             LIMIT 50
         """, [gameweek, gameweek])
         
@@ -4847,43 +5197,43 @@ def get_archived_gameweeks():
 # REACT FRONTEND ROUTES - Added for Railway deployment
 # ============================================================================
 
-@app.route('/static/<path:filename>')
-def serve_react_static(filename):
-    """Serve React static files with robust fallback paths"""
-
-    # Try multiple paths in order of preference
-    static_paths = [
-        # Primary: Built files copied by Railway build process
-        os.path.join(os.path.dirname(__file__), 'static', 'react-build', 'static'),
-        # Fallback: Direct from frontend build (for development/Git)
-        os.path.join(os.path.dirname(os.path.dirname(__file__)), 'frontend', 'build', 'static')
-    ]
-
-    app.logger.info(f"📁 Static file request: {filename}")
-
-    for i, static_dir in enumerate(static_paths, 1):
-        file_path = os.path.join(static_dir, filename)
-        app.logger.info(f"🔍 Trying path {i}: {static_dir}")
-
-        if os.path.exists(file_path):
-            app.logger.info(f"✅ Found file at path {i}: {file_path}")
-            return send_file(file_path)
-        else:
-            app.logger.info(f"❌ Not found at path {i}: {file_path}")
-
-    # If no file found, log directory contents for debugging
-    for i, static_dir in enumerate(static_paths, 1):
-        if os.path.exists(static_dir):
-            try:
-                contents = os.listdir(static_dir)[:10]  # Limit to 10 items
-                app.logger.info(f"📋 Directory {i} contents: {contents}")
-            except Exception as e:
-                app.logger.error(f"📋 Could not list directory {i}: {e}")
-        else:
-            app.logger.error(f"📂 Directory {i} does not exist: {static_dir}")
-
-    app.logger.error(f"❌ Static file not found in any location: {filename}")
-    return f"Static file not found: {filename}", 404
+# DISABLED - WhiteNoise handles this: @app.route('/static/<path:filename>')
+# DISABLED - WhiteNoise handles this: def serve_react_static(filename):
+# DISABLED - WhiteNoise handles this:     """Serve React static files with robust fallback paths"""
+# DISABLED - WhiteNoise handles this: 
+# DISABLED - WhiteNoise handles this:     # Try multiple paths in order of preference
+# DISABLED - WhiteNoise handles this:     static_paths = [
+# DISABLED - WhiteNoise handles this:         # Primary: Built files copied by Railway build process
+# DISABLED - WhiteNoise handles this:         os.path.join(os.path.dirname(__file__), 'static', 'react-build', 'static'),
+# DISABLED - WhiteNoise handles this:         # Fallback: Direct from frontend build (for development/Git)
+# DISABLED - WhiteNoise handles this:         os.path.join(os.path.dirname(os.path.dirname(__file__)), 'frontend', 'build', 'static')
+# DISABLED - WhiteNoise handles this:     ]
+# DISABLED - WhiteNoise handles this: 
+# DISABLED - WhiteNoise handles this:     app.logger.info(f"📁 Static file request: {filename}")
+# DISABLED - WhiteNoise handles this: 
+# DISABLED - WhiteNoise handles this:     for i, static_dir in enumerate(static_paths, 1):
+# DISABLED - WhiteNoise handles this:         file_path = os.path.join(static_dir, filename)
+# DISABLED - WhiteNoise handles this:         app.logger.info(f"🔍 Trying path {i}: {static_dir}")
+# DISABLED - WhiteNoise handles this: 
+# DISABLED - WhiteNoise handles this:         if os.path.exists(file_path):
+# DISABLED - WhiteNoise handles this:             app.logger.info(f"✅ Found file at path {i}: {file_path}")
+# DISABLED - WhiteNoise handles this:             return send_file(file_path)
+# DISABLED - WhiteNoise handles this:         else:
+# DISABLED - WhiteNoise handles this:             app.logger.info(f"❌ Not found at path {i}: {file_path}")
+# DISABLED - WhiteNoise handles this: 
+# DISABLED - WhiteNoise handles this:     # If no file found, log directory contents for debugging
+# DISABLED - WhiteNoise handles this:     for i, static_dir in enumerate(static_paths, 1):
+# DISABLED - WhiteNoise handles this:         if os.path.exists(static_dir):
+# DISABLED - WhiteNoise handles this:             try:
+# DISABLED - WhiteNoise handles this:                 contents = os.listdir(static_dir)[:10]  # Limit to 10 items
+# DISABLED - WhiteNoise handles this:                 app.logger.info(f"📋 Directory {i} contents: {contents}")
+# DISABLED - WhiteNoise handles this:             except Exception as e:
+# DISABLED - WhiteNoise handles this:                 app.logger.error(f"📋 Could not list directory {i}: {e}")
+# DISABLED - WhiteNoise handles this:         else:
+# DISABLED - WhiteNoise handles this:             app.logger.error(f"📂 Directory {i} does not exist: {static_dir}")
+# DISABLED - WhiteNoise handles this: 
+# DISABLED - WhiteNoise handles this:     app.logger.error(f"❌ Static file not found in any location: {filename}")
+# DISABLED - WhiteNoise handles this:     return f"Static file not found: {filename}", 404
 
 def serve_react_static_old(filename):
     """Serve React static files (CSS, JS, images)"""
@@ -4930,27 +5280,52 @@ def serve_react_app(path=''):
 if __name__ == '__main__':
     print("Starting Fantrax Value Hunter Flask Backend...")
     print(f"Database: {DB_CONFIG['database']} on port {DB_CONFIG['port']}")
-    
-    # Test database connection on startup
-    try:
-        conn = get_db_connection()
-        cursor = conn.cursor()
-        cursor.execute("SELECT COUNT(*) FROM players")
-        player_count = cursor.fetchone()[0]
-        print(f"Database connected: {player_count} players loaded")
-        
-        cursor.close()
-        conn.close()
-    except Exception as e:
-        print(f"Database connection failed: {e}")
-        print("Starting app anyway...")
-    
+
+    # Test database connection on startup with timeout
+    def test_db_connection():
+        """Test database connection in a separate thread"""
+        try:
+            conn = get_db_connection()
+            cursor = conn.cursor()
+            cursor.execute("SELECT COUNT(*) FROM players")
+            player_count = cursor.fetchone()[0]
+            print(f"Database connected: {player_count} players loaded")
+
+            cursor.close()
+            conn.close()
+            return True
+        except Exception as e:
+            print(f"Database connection failed: {e}")
+            print("App will start anyway - database operations may fail until connection is established")
+            return False
+
+    # Run database test with timeout
+    import threading
+    import time
+
+    db_test_result = {'connected': False}
+
+    def db_test_thread():
+        db_test_result['connected'] = test_db_connection()
+
+    # Start database test in background
+    test_thread = threading.Thread(target=db_test_thread)
+    test_thread.daemon = True
+    test_thread.start()
+
+    # Wait max 8 seconds for database test
+    test_thread.join(timeout=8)
+
+    if test_thread.is_alive():
+        print("Database connection test timed out - starting app anyway")
+        print("Note: Database operations may fail until connection is established")
+
     # Production-ready configuration
     port = int(os.getenv('PORT', 5001))  # Use 5001 to avoid conflict
     debug = os.getenv('FLASK_ENV') == 'development'
-    
+
     # DEVELOPMENT: Enable auto-reload for code changes
     # Set debug=True to auto-restart server when Python files change
     development_mode = False  # Production mode
-    
+
     app.run(debug=development_mode, host='0.0.0.0', port=port, use_reloader=development_mode)

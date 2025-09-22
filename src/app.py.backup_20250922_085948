@@ -2657,18 +2657,22 @@ def import_form_data():
             SET ppg = (
                 SELECT 
                     CASE 
-                        WHEN COALESCE(players.games_current_season, 0) > 0 
-                        THEN COALESCE(pf_max.total_points, 0) / players.games_current_season
+                        WHEN COALESCE(p.games_current_season, 0) > 0 
+                        THEN COALESCE(pf_max.total_points, 0) / pgd.games_played_current
                         ELSE 0 
                     END
-                FROM players
-                LEFT JOIN (
+                FROM (
                     SELECT player_id, MAX(points) as total_points
                     FROM player_form
                     WHERE player_id = pm.player_id
                     GROUP BY player_id
-                ) pf_max ON players.id = pf_max.player_id
-                WHERE players.id = pm.player_id
+                ) pf_max
+                LEFT JOIN (
+                    SELECT player_id, SUM(games_played) as games_played_current
+                    FROM player_games_data 
+                    WHERE player_id = pm.player_id
+                    GROUP BY player_id
+                ) pgd ON pf_max.player_id = pgd.player_id
                 LIMIT 1
             )
             WHERE pm.gameweek = %s
