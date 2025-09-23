@@ -970,11 +970,29 @@ def update_parameters():
             """, query_params + query_params[:4])  # Duplicate params for both updates
 
             updated_csv_players = cursor_param.rowcount
+
+            # Update non-CSV players with the same parameter values
+            cursor_param.execute("""
+                UPDATE player_metrics
+                SET starter_multiplier = %s,
+                    form_multiplier = %s,
+                    fixture_multiplier = %s,
+                    xgi_multiplier = %s
+                WHERE player_name NOT IN (
+                    SELECT DISTINCT player_name
+                    FROM player_metrics
+                    WHERE csv_upload_id IS NOT NULL
+                )
+            """, query_params[:4])
+
+            updated_non_csv_players = cursor_param.rowcount
+
             conn_param.commit()
             cursor_param.close()
             conn_param.close()
 
             print(f"Updated {updated_csv_players} CSV players with new parameter values")
+            print(f"Updated {updated_non_csv_players} non-CSV players with new parameter values")
 
         except Exception as e:
             print(f"Error updating CSV multipliers: {e}")
@@ -999,9 +1017,10 @@ def update_parameters():
         
         # Clear the cache so frontend gets fresh data immediately
         # Clear only this player's cache entries for efficiency
-        cache_keys_to_delete = [key for key in cache.cache._cache.keys() if str(player_id) in str(key)]
-        for key in cache_keys_to_delete:
-            cache.delete(key)
+        if 'player_id' in locals():
+            cache_keys_to_delete = [key for key in cache.cache._cache.keys() if str(player_id) in str(key)]
+            for key in cache_keys_to_delete:
+                cache.delete(key)
         
         return jsonify({
             'success': True,

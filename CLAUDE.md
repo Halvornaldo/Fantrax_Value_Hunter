@@ -6,8 +6,9 @@ V2.0 Enhanced Formula system for Premier League fantasy analysis using Python Fl
 ## Quick Start
 ```bash
 cd C:/Users/halvo/.claude/Fantrax_Value_Hunter
-start_dashboard.bat  # Starts backend (5001) + React dashboard (3000)
-# OR manually: python src/app.py && cd frontend && npm start
+start_dashboard_safe.bat  # RECOMMENDED: Starts backend (5001) + React dashboard (3000) with safe file editing
+# Alternative: start_dashboard.bat (original, may cause file locks during intensive editing)
+# Manual: python src/app.py && cd frontend && npm start
 ```
 
 ## Core Architecture
@@ -85,28 +86,30 @@ python check_current_state.py
 - **Without this**: New data won't update due to aggressive caching
 - **Status**: ✅ Currently enabled (September 2025)
 
-## Fixing File Modification Errors
-If you encounter "File has been unexpectedly modified" errors when using Claude Code:
+## File Editing and Process Management
+✅ **File modification issues have been resolved** (September 2025)
 
-### Solution 1: Use No-Reload Mode (Immediate Fix)
+### Recommended Startup Methods
 ```bash
-start_dev_no_reload.bat  # Start Flask WITHOUT auto-reloader
+start_dashboard_safe.bat  # RECOMMENDED: Safe mode prevents file lock issues
+start_dev_no_reload_corrected.bat  # Backend only, no auto-reload
+emergency_recovery.bat  # For recovery if services get stuck
 ```
-This prevents Flask's file watcher from interfering with external edits.
 
-### Solution 2: Regular Development (With Watchdog)
-```bash
-start_dashboard.bat  # Normal mode - now uses efficient watchdog instead of stat polling
-```
-The `watchdog` package is installed to prevent race conditions with the auto-reloader.
+### Issue Resolution Summary
+- **Root Cause**: Multiple `cmd.exe` processes holding directory handles
+- **Solution**: Use safe startup scripts with `FLASK_NO_RELOAD=true`
+- **Status**: Parameter updates now work without CSV re-import
+- **Fixes Applied**: Cache clearing bug, cursor closure bug, UI cleanup
 
-### Environment Variables
-- `FLASK_NO_RELOAD=true` - Disables auto-reloader to prevent file conflicts
+### Environment Variables (Current Working Setup)
 - `FLASK_ENV=development` - Enables development mode features
+- `FLASK_NO_RELOAD=true` - Prevents file watcher conflicts with Claude Code
+- ❌ **Do NOT use**: `WERKZEUG_RUN_MAIN=true` (causes KeyError)
 
 ### VS Code Configuration
 - `.vscode/settings.json` - Excludes unnecessary directories from file watching
-- Reduces background file system activity that can cause conflicts
+- Background processes are managed automatically by safe startup scripts
 
 ## Current Status
 Production-ready V2.0 system processing 714 Premier League players with advanced mathematical formulas for live fantasy optimization. Uses single live table approach for real-time data updates. No snapshot tables needed - all data is live and continuously updated.

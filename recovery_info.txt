@@ -1,0 +1,61 @@
+# RECOVERY INFORMATION - FINAL RESOLUTION ✅
+# Created: 2025-09-23 during file lock diagnosis session
+# Updated: 2025-09-23 with final resolution
+# Claude Code session recovery context
+
+## FINAL STATUS: ALL ISSUES RESOLVED ✅
+- ✅ File editing works properly with corrected scripts
+- ✅ Parameter updates work without CSV re-import
+- ✅ Cache clearing bug fixed (undefined player_id)
+- ✅ UI cleanup complete (Out parameter removed)
+- ✅ Documentation updated with safe startup methods
+
+## RECOMMENDED STARTUP SCRIPTS:
+1. **start_dashboard_safe.bat** - NEW RECOMMENDED: Safe startup preventing file locks
+2. start_dashboard_corrected.bat - Alternative working version
+3. start_dev_no_reload_corrected.bat - Backend only without auto-reload
+4. emergency_recovery.bat - For recovery situations
+5. Deprecated scripts moved to archive/old_scripts/
+
+## ENVIRONMENT VARIABLES THAT WORK:
+- FLASK_ENV=development
+- FLASK_NO_RELOAD=true
+- DO NOT USE: WERKZEUG_RUN_MAIN=true (causes KeyError)
+
+## FLASK STARTUP COMMAND THAT WORKS:
+cd C:/Users/halvo/.claude/Fantrax_Value_Hunter
+export FLASK_ENV=development
+export FLASK_NO_RELOAD=true
+python src/app.py
+
+## ORIGINAL ISSUES TO FIX AFTER CLEANUP:
+1. Cache clearing error in app.py line 1002 (undefined player_id)
+2. Add non-CSV players update query after line 977
+3. Remove "Out" parameter from ParameterPanel.js lines 548-563
+4. Fix hardcoded bench penalty in PlayerTable.js line 343
+
+## RESOURCE MONITOR FINDINGS:
+- Search "Fantrax_Value_Hunter" in Resource Monitor > CPU > Associated Handles
+- Found massive handle contention from cmd.exe, Code.exe, node.exe, github-mcp-server.exe
+- No locks on specific files (app.py, *.bat) - just directory-level handles
+
+## VS CODE STATUS:
+- Keep VS Code open for Claude Code communication
+- Close all tabs, terminals (except Claude Code), collapse sidebar
+- File locks are from spawned processes, not VS Code directly
+
+## DATABASE CONNECTION:
+- PostgreSQL: fantrax_value_hunter on localhost:5433
+- User: fantrax_user / fantrax_password
+- 713 players loaded successfully
+
+## NEXT STEPS AFTER RECOVERY:
+1. Use external terminal for Flask (not VS Code integrated)
+2. Single process only - no batch files with multiple 'start' commands
+3. Test file editing works
+4. Apply original parameter update fixes
+
+## EMERGENCY CONTACTS:
+- If lost, restart with: start_dev_no_reload_corrected.bat
+- Check this file for context recovery
+- Use emergency_recovery.bat if created

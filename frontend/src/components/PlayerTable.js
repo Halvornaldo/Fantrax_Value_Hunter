@@ -340,7 +340,7 @@ const PlayerTable = ({ playersData, gameweekInfo, systemConfig, onDataRefresh })
       starter_override: {
         title: 'Starter Override',
         description: 'Manual controls for starter predictions',
-        interpretation: 'S=Starter (1.0x) • L=Likely (0.90x) • R=Rotation (0.75x) • U=Unlikely (0.50x) • B=Bench (0.35x) • O=Out (0.0x) • A=Auto',
+        interpretation: 'S=Starter (1.0x) • L=Likely (0.90x) • R=Rotation (0.75x) • U=Unlikely (0.50x) • B=Bench (dynamic) • O=Out (0.0x) • A=Auto',
         details: 'Click to override automatic predictions. Values adjustable in parameter panel.'
       },
       xgi_multiplier: {

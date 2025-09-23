@@ -545,25 +545,6 @@ const ParameterPanel = ({ systemConfig, onParametersUpdate, playersCount }) => {
 
         <Divider orientation="vertical" flexItem />
 
-        {/* Out Penalty */}
-        <Grid item xs={1.5}>
-          <Typography variant="body2" gutterBottom>Out</Typography>
-          <Slider
-            value={parameters.outPenalty}
-            onChange={(e, value) => handleParameterChange('outPenalty', value)}
-            min={0.0}
-            max={1.0}
-            step={0.05}
-            size="small"
-            valueLabelDisplay="auto"
-          />
-          <Typography variant="caption" color="text.secondary">
-            {(parameters.outPenalty || 0.0).toFixed(2)}x
-          </Typography>
-        </Grid>
-
-        <Divider orientation="vertical" flexItem />
-
         {/* Actions */}
         <Grid item>
           <Box sx={{ display: 'flex', gap: 1 }}>

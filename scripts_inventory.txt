@@ -1,0 +1,32 @@
+# WORKING SCRIPTS INVENTORY - Safety Backup
+# Created during file lock resolution session
+
+## CORRECTED STARTUP SCRIPTS (WORKING):
+1. start_dev_no_reload_corrected.bat - Single Flask instance without auto-reload
+2. start_dashboard_corrected.bat - Full dashboard with backend + frontend
+
+## ORIGINAL SCRIPTS (VARIOUS ISSUES):
+- start_dashboard.bat - Original, spawns multiple cmd windows
+- start_dev_no_reload.bat - Original no-reload version
+- start_dev_no_reload_fixed.bat - Had WERKZEUG_RUN_MAIN issue
+- start_dashboard_fixed.bat - Had WERKZEUG_RUN_MAIN issue
+
+## BACKUP FILES:
+- src/app_backup_safe.py - Backup of app.py before any modifications
+- recovery_info.txt - Full session context and recovery information
+
+## COMMAND THAT WORKS FOR FLASK:
+cd C:/Users/halvo/.claude/Fantrax_Value_Hunter
+export FLASK_ENV=development
+export FLASK_NO_RELOAD=true
+python src/app.py
+
+## FILES TO EDIT AFTER CLEANUP:
+- src/app.py (cache clearing fix, non-CSV player updates)
+- frontend/src/components/ParameterPanel.js (remove Out parameter)
+- frontend/src/components/PlayerTable.js (fix hardcoded bench penalty)
+
+## ENVIRONMENT SETUP:
+- Database: fantrax_value_hunter (PostgreSQL localhost:5433)
+- User: fantrax_user / fantrax_password
+- Project: Fantrax Value Hunter V2.0 Enhanced Formula system
