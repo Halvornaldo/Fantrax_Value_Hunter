@@ -23,11 +23,12 @@ import {
   CloudSync,
   FileUpload,
   SportsFootball,
-  SportsSoccer
+  SportsSoccer,
+  Restore
 } from '@mui/icons-material';
 import { useTheme as useMuiTheme } from '@mui/material/styles';
 
-import { updateSystemParameters, runModelValidation, syncUnderstatData, importLineupCSV, importOddsCSV } from '../services/api';
+import { updateSystemParameters, resetSystemParametersToDefaults, runModelValidation, syncUnderstatData, importLineupCSV, importOddsCSV } from '../services/api';
 
 const ParameterPanel = ({ systemConfig, onParametersUpdate, playersCount }) => {
   const muiTheme = useMuiTheme();
@@ -35,15 +36,15 @@ const ParameterPanel = ({ systemConfig, onParametersUpdate, playersCount }) => {
 
   // Parameter states
   const [parameters, setParameters] = useState({
-    ewmaAlpha: 0.87,
-    adaptationGameweek: 12,
+    ewmaAlpha: 0.44,
+    adaptationGameweek: 10,
     xgiEnabled: false,
     xgiStrength: 1.0,
-    formCap: 2.0,
+    formCap: 1.4,
     fixtureCap: 1.8,
     xgiCap: 2.5,
     globalCap: 3.0,
-    fixtureBase: 1.15,
+    fixtureBase: 1.3,
     // Formula toggles
     formEnabled: false,
     fixtureEnabled: true,
@@ -66,15 +67,15 @@ const ParameterPanel = ({ systemConfig, onParametersUpdate, playersCount }) => {
       const v2Config = systemConfig.formula_optimization_v2;
       const starterConfig = systemConfig.starter_prediction;
       setParameters({
-        ewmaAlpha: v2Config.ewma_form?.alpha || 0.87,
-        adaptationGameweek: v2Config.dynamic_blending?.full_adaptation_gw || 12,
+        ewmaAlpha: v2Config.ewma_form?.alpha || 0.44,
+        adaptationGameweek: v2Config.dynamic_blending?.full_adaptation_gw || 10,
         xgiEnabled: v2Config.normalized_xgi?.enabled || false,
         xgiStrength: v2Config.normalized_xgi?.normalization_strength || 1.0,
-        formCap: v2Config.multiplier_caps?.form || 2.0,
+        formCap: v2Config.multiplier_caps?.form || 1.4,
         fixtureCap: v2Config.multiplier_caps?.fixture || 1.8,
         xgiCap: v2Config.multiplier_caps?.xgi || 2.5,
         globalCap: v2Config.multiplier_caps?.global || 3.0,
-        fixtureBase: v2Config.exponential_fixture?.base || 1.15,
+        fixtureBase: v2Config.exponential_fixture?.base || 1.3,
         // Formula toggles
         formEnabled: v2Config.formula_toggles?.form_enabled ?? false,
         fixtureEnabled: v2Config.formula_toggles?.fixture_enabled ?? true,
@@ -200,6 +201,38 @@ const ParameterPanel = ({ systemConfig, onParametersUpdate, playersCount }) => {
     }
   };
 
+  // Reset parameters to defaults
+  const handleResetToDefaults = async () => {
+    const confirmReset = window.confirm(
+      'Are you sure you want to reset all parameters to their default values?\n\n' +
+      'This will:\n' +
+      '• Reset all sliders to baseline values\n' +
+      '• Update all player calculations\n' +
+      '• Cannot be undone\n\n' +
+      'Proceed with reset?'
+    );
+
+    if (!confirmReset) return;
+
+    try {
+      setUpdating(true);
+      const response = await resetSystemParametersToDefaults();
+
+      if (response.success) {
+        setPendingChanges(false);
+        await onParametersUpdate(response.updated_config || {});
+        alert(`${response.message}\n\nUpdated ${response.updated_players} players with default parameter values.`);
+      } else {
+        throw new Error(response.error || 'Failed to reset parameters');
+      }
+    } catch (error) {
+      console.error('Reset failed:', error);
+      alert('Reset failed: ' + error.message);
+    } finally {
+      setUpdating(false);
+    }
+  };
+
   // Handle lineup import
   const handleLineupImport = async (event) => {
     const file = event.target.files?.[0];
@@ -267,8 +300,8 @@ const ParameterPanel = ({ systemConfig, onParametersUpdate, playersCount }) => {
           <Slider
             value={parameters.ewmaAlpha}
             onChange={(e, value) => handleParameterChange('ewmaAlpha', value)}
-            min={0.1}
-            max={1.0}
+            min={0.25}
+            max={0.75}
             step={0.01}
             size="small"
             valueLabelDisplay="auto"
@@ -286,8 +319,8 @@ const ParameterPanel = ({ systemConfig, onParametersUpdate, playersCount }) => {
           <Slider
             value={parameters.adaptationGameweek}
             onChange={(e, value) => handleParameterChange('adaptationGameweek', value)}
-            min={8}
-            max={20}
+            min={5}
+            max={15}
             step={1}
             size="small"
             valueLabelDisplay="auto"
@@ -415,16 +448,16 @@ const ParameterPanel = ({ systemConfig, onParametersUpdate, playersCount }) => {
         <Grid item xs={1.5}>
           <Typography variant="body2" gutterBottom>Fixture Base</Typography>
           <Slider
-            value={parameters.fixtureBase || 1.15}
+            value={parameters.fixtureBase || 1.3}
             onChange={(e, value) => handleParameterChange('fixtureBase', value)}
-            min={1.0}
-            max={1.3}
+            min={1.15}
+            max={1.50}
             step={0.01}
             size="small"
             valueLabelDisplay="auto"
           />
           <Typography variant="caption" color="text.secondary">
-            {(parameters.fixtureBase || 1.15).toFixed(2)}
+            {(parameters.fixtureBase || 1.3).toFixed(2)}
           </Typography>
         </Grid>
 
@@ -474,9 +507,9 @@ const ParameterPanel = ({ systemConfig, onParametersUpdate, playersCount }) => {
           <Slider
             value={parameters.likelyStarterPenalty}
             onChange={(e, value) => handleParameterChange('likelyStarterPenalty', value)}
-            min={0.0}
-            max={1.0}
-            step={0.05}
+            min={0.7}
+            max={0.95}
+            step={0.01}
             size="small"
             valueLabelDisplay="auto"
           />
@@ -493,9 +526,9 @@ const ParameterPanel = ({ systemConfig, onParametersUpdate, playersCount }) => {
           <Slider
             value={parameters.rotationPenalty}
             onChange={(e, value) => handleParameterChange('rotationPenalty', value)}
-            min={0.0}
-            max={1.0}
-            step={0.05}
+            min={0.5}
+            max={0.85}
+            step={0.01}
             size="small"
             valueLabelDisplay="auto"
           />
@@ -513,9 +546,9 @@ const ParameterPanel = ({ systemConfig, onParametersUpdate, playersCount }) => {
           <Slider
             value={parameters.unlikelyStarterPenalty}
             onChange={(e, value) => handleParameterChange('unlikelyStarterPenalty', value)}
-            min={0.0}
-            max={1.0}
-            step={0.05}
+            min={0.30}
+            max={0.65}
+            step={0.01}
             size="small"
             valueLabelDisplay="auto"
           />
@@ -532,9 +565,9 @@ const ParameterPanel = ({ systemConfig, onParametersUpdate, playersCount }) => {
           <Slider
             value={parameters.benchPenalty}
             onChange={(e, value) => handleParameterChange('benchPenalty', value)}
-            min={0.0}
-            max={1.0}
-            step={0.05}
+            min={0.05}
+            max={0.25}
+            step={0.01}
             size="small"
             valueLabelDisplay="auto"
           />
@@ -587,6 +620,17 @@ const ParameterPanel = ({ systemConfig, onParametersUpdate, playersCount }) => {
             <Tooltip title="Run Validation">
               <IconButton size="small" onClick={() => window.open('/api/validation-dashboard', '_blank')}>
                 <Assessment />
+              </IconButton>
+            </Tooltip>
+
+            <Tooltip title="Reset to Defaults">
+              <IconButton
+                size="small"
+                onClick={handleResetToDefaults}
+                disabled={updating}
+                color="warning"
+              >
+                <Restore />
               </IconButton>
             </Tooltip>
           </Box>

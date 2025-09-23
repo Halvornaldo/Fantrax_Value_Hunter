@@ -157,6 +157,16 @@ def save_system_parameters(parameters: Dict):
         print(f"Error saving system parameters: {e}")
         return False
 
+def load_default_system_parameters():
+    """Load default system parameters from defaults config file"""
+    config_path = os.path.join(os.path.dirname(__file__), '..', 'config', 'system_parameters_defaults.json')
+    try:
+        with open(config_path, 'r') as f:
+            return json.load(f)
+    except Exception as e:
+        print(f"Error loading default system parameters: {e}")
+        return {}
+
 def get_data_freshness_info(gameweek: int) -> Dict:
     """Get detailed data freshness information for monitoring"""
     conn = get_db_connection()
@@ -1087,6 +1097,35 @@ def update_system_parameters():
             'updated_config': current_params
         })
         
+    except Exception as e:
+        return jsonify({
+            'success': False,
+            'error': str(e)
+        }), 500
+
+@app.route('/api/system/reset-to-defaults', methods=['POST'])
+def reset_system_parameters_to_defaults():
+    """Reset system parameters to default values"""
+    try:
+        # Load default parameters
+        default_params = load_default_system_parameters()
+        if not default_params:
+            return jsonify({'error': 'Failed to load default system configuration'}), 500
+
+        # Save defaults as current parameters
+        if not save_system_parameters(default_params):
+            return jsonify({'error': 'Failed to save default parameters'}), 500
+
+        # Trigger recalculation using the same pattern as regular parameter updates
+        gameweek = 1  # Fixed for live data system
+        recalc_result = recalculate_true_values(gameweek)
+
+        return jsonify({
+            'success': True,
+            'message': 'Successfully reset to default parameters and recalculated all player values',
+            'updated_config': default_params
+        })
+
     except Exception as e:
         return jsonify({
             'success': False,

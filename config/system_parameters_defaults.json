@@ -1,0 +1,122 @@
+{
+  "games_display": {
+    "baseline_switchover_gameweek": 10,
+    "transition_end_gameweek": 15,
+    "description": "Blender display configuration"
+  },
+  "xgi_integration": {
+    "enabled": true,
+    "last_sync": 1758520347.2426536,
+    "matched_players": 404,
+    "unmatched_players": 12,
+    "description": "xGI integration toggle and statistics"
+  },
+  "starter_prediction": {
+    "enabled": true,
+    "manual_overrides": {},
+    "likely_starter_penalty": 0.8,
+    "auto_rotation_penalty": 0.7,
+    "unlikely_starter_penalty": 0.5,
+    "force_bench_penalty": 0.15,
+    "force_out_penalty": 0,
+    "description": "5-category starter prediction system: 1.0x (definite), 0.90x (likely), 0.75x (rotation), 0.50x (unlikely), 0.35x (bench), 0.0x (out)"
+  },
+  "formula_optimization_v2": {
+    "enabled": true,
+    "formula_toggles": {
+      "form_enabled": true,
+      "fixture_enabled": true,
+      "starter_enabled": true,
+      "xgi_enabled": true
+    },
+    "exponential_form": {
+      "enabled": true,
+      "alpha": 0.44
+    },
+    "dynamic_blending": {
+      "enabled": true,
+      "full_adaptation_gw": 10,
+      "transition_period": 12,
+      "description": "MAX(games_ratio, transition_ratio) blending formula - transition_period controls pace of adaptation"
+    },
+    "normalized_xgi": {
+      "enabled": true,
+      "normalization_strength": 1,
+      "position_adjustments": {
+        "defenders": true,
+        "midfielders": true,
+        "forwards": true
+      }
+    },
+    "exponential_fixture": {
+      "enabled": true,
+      "base": 1.3,
+      "position_weights": {
+        "G": 1.25,
+        "D": 1.2,
+        "M": 1.0,
+        "F": 1.12
+      }
+    },
+    "progressive_form_ranges": {
+      "enabled": true,
+      "ranges_by_games": [
+        {
+          "games": 2,
+          "min": 0.95,
+          "max": 1.05,
+          "description": "±5% for 1-2 games"
+        },
+        {
+          "games": 4,
+          "min": 0.85,
+          "max": 1.15,
+          "description": "±15% for 3-4 games"
+        },
+        {
+          "games": 6,
+          "min": 0.8,
+          "max": 1.2,
+          "description": "±20% for 5-6 games"
+        },
+        {
+          "games": 8,
+          "min": 0.75,
+          "max": 1.25,
+          "description": "±25% for 7-8 games"
+        },
+        {
+          "games": 10,
+          "min": 0.7,
+          "max": 1.3,
+          "description": "±30% for 9-10 games"
+        }
+      ],
+      "full_range_games": 15,
+      "description": "Progressive form ranges based on sample size for balanced multiplier impact"
+    },
+    "multiplier_caps": {
+      "form": 1.4,
+      "fixture": 2.5,
+      "xgi": 2.5,
+      "global": 3
+    },
+    "ewma_form": {
+      "alpha": 0.44
+    }
+  },
+  "candidate_pools": {
+    "description": "Pool sizes and filters",
+    "pool_sizes": {
+      "G": 8,
+      "D": 20,
+      "M": 20,
+      "F": 20
+    }
+  },
+  "metadata": {
+    "version": "v2.0",
+    "last_updated": "2025-09-23",
+    "description": "Default parameter configuration - pristine baseline values"
+  }
+}

@@ -120,6 +120,27 @@ export const updateSystemParameters = async (parameters) => {
   }
 };
 
+// Reset system parameters to defaults
+export const resetSystemParametersToDefaults = async () => {
+  try {
+    const data = await makeRequest('/api/system/reset-to-defaults', {
+      method: 'POST',
+    });
+
+    return {
+      success: true,
+      updated_config: data.updated_config,
+      message: data.message || 'Parameters reset to defaults successfully',
+      updated_players: data.updated_players
+    };
+  } catch (error) {
+    return {
+      success: false,
+      error: error.message
+    };
+  }
+};
+
 // Run model validation
 export const runModelValidation = async (version = 'v2.0') => {
   try {
@@ -318,6 +339,7 @@ export default {
   fetchPlayersData,
   fetchSystemConfig,
   updateSystemParameters,
+  resetSystemParametersToDefaults,
   runModelValidation,
   syncUnderstatData,
   exportPlayersCSV,
