@@ -173,9 +173,10 @@ const Dashboard = () => {
               border: `1px solid ${muiTheme.palette.divider}`,
             }}
           >
-            <PlayerTable 
+            <PlayerTable
               playersData={playersData}
               gameweekInfo={gameweekInfo}
+              systemConfig={systemConfig}
               onDataRefresh={loadDashboardData}
             />
           </Paper>

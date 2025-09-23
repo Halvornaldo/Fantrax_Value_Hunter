@@ -4,10 +4,10 @@ Handles team name mapping, confidence percentage parsing, and confidence-based m
 
 This script converts FFP's confidence-based predictions to weighted starter multipliers:
 - 90-100% confidence → 1.0x (definite starter)
-- 70-89% confidence → 0.9x (likely starter)
-- 50-69% confidence → 0.75x (rotation risk)
+- 70-89% confidence → 0.85x (likely starter)
+- 50-69% confidence → 0.70x (rotation risk)
 - 30-49% confidence → 0.50x (unlikely starter)
-- <30% confidence → 0.35x (bench)
+- <30% confidence → 0.15x (bench)
 """
 
 import csv
@@ -61,22 +61,22 @@ def confidence_to_multiplier(confidence_percentage, starter_params=None):
     if starter_params is None:
         # Default values if no parameters provided (backwards compatibility)
         starter_params = {
-            'likely_starter_penalty': 0.90,
-            'auto_rotation_penalty': 0.75,
+            'likely_starter_penalty': 0.85,
+            'auto_rotation_penalty': 0.70,
             'unlikely_starter_penalty': 0.50,
-            'force_bench_penalty': 0.35
+            'force_bench_penalty': 0.15
         }
 
     if confidence_percentage >= 90:
         return 1.0    # Definite starter
     elif confidence_percentage >= 70:
-        return starter_params.get('likely_starter_penalty', 0.90)
+        return starter_params.get('likely_starter_penalty', 0.85)
     elif confidence_percentage >= 50:
-        return starter_params.get('auto_rotation_penalty', 0.75)
+        return starter_params.get('auto_rotation_penalty', 0.70)
     elif confidence_percentage >= 30:
         return starter_params.get('unlikely_starter_penalty', 0.50)
     else:
-        return starter_params.get('force_bench_penalty', 0.35)
+        return starter_params.get('force_bench_penalty', 0.15)
 
 def parse_confidence_percentage(confidence_str):
     """
@@ -239,10 +239,10 @@ def main():
         print("Converts Fantasy Football Pundit confidence-based predictions to individual player format")
         print("with confidence-based multipliers:")
         print("  90-100% → 1.0x (definite starter)")
-        print("  70-89%  → 0.9x (likely starter)")
-        print("  50-69%  → 0.75x (rotation risk)")
+        print("  70-89%  → 0.85x (likely starter)")
+        print("  50-69%  → 0.70x (rotation risk)")
         print("  30-49%  → 0.50x (unlikely starter)")
-        print("  <30%    → 0.35x (bench)")
+        print("  <30%    → 0.15x (bench)")
         sys.exit(1)
     
     input_path = sys.argv[1]

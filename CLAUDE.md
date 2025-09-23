@@ -85,5 +85,28 @@ python check_current_state.py
 - **Without this**: New data won't update due to aggressive caching
 - **Status**: ✅ Currently enabled (September 2025)
 
+## Fixing File Modification Errors
+If you encounter "File has been unexpectedly modified" errors when using Claude Code:
+
+### Solution 1: Use No-Reload Mode (Immediate Fix)
+```bash
+start_dev_no_reload.bat  # Start Flask WITHOUT auto-reloader
+```
+This prevents Flask's file watcher from interfering with external edits.
+
+### Solution 2: Regular Development (With Watchdog)
+```bash
+start_dashboard.bat  # Normal mode - now uses efficient watchdog instead of stat polling
+```
+The `watchdog` package is installed to prevent race conditions with the auto-reloader.
+
+### Environment Variables
+- `FLASK_NO_RELOAD=true` - Disables auto-reloader to prevent file conflicts
+- `FLASK_ENV=development` - Enables development mode features
+
+### VS Code Configuration
+- `.vscode/settings.json` - Excludes unnecessary directories from file watching
+- Reduces background file system activity that can cause conflicts
+
 ## Current Status
 Production-ready V2.0 system processing 714 Premier League players with advanced mathematical formulas for live fantasy optimization. Uses single live table approach for real-time data updates. No snapshot tables needed - all data is live and continuously updated.

@@ -241,31 +241,42 @@ class FormulaEngineV2:
             # Apply progressive range based on games played
             games_played = len(numeric_games)
             progressive_config = self.v2_config.get('progressive_form_ranges', {})
-            
+
+            # Get form cap from multiplier caps configuration
+            form_cap = self.v2_config.get('multiplier_caps', {}).get('form', 1.5)
+            form_floor = 2.0 - form_cap  # Symmetric bounds around 1.0
+
             if progressive_config.get('enabled', True):
-                # Find appropriate range based on games played
-                ranges = progressive_config.get('ranges_by_games', [])
-                form_min, form_max = 0.9, 1.1  # Default tight range for safety
-                
-                for range_config in ranges:
-                    if games_played <= range_config['games']:
-                        form_min = range_config['min']
-                        form_max = range_config['max']
-                        break
+                # Use dynamic progressive ranges based on form cap parameter
+                # Scale the ranges based on sample size, respecting the form cap
+                if games_played <= 2:
+                    # Early season: ±5% range
+                    range_factor = 0.05
+                elif games_played <= 4:
+                    # Building confidence: ±15% range
+                    range_factor = 0.15
+                elif games_played <= 6:
+                    # Moderate confidence: ±25% range
+                    range_factor = 0.25
+                elif games_played <= 8:
+                    # Good confidence: ±40% range
+                    range_factor = 0.40
                 else:
-                    # If more games than any defined range, use the last (most permissive) range
-                    if ranges:
-                        last_range = ranges[-1]
-                        form_min = last_range['min']
-                        form_max = last_range['max']
-                
-                # Apply the progressive bounds
+                    # Full confidence: Use full form cap range
+                    range_factor = 1.0
+
+                # Calculate dynamic bounds based on form cap and sample size
+                max_deviation = (form_cap - 1.0) * range_factor
+                form_min = max(form_floor, 1.0 - max_deviation)
+                form_max = min(form_cap, 1.0 + max_deviation)
+
+                # Apply the dynamic bounds
                 form_multiplier = max(form_min, min(form_max, form_multiplier))
-                
-                logger.debug(f"Player form: {games_played} games played, range [{form_min}, {form_max}], multiplier: {form_multiplier:.3f}")
+
+                logger.debug(f"Player form: {games_played} games played, dynamic range [{form_min:.3f}, {form_max:.3f}], cap: {form_cap}, multiplier: {form_multiplier:.3f}")
             else:
-                # Fallback to early season bounds if progressive ranges disabled
-                form_multiplier = max(0.9, min(1.1, form_multiplier))
+                # If progressive ranges disabled, use full form cap range
+                form_multiplier = max(form_floor, min(form_cap, form_multiplier))
                 
             return form_multiplier
             
@@ -348,7 +359,7 @@ class FormulaEngineV2:
             fixture_multiplier = base ** adjusted_score
             
             # Ensure reasonable bounds
-            return max(0.5, min(2.0, fixture_multiplier))
+            return max(0.3, min(2.5, fixture_multiplier))
             
         except Exception as e:
             logger.warning(f"Error calculating exponential fixture multiplier: {e}")

@@ -916,7 +916,69 @@ def update_parameters():
         # Save updated parameters
         if not save_system_parameters(current_params):
             return jsonify({'error': 'Failed to save parameters'}), 500
-        
+
+        # Recalculate starter multipliers for CSV-imported players with new parameters
+        # Always run this when any parameters change
+        try:
+            conn_param = get_db_connection()
+            cursor_param = conn_param.cursor()
+
+            # Get new parameter values
+            starter_config = current_params.get('starter_prediction', {})
+            likely_penalty = starter_config.get('likely_starter_penalty', 0.8)
+            rotation_penalty = starter_config.get('auto_rotation_penalty', 0.7)
+            unlikely_penalty = starter_config.get('unlikely_starter_penalty', 0.5)
+            bench_penalty = starter_config.get('force_bench_penalty', 0.15)
+            out_penalty = starter_config.get('force_out_penalty', 0.0)
+
+            # Get manual overrides to exclude them
+            manual_overrides = starter_config.get('manual_overrides', {})
+            manual_override_ids = list(manual_overrides.keys())
+
+            # Build exclusion clause for manual overrides
+            if manual_override_ids:
+                placeholders = ','.join(['%s'] * len(manual_override_ids))
+                exclusion_clause = f"AND pm.player_id NOT IN ({placeholders})"
+                query_params = [likely_penalty, rotation_penalty, unlikely_penalty, bench_penalty] + manual_override_ids
+            else:
+                exclusion_clause = ""
+                query_params = [likely_penalty, rotation_penalty, unlikely_penalty, bench_penalty]
+
+            # Recalculate multipliers based on stored confidence percentages
+            cursor_param.execute(f"""
+                UPDATE player_metrics pm
+                SET starter_multiplier =
+                    CASE
+                        WHEN csv_confidence_percentage >= 90 THEN 1.0
+                        WHEN csv_confidence_percentage >= 70 THEN %s
+                        WHEN csv_confidence_percentage >= 50 THEN %s
+                        WHEN csv_confidence_percentage >= 30 THEN %s
+                        WHEN csv_confidence_percentage > 0 THEN %s
+                        ELSE starter_multiplier
+                    END,
+                    csv_confidence_multiplier =
+                    CASE
+                        WHEN csv_confidence_percentage >= 90 THEN 1.0
+                        WHEN csv_confidence_percentage >= 70 THEN %s
+                        WHEN csv_confidence_percentage >= 50 THEN %s
+                        WHEN csv_confidence_percentage >= 30 THEN %s
+                        WHEN csv_confidence_percentage > 0 THEN %s
+                        ELSE csv_confidence_multiplier
+                    END
+                WHERE csv_confidence_percentage IS NOT NULL
+                {exclusion_clause}
+            """, query_params + query_params[:4])  # Duplicate params for both updates
+
+            updated_csv_players = cursor_param.rowcount
+            conn_param.commit()
+            cursor_param.close()
+            conn_param.close()
+
+            print(f"Updated {updated_csv_players} CSV players with new parameter values")
+
+        except Exception as e:
+            print(f"Error updating CSV multipliers: {e}")
+
         # Trigger True Value recalculation using live_data_system for default
         gameweek = data.get('gameweek')
         if gameweek is None:
@@ -1034,10 +1096,10 @@ def manual_override():
         # Load current system parameters to get penalties
         params = load_system_parameters()
         starter_config = params.get('starter_prediction', {})
-        likely_penalty = starter_config.get('likely_starter_penalty', 0.90)
-        rotation_penalty = starter_config.get('auto_rotation_penalty', 0.75)
+        likely_penalty = starter_config.get('likely_starter_penalty', 0.8)
+        rotation_penalty = starter_config.get('auto_rotation_penalty', 0.7)
         unlikely_penalty = starter_config.get('unlikely_starter_penalty', 0.50)
-        bench_penalty = starter_config.get('force_bench_penalty', 0.35)
+        bench_penalty = starter_config.get('force_bench_penalty', 0.15)
         out_penalty = starter_config.get('force_out_penalty', 0.0)
         
         # Establish database connection
@@ -1736,13 +1798,15 @@ def import_lineups():
             manual_overrides = manual_overrides_section if isinstance(manual_overrides_section, dict) else {}
         
         try:
-            # STEP 1: Set ALL players to lowest category (0.35x bench) - clean slate approach
+            # STEP 1: Set ALL players to lowest category (bench) - clean slate approach
             # This aligns with the weekly archive workflow where we start fresh each week
-            lowest_multiplier = 0.35
+            starter_config = params.get('starter_prediction', {})
+            lowest_multiplier = starter_config.get('force_bench_penalty', 0.15)
             cursor.execute("""
                 UPDATE player_metrics
                 SET starter_multiplier = %s,
-                    csv_confidence_multiplier = %s
+                    csv_confidence_multiplier = %s,
+                    csv_confidence_percentage = NULL
                 WHERE gameweek = %s
             """, [lowest_multiplier, lowest_multiplier, gameweek])
             
@@ -1759,11 +1823,12 @@ def import_lineups():
                 # Check if this player has a manual override - if so, skip CSV update
                 if player['player_id'] not in manual_overrides:
                     cursor.execute("""
-                        UPDATE player_metrics 
+                        UPDATE player_metrics
                         SET starter_multiplier = %s,
-                            csv_confidence_multiplier = %s
+                            csv_confidence_multiplier = %s,
+                            csv_confidence_percentage = %s
                         WHERE player_id = %s AND gameweek = %s
-                    """, [player['multiplier'], player['multiplier'], player['player_id'], gameweek])
+                    """, [player['multiplier'], player['multiplier'], player.get('confidence', None), player['player_id'], gameweek])
                     rows_affected = cursor.rowcount
                     starter_ids.append(player['player_id'])
                     updated_count += 1
@@ -1771,14 +1836,14 @@ def import_lineups():
                     print(f"Skipping {player['name']} - has manual override")
             
             print(f"Updated {len(starter_ids)} CSV players with confidence-based multipliers")
-            print(f"Remaining players stay at lowest category (0.35x) as expected")
+            print(f"Remaining players stay at lowest category ({lowest_multiplier:.2f}x) as expected")
             
             # STEP 3: Re-apply any existing manual overrides (5-category system)
             starter_config = params.get('starter_prediction', {})
-            likely_penalty = starter_config.get('likely_starter_penalty', 0.90)
-            rotation_penalty = starter_config.get('auto_rotation_penalty', 0.75)
+            likely_penalty = starter_config.get('likely_starter_penalty', 0.8)
+            rotation_penalty = starter_config.get('auto_rotation_penalty', 0.7)
             unlikely_penalty = starter_config.get('unlikely_starter_penalty', 0.50)
-            bench_penalty = starter_config.get('force_bench_penalty', 0.35)
+            bench_penalty = starter_config.get('force_bench_penalty', 0.15)
             out_penalty = starter_config.get('force_out_penalty', 0.0)
             
             for player_id, override in manual_overrides.items():
@@ -3522,12 +3587,17 @@ def sync_understat_data():
         """)
         players_reset = cursor.rowcount
         
-        # Also reset starter_multiplier to default bench level (0.35) for consistency
+        # Load system parameters to get current bench penalty
+        params = load_system_parameters()
+        starter_config = params.get('starter_prediction', {})
+        bench_penalty = starter_config.get('force_bench_penalty', 0.15)
+
+        # Also reset starter_multiplier to default bench level for consistency
         cursor.execute("""
-            UPDATE player_metrics 
-            SET starter_multiplier = 0.35
+            UPDATE player_metrics
+            SET starter_multiplier = %s
             WHERE gameweek = 1
-        """)
+        """, [bench_penalty])
         starter_reset = cursor.rowcount
         
         reset_count = players_reset
@@ -5582,8 +5652,18 @@ if __name__ == '__main__':
     port = int(os.getenv('PORT', 5001))  # Use 5001 to avoid conflict
     debug = os.getenv('FLASK_ENV') == 'development'
 
+    # File modification error mitigation: Allow disabling auto-reloader
+    disable_reloader = os.getenv('FLASK_NO_RELOAD', '').lower() in ('true', '1', 'yes')
+
     # DEVELOPMENT: Enable auto-reload for code changes
     # Set debug=True to auto-restart server when Python files change
     development_mode = False  # Production mode
-    app.run(debug=development_mode, host='0.0.0.0', port=port, use_reloader=development_mode)
+    use_reloader = development_mode and not disable_reloader
+
+    # Log reloader status (helps diagnose file modification conflicts)
+    if development_mode:
+        reloader_backend = "watchdog" if disable_reloader else "watchdog (if installed) or stat polling"
+        print(f"Flask reloader: {'disabled' if disable_reloader else 'enabled'} - backend: {reloader_backend}")
+
+    app.run(debug=development_mode, host='0.0.0.0', port=port, use_reloader=use_reloader)
 

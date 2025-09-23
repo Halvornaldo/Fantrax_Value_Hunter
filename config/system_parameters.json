@@ -14,10 +14,10 @@
   "starter_prediction": {
     "enabled": true,
     "manual_overrides": {},
-    "likely_starter_penalty": 0.9,
-    "auto_rotation_penalty": 0.75,
+    "likely_starter_penalty": 0.75,
+    "auto_rotation_penalty": 0.7,
     "unlikely_starter_penalty": 0.5,
-    "force_bench_penalty": 0.35,
+    "force_bench_penalty": 0.15,
     "force_out_penalty": 0,
     "description": "5-category starter prediction system: 1.0x (definite), 0.90x (likely), 0.75x (rotation), 0.50x (unlikely), 0.35x (bench), 0.0x (out)"
   },
@@ -31,7 +31,7 @@
     },
     "exponential_form": {
       "enabled": true,
-      "alpha": 0.34
+      "alpha": 0.39
     },
     "dynamic_blending": {
       "enabled": true,
@@ -50,12 +50,12 @@
     },
     "exponential_fixture": {
       "enabled": true,
-      "base": 1.05,
+      "base": 1.2,
       "position_weights": {
-        "G": 1.1,
+        "G": 1.25,
         "D": 1.2,
         "M": 1.0,
-        "F": 1.05
+        "F": 1.12
       }
     },
     "progressive_form_ranges": {
@@ -97,12 +97,12 @@
     },
     "multiplier_caps": {
       "form": 1.5,
-      "fixture": 1.8,
+      "fixture": 1.6,
       "xgi": 2.5,
       "global": 3
     },
     "ewma_form": {
-      "alpha": 0.34
+      "alpha": 0.39
     }
   },
   "candidate_pools": {

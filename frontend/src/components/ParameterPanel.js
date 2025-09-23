@@ -43,15 +43,16 @@ const ParameterPanel = ({ systemConfig, onParametersUpdate, playersCount }) => {
     fixtureCap: 1.8,
     xgiCap: 2.5,
     globalCap: 3.0,
+    fixtureBase: 1.15,
     // Formula toggles
     formEnabled: false,
     fixtureEnabled: true,
     starterEnabled: true,
-    // Starter penalties (5-tier system)
-    likelyStarterPenalty: 0.9,
-    rotationPenalty: 0.75,
+    // Starter penalties (6-tier system)
+    likelyStarterPenalty: 0.85,
+    rotationPenalty: 0.7,
     unlikelyStarterPenalty: 0.5,
-    benchPenalty: 0.35,
+    benchPenalty: 0.15,
     outPenalty: 0.0
   });
 
@@ -73,15 +74,16 @@ const ParameterPanel = ({ systemConfig, onParametersUpdate, playersCount }) => {
         fixtureCap: v2Config.multiplier_caps?.fixture || 1.8,
         xgiCap: v2Config.multiplier_caps?.xgi || 2.5,
         globalCap: v2Config.multiplier_caps?.global || 3.0,
+        fixtureBase: v2Config.exponential_fixture?.base || 1.15,
         // Formula toggles
         formEnabled: v2Config.formula_toggles?.form_enabled ?? false,
         fixtureEnabled: v2Config.formula_toggles?.fixture_enabled ?? true,
         starterEnabled: v2Config.formula_toggles?.starter_enabled ?? true,
         // Starter penalties (5-tier system)
-        likelyStarterPenalty: starterConfig?.likely_starter_penalty || 0.9,
-        rotationPenalty: starterConfig?.auto_rotation_penalty || 0.75,
+        likelyStarterPenalty: starterConfig?.likely_starter_penalty || 0.85,
+        rotationPenalty: starterConfig?.auto_rotation_penalty || 0.7,
         unlikelyStarterPenalty: starterConfig?.unlikely_starter_penalty || 0.5,
-        benchPenalty: starterConfig?.force_bench_penalty || 0.35,
+        benchPenalty: starterConfig?.force_bench_penalty || 0.15,
         outPenalty: starterConfig?.force_out_penalty || 0.0
       });
       setPendingChanges(false);
@@ -132,6 +134,10 @@ const ParameterPanel = ({ systemConfig, onParametersUpdate, playersCount }) => {
           },
           ewma_form: {
             alpha: parameters.ewmaAlpha
+          },
+          exponential_fixture: {
+            enabled: true,
+            base: parameters.fixtureBase
           }
         },
         starter_prediction: {
@@ -373,9 +379,9 @@ const ParameterPanel = ({ systemConfig, onParametersUpdate, playersCount }) => {
           <Slider
             value={parameters.formCap}
             onChange={(e, value) => handleParameterChange('formCap', value)}
-            min={1.5}
-            max={3.0}
-            step={0.1}
+            min={1.1}
+            max={2.0}
+            step={0.05}
             size="small"
             valueLabelDisplay="auto"
           />
@@ -400,6 +406,25 @@ const ParameterPanel = ({ systemConfig, onParametersUpdate, playersCount }) => {
           />
           <Typography variant="caption" color="text.secondary">
             {parameters.fixtureCap.toFixed(1)}x
+          </Typography>
+        </Grid>
+
+        <Divider orientation="vertical" flexItem />
+
+        {/* Fixture Base */}
+        <Grid item xs={1.5}>
+          <Typography variant="body2" gutterBottom>Fixture Base</Typography>
+          <Slider
+            value={parameters.fixtureBase || 1.15}
+            onChange={(e, value) => handleParameterChange('fixtureBase', value)}
+            min={1.0}
+            max={1.3}
+            step={0.01}
+            size="small"
+            valueLabelDisplay="auto"
+          />
+          <Typography variant="caption" color="text.secondary">
+            {(parameters.fixtureBase || 1.15).toFixed(2)}
           </Typography>
         </Grid>
 
@@ -456,7 +481,7 @@ const ParameterPanel = ({ systemConfig, onParametersUpdate, playersCount }) => {
             valueLabelDisplay="auto"
           />
           <Typography variant="caption" color="text.secondary">
-            {parameters.likelyStarterPenalty.toFixed(2)}x
+            {(parameters.likelyStarterPenalty || 0.85).toFixed(2)}x
           </Typography>
         </Grid>
 
@@ -475,7 +500,7 @@ const ParameterPanel = ({ systemConfig, onParametersUpdate, playersCount }) => {
             valueLabelDisplay="auto"
           />
           <Typography variant="caption" color="text.secondary">
-            {parameters.rotationPenalty.toFixed(2)}x
+            {(parameters.rotationPenalty || 0.7).toFixed(2)}x
           </Typography>
         </Grid>
 
@@ -495,7 +520,7 @@ const ParameterPanel = ({ systemConfig, onParametersUpdate, playersCount }) => {
             valueLabelDisplay="auto"
           />
           <Typography variant="caption" color="text.secondary">
-            {parameters.unlikelyStarterPenalty.toFixed(2)}x
+            {(parameters.unlikelyStarterPenalty || 0.5).toFixed(2)}x
           </Typography>
         </Grid>
 
@@ -514,7 +539,7 @@ const ParameterPanel = ({ systemConfig, onParametersUpdate, playersCount }) => {
             valueLabelDisplay="auto"
           />
           <Typography variant="caption" color="text.secondary">
-            {parameters.benchPenalty.toFixed(2)}x
+            {(parameters.benchPenalty || 0.15).toFixed(2)}x
           </Typography>
         </Grid>
 
@@ -533,7 +558,7 @@ const ParameterPanel = ({ systemConfig, onParametersUpdate, playersCount }) => {
             valueLabelDisplay="auto"
           />
           <Typography variant="caption" color="text.secondary">
-            {parameters.outPenalty.toFixed(2)}x
+            {(parameters.outPenalty || 0.0).toFixed(2)}x
           </Typography>
         </Grid>
 

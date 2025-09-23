@@ -39,7 +39,7 @@ import { Tooltip as ReactTooltip } from 'react-tooltip';
 
 import { exportPlayersCSV, applyStarterOverride } from '../services/api';
 
-const PlayerTable = ({ playersData, gameweekInfo, onDataRefresh }) => {
+const PlayerTable = ({ playersData, gameweekInfo, systemConfig, onDataRefresh }) => {
   const theme = useTheme();
   const isDark = theme.palette.mode === 'dark';
 
@@ -703,13 +703,21 @@ const PlayerTable = ({ playersData, gameweekInfo, onDataRefresh }) => {
         const currentOverride = params.row.starter_override || 'auto';
         const isLoading = processingOverride === playerId;
 
+        // Get current penalty values from system config
+        const starterConfig = systemConfig?.starter_prediction || {};
+        const likelyPenalty = starterConfig.likely_starter_penalty || 0.85;
+        const rotationPenalty = starterConfig.auto_rotation_penalty || 0.7;
+        const unlikelyPenalty = starterConfig.unlikely_starter_penalty || 0.5;
+        const benchPenalty = starterConfig.force_bench_penalty || 0.15;
+        const outPenalty = starterConfig.force_out_penalty || 0.0;
+
         const overrideOptions = [
-          { value: 'starter', label: 'S', title: 'Definite Starter (1.0x)', color: '#28a745' },
-          { value: 'likely', label: 'L', title: 'Likely Starter (0.90x)', color: '#20c997' },
-          { value: 'rotation', label: 'R', title: 'Rotation Risk (0.75x)', color: '#ff9800' },
-          { value: 'unlikely', label: 'U', title: 'Unlikely Starter (0.50x)', color: '#fd7e14' },
-          { value: 'bench', label: 'B', title: 'Bench (0.35x)', color: '#ffc107' },
-          { value: 'out', label: 'O', title: 'Out (0.0x)', color: '#dc3545' }
+          { value: 'starter', label: 'S', title: `Definite Starter (1.0x)`, color: '#28a745' },
+          { value: 'likely', label: 'L', title: `Likely Starter (${likelyPenalty.toFixed(2)}x)`, color: '#20c997' },
+          { value: 'rotation', label: 'R', title: `Rotation Risk (${rotationPenalty.toFixed(2)}x)`, color: '#ff9800' },
+          { value: 'unlikely', label: 'U', title: `Unlikely Starter (${unlikelyPenalty.toFixed(2)}x)`, color: '#fd7e14' },
+          { value: 'bench', label: 'B', title: `Bench (${benchPenalty.toFixed(2)}x)`, color: '#ffc107' },
+          { value: 'out', label: 'O', title: `Out (${outPenalty.toFixed(2)}x)`, color: '#dc3545' }
         ];
 
         const autoOption = { value: 'auto', label: 'A', title: 'Auto (CSV)', color: '#6c757d' };
