@@ -94,6 +94,28 @@ const PlayerTable = ({ playersData, gameweekInfo, systemConfig, onDataRefresh })
     return '#dc3545'; // Red
   };
 
+  const getDynamicColor = (value, maxValue) => {
+    if (!value || value <= 0) return '#dc3545'; // Red for 0
+    const percentage = (value / maxValue) * 100;
+
+    if (percentage >= 90) return '#00cc66';  // Deep green (90%+ of max)
+    if (percentage >= 75) return '#28a745';  // Green (75-90%)
+    if (percentage >= 50) return '#a4c639';  // Yellow-green (50-75%)
+    if (percentage >= 25) return '#ffc107';  // Yellow (25-50%)
+    return '#dc3545'; // Red (<25%)
+  };
+
+  const getDynamicColorReverse = (value, maxValue) => {
+    if (!value || value <= 0) return '#00cc66'; // Green for 0 (lowest price is best)
+    const percentage = (value / maxValue) * 100;
+
+    if (percentage >= 90) return '#dc3545';  // Red (90%+ of max - highest prices)
+    if (percentage >= 75) return '#ffc107';  // Yellow (75-90%)
+    if (percentage >= 50) return '#a4c639';  // Yellow-green (50-75%)
+    if (percentage >= 25) return '#28a745';  // Green (25-50%)
+    return '#00cc66'; // Deep green (<25% - lowest prices)
+  };
+
   const getMultiplierColor = (value) => {
     if (!value) return theme.palette.text.disabled;
     const base = parseFloat(value);
@@ -423,6 +445,33 @@ const PlayerTable = ({ playersData, gameweekInfo, systemConfig, onDataRefresh })
     );
   };
 
+  // Render function for dynamic color cells
+  const renderDynamicColorCell = (params, maxValue) => {
+    const value = parseFloat(params.value) || 0;
+    const color = getDynamicColor(value, maxValue);
+
+    return (
+      <Box sx={{
+        color,
+        fontWeight: 600,
+        textAlign: 'center',
+        py: 0.5,
+        px: 1,
+        borderRadius: 1,
+        background: `linear-gradient(135deg, ${color}15, ${color}08)`,
+        border: `1px solid ${color}30`,
+        textShadow: isDark ? `0 0 4px ${color}40` : 'none',
+      }}>
+        {value.toFixed(
+          params.field === 'roi' ? 3 :
+          params.field === 'price' ? 2 :
+          params.field === 'ppg' || params.field === 'total_fpts' ? 1 :
+          0
+        )}
+      </Box>
+    );
+  };
+
   // Position-aware xG90 cell renderer
   const renderXG90Cell = (params) => {
     const value = params.value;
@@ -528,6 +577,20 @@ const PlayerTable = ({ playersData, gameweekInfo, systemConfig, onDataRefresh })
       width: 80,
     },
     {
+      field: 'next_opponent',
+      headerName: 'Next',
+      width: 60,
+      renderCell: (params) => {
+        if (!params.value) return '-';
+        const isHome = params.row.is_home;
+        return (
+          <span style={{ fontSize: '0.8rem' }}>
+            {isHome ? 'vs ' : '@ '}{params.value}
+          </span>
+        );
+      },
+    },
+    {
       field: 'position',
       headerName: 'Pos',
       width: 80,
@@ -563,27 +626,40 @@ const PlayerTable = ({ playersData, gameweekInfo, systemConfig, onDataRefresh })
       headerName: 'Price',
       width: 80,
       type: 'number',
-      renderCell: (params) => `£${params.value}`,
+      renderCell: (params) => {
+        const value = parseFloat(params.value) || 0;
+        const color = getDynamicColorReverse(value, columnMaxValues.maxPrice);
+
+        return (
+          <Box sx={{
+            color,
+            fontWeight: 600,
+            textAlign: 'center',
+            py: 0.5,
+            px: 1,
+            borderRadius: 1,
+            background: `linear-gradient(135deg, ${color}15, ${color}08)`,
+            border: `1px solid ${color}30`,
+            textShadow: isDark ? `0 0 4px ${color}40` : 'none',
+          }}>
+            £{value.toFixed(2)}
+          </Box>
+        );
+      },
     },
     {
       field: 'total_fpts',
       headerName: 'TFPts',
       width: 70,
       type: 'number',
-      renderCell: (params) => {
-        const value = parseFloat(params.value);
-        return isNaN(value) ? '0.0' : value.toFixed(1);
-      },
+      renderCell: (params) => renderDynamicColorCell(params, columnMaxValues.maxTotalFpts),
     },
     {
       field: 'ppg',
       headerName: 'PPG',
       width: 80,
       type: 'number',
-      renderCell: (params) => {
-        const value = parseFloat(params.value);
-        return isNaN(value) ? '0.0' : value.toFixed(1);
-      },
+      renderCell: (params) => renderDynamicColorCell(params, columnMaxValues.maxPpg),
     },
     {
       field: 'blended_ppg',
@@ -640,20 +716,7 @@ const PlayerTable = ({ playersData, gameweekInfo, systemConfig, onDataRefresh })
       field: 'games_played',
       headerName: '25-26',
       width: 80,
-      renderCell: (params) => {
-        const current = params.row.games_played || 0;
-        const color = current >= 5 ? '#28a745' : current >= 2 ? '#ffc107' : current === 0 ? '#dc3545' : '#ff9800';
-
-        return (
-          <Typography
-            variant="body2"
-            fontWeight={600}
-            sx={{ color, textAlign: 'center' }}
-          >
-            {current}
-          </Typography>
-        );
-      },
+      renderCell: (params) => renderDynamicColorCell(params, columnMaxValues.maxGamesPlayed),
     },
     {
       field: 'true_value',
@@ -667,7 +730,7 @@ const PlayerTable = ({ playersData, gameweekInfo, systemConfig, onDataRefresh })
       headerName: 'ROI',
       width: 100,
       type: 'number',
-      renderCell: (params) => renderValueCell(params, getROIColor),
+      renderCell: (params) => renderDynamicColorCell(params, columnMaxValues.maxRoi),
     },
     {
       field: 'form_multiplier',
@@ -825,6 +888,7 @@ const PlayerTable = ({ playersData, gameweekInfo, systemConfig, onDataRefresh })
       headerName: 'Min',
       width: 70,
       type: 'number',
+      renderCell: (params) => renderDynamicColorCell(params, columnMaxValues.maxMinutes),
     },
   ];
 
@@ -870,6 +934,18 @@ const PlayerTable = ({ playersData, gameweekInfo, systemConfig, onDataRefresh })
     });
   }, [playersData, positionFilter, priceMin, priceMax, teamFilter, searchTerm, historicalDataFilter, minutesFilterEnabled, minutesThreshold, overrideFilter]);
 
+  // Calculate maximum values for dynamic color coding
+  const columnMaxValues = useMemo(() => {
+    return {
+      maxMinutes: Math.max(...playersData.map(p => p.minutes || 0)),
+      maxGamesPlayed: Math.max(...playersData.map(p => p.games_played || 0)),
+      maxTotalFpts: Math.max(...playersData.map(p => p.total_fpts || 0)),
+      maxPpg: Math.max(...playersData.map(p => p.ppg || 0)),
+      maxPrice: Math.max(...playersData.map(p => p.price || 0)),
+      maxRoi: Math.max(...playersData.map(p => p.roi || 0))
+    };
+  }, [playersData]);
+
   // Export CSV handler
   const handleExportCSV = async () => {
     try {
@@ -899,17 +975,9 @@ const PlayerTable = ({ playersData, gameweekInfo, systemConfig, onDataRefresh })
         alignItems: 'center'
       }}>
         <Box sx={{ display: 'flex', alignItems: 'center', gap: 2 }}>
-          <SportsFootball />
           <Typography variant="h6" fontWeight={700}>
-            All {filteredData.length} Premier League Players
+            All Active {filteredData.length} Premier League Players
           </Typography>
-          {gameweekInfo && (
-            <Chip
-              label={`Gameweek ${gameweekInfo.current_gameweek}`}
-              icon={<TrendingUp />}
-              sx={{ bgcolor: 'rgba(0,255,136,0.9)', color: 'black', fontWeight: 600 }}
-            />
-          )}
         </Box>
         <Box sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
           <FormControlLabel

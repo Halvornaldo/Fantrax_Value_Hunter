@@ -650,7 +650,9 @@ def get_players():
         'xgi_multiplier': 'pm.xgi_multiplier',
         'games_played': 'pgd.games_played',
         'games_played_historical': 'pgd.games_played_historical',
-        'games_total': '(COALESCE(pgd.games_played_historical, 0) + COALESCE(pgd.games_played, 0))'
+        'games_total': '(COALESCE(pgd.games_played_historical, 0) + COALESCE(pgd.games_played, 0))',
+        'next_opponent': 'tf.opponent_code',
+        'is_home': 'tf.is_home'
     }
     
     if sort_by not in valid_sort_fields:
@@ -690,7 +692,9 @@ def get_players():
                     ELSE NULL 
                 END as historical_ppg,
                 p.id as player_id,
-                COALESCE(tf.difficulty_score, 0) as fixture_difficulty
+                COALESCE(tf.difficulty_score, 0) as fixture_difficulty,
+                pm.next_opponent,
+                pm.is_home
             FROM players p
             JOIN player_metrics pm ON p.id = pm.player_id
             LEFT JOIN (
@@ -757,6 +761,10 @@ def get_players():
         count_query = f"SELECT COUNT(*) as total FROM ({base_query}) as filtered"
         cursor.execute(count_query, params)
         total_count = cursor.fetchone()['total']
+
+        # Get total database player count (all players, not just active ones)
+        cursor.execute("SELECT COUNT(*) as total FROM players WHERE team != 'TST'")
+        total_database_count = cursor.fetchone()['total']
         
         # Add ordering and pagination
         sort_column = valid_sort_fields[sort_by]
@@ -770,7 +778,7 @@ def get_players():
         
         cursor.execute(final_query, params)
         players = cursor.fetchall()
-        
+
         # Convert to list of dicts for JSON serialization
         players_list = []
         for player in players:
@@ -822,6 +830,7 @@ def get_players():
         return jsonify({
             'players': players_list,
             'total_count': total_count,
+            'total_database_count': total_database_count,
             'filtered_count': len(players_list),
             'pagination': {
                 'limit': limit,
@@ -2691,22 +2700,47 @@ def import_form_data():
                 fpts = float(row['FPts'])
                 salary = float(row['Salary'])
                 print(f"DEBUG - Price for {player_name}: {salary} (from CSV column 'Salary')")
-                
+
+                # Extract opponent data from CSV
+                opponent_raw = row.get('Opponent', '')
+                next_opponent = None
+                is_home = None
+
+                if opponent_raw:
+                    # Parse Fantrax opponent format: "BUR Sat 4:00PM" (home) or "@EVE Mon 9:00PM" (away)
+                    opponent_raw = opponent_raw.strip()
+                    if opponent_raw.startswith('@'):
+                        # Away game: "@EVE Mon 9:00PM" -> extract "EVE"
+                        parts = opponent_raw[1:].split()
+                        if parts:
+                            next_opponent = parts[0].strip()
+                            is_home = False
+                    else:
+                        # Home game: "BUR Sat 4:00PM" -> extract "BUR"
+                        parts = opponent_raw.split()
+                        if parts:
+                            next_opponent = parts[0].strip()
+                            is_home = True
+
                 # Insert/update player form data
                 cursor.execute("""
                     INSERT INTO player_form (player_id, gameweek, points, timestamp)
                     VALUES (%s, %s, %s, NOW())
-                    ON CONFLICT (player_id, gameweek) 
+                    ON CONFLICT (player_id, gameweek)
                     DO UPDATE SET points = EXCLUDED.points, timestamp = NOW()
                 """, [player_id, gameweek, fpts])
-                
-                # Insert/update player_metrics with price
+
+                # Insert/update player_metrics with price and opponent data
                 cursor.execute("""
-                    INSERT INTO player_metrics (player_id, gameweek, price, last_updated)
-                    VALUES (%s, %s, %s, NOW())
-                    ON CONFLICT (player_id, gameweek) 
-                    DO UPDATE SET price = EXCLUDED.price, last_updated = NOW()
-                """, [player_id, gameweek, salary])
+                    INSERT INTO player_metrics (player_id, gameweek, price, next_opponent, is_home, last_updated)
+                    VALUES (%s, %s, %s, %s, %s, NOW())
+                    ON CONFLICT (player_id, gameweek)
+                    DO UPDATE SET
+                        price = EXCLUDED.price,
+                        next_opponent = EXCLUDED.next_opponent,
+                        is_home = EXCLUDED.is_home,
+                        last_updated = NOW()
+                """, [player_id, gameweek, salary, next_opponent, is_home])
                 
                 # Update games_played count using minutes-based logic
                 # Compare current total minutes vs first game minutes to detect if player played this gameweek
