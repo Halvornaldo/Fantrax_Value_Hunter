@@ -2128,7 +2128,7 @@ def export_players():
             positions = player['position'].split(',') if player['position'] else ['']
             position1 = positions[0].strip() if len(positions) > 0 else ''
             position2 = positions[1].strip() if len(positions) > 1 else ''
-            csv_lines.append(f"{player['name']},{player['team']},{position1},{position2},{player['price']},{player['ppg']},{player['blended_ppg']:.2f},{player["total_fpts"]:.3f},{player["games_played_historical"]},{player["games_current_season"]},{player["true_value"]:.3f},{player['roi']:.3f},{player['form_multiplier']:.2f},{player['fixture_multiplier']:.2f},{player['starter_multiplier']:.2f},{player['xgi_multiplier']:.2f},{current_weight:.3f},{minutes},{xg90:.3f},{xa90:.3f},{xgi90:.3f},{xgi:.3f}")
+            csv_lines.append(f"{player['name']},{player['team']},{position1},{position2},{player['price']},{player['ppg']},{player['blended_ppg']:.2f},{player['total_fpts']:.3f},{player['games_played_historical']},{player['games_current_season']},{player['true_value']:.3f},{player['roi']:.3f},{player['form_multiplier']:.2f},{player['fixture_multiplier']:.2f},{player['starter_multiplier']:.2f},{player['xgi_multiplier']:.2f},{current_weight:.3f},{minutes},{xg90:.3f},{xa90:.3f},{xgi90:.3f},{xgi:.3f}")
         
         csv_content = '\n'.join(csv_lines)
         
