@@ -183,14 +183,14 @@ class FormulaEngineV2:
     
     def _calculate_form_multiplier(self, player_data: Dict[str, Any]) -> float:
         """
-        SPRINT 2: Calculate form multiplier using EWMA with Î±=0.87
+        SPRINT 2: Calculate form multiplier using EWMA with α=0.87
         """
         return self._calculate_exponential_form_multiplier(player_data)
     
     def _calculate_exponential_form_multiplier(self, player_data: Dict[str, Any]) -> float:
         """
         SPRINT 2: Calculate form using Exponential Weighted Moving Average (EWMA)
-        Algorithm: More recent games have exponentially higher weights (Î±=0.87)
+        Algorithm: More recent games have exponentially higher weights (α=0.87)
         """
         try:
             alpha = self.v2_config.get('exponential_form', {}).get('alpha', 0.87)
@@ -217,7 +217,7 @@ class FormulaEngineV2:
             # Generate exponential decay weights (most recent = highest weight)
             weights = []
             for i in range(len(numeric_games)):
-                weight = alpha ** i  # Exponential decay: Î±^0, Î±^1, Î±^2, ...
+                weight = alpha ** i  # Exponential decay: α^0, α^1, α^2, ...
                 weights.append(weight)
             
             # Normalize weights to sum to 1
@@ -250,16 +250,16 @@ class FormulaEngineV2:
                 # Use dynamic progressive ranges based on form cap parameter
                 # Scale the ranges based on sample size, respecting the form cap
                 if games_played <= 2:
-                    # Early season: Â±5% range
+                    # Early season: ±5% range
                     range_factor = 0.05
                 elif games_played <= 4:
-                    # Building confidence: Â±15% range
+                    # Building confidence: ±15% range
                     range_factor = 0.15
                 elif games_played <= 6:
-                    # Moderate confidence: Â±25% range
+                    # Moderate confidence: ±25% range
                     range_factor = 0.25
                 elif games_played <= 8:
-                    # Good confidence: Â±40% range
+                    # Good confidence: ±40% range
                     range_factor = 0.40
                 else:
                     # Full confidence: Use full form cap range
