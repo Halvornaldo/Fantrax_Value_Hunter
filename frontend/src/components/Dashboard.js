@@ -20,6 +20,7 @@ const Dashboard = () => {
   const [playersData, setPlayersData] = useState([]);
   const [systemConfig, setSystemConfig] = useState({});
   const [gameweekInfo, setGameweekInfo] = useState(null);
+  const [totalDatabaseCount, setTotalDatabaseCount] = useState(0);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);
   
@@ -61,6 +62,7 @@ const Dashboard = () => {
       if (playersResponse.players && Array.isArray(playersResponse.players)) {
         setPlayersData(playersResponse.players);
         setGameweekInfo(playersResponse.gameweek_info);
+        setTotalDatabaseCount(playersResponse.total_database_count || 0);
         console.log(`✅ Loaded ${playersResponse.players.length} players with V2.0 calculations`);
       } else {
         throw new Error(playersResponse.error || 'Failed to load player data');

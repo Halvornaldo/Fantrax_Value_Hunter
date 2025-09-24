@@ -3,1001 +3,345 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Import Validation - Fantrax Value Hunter</title>
+    <title>Lineup Predictions Upload - Fantrax Value Hunter</title>
     <style>
         body {
             font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
             margin: 0;
             padding: 20px;
-            background-color: #f5f5f5;
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            min-height: 100vh;
         }
-        
+
         .container {
-            max-width: 1200px;
+            max-width: 800px;
             margin: 0 auto;
             background: white;
-            border-radius: 8px;
-            box-shadow: 0 2px 10px rgba(0,0,0,0.1);
-            padding: 20px;
+            border-radius: 10px;
+            padding: 30px;
+            box-shadow: 0 10px 30px rgba(0,0,0,0.2);
         }
-        
+
         h1 {
             color: #333;
-            border-bottom: 3px solid #007bff;
-            padding-bottom: 10px;
+            text-align: center;
+            margin-bottom: 30px;
+            font-size: 2.2em;
         }
-        
+
         .upload-section {
             background: #f8f9fa;
-            padding: 20px;
-            border-radius: 6px;
+            border-radius: 8px;
+            padding: 25px;
+            margin-bottom: 25px;
+            border: 2px dashed #dee2e6;
+        }
+
+        .form-group {
             margin-bottom: 20px;
         }
-        
-        .file-input {
-            margin-bottom: 15px;
+
+        label {
+            display: block;
+            margin-bottom: 8px;
+            font-weight: 600;
+            color: #495057;
         }
-        
-        .btn {
-            background: #007bff;
+
+        input[type="file"] {
+            width: 100%;
+            padding: 12px;
+            border: 2px solid #dee2e6;
+            border-radius: 6px;
+            font-size: 16px;
+            background: white;
+        }
+
+        .upload-btn {
+            background: linear-gradient(135deg, #28a745, #20c997);
+            color: white;
+            border: none;
+            padding: 15px 30px;
+            font-size: 16px;
+            border-radius: 6px;
+            cursor: pointer;
+            transition: all 0.3s ease;
+            margin-top: 10px;
+        }
+
+        .upload-btn:hover {
+            transform: translateY(-2px);
+            box-shadow: 0 5px 15px rgba(40, 167, 69, 0.4);
+        }
+
+        .upload-btn:disabled {
+            background: #6c757d;
+            cursor: not-allowed;
+            transform: none;
+            box-shadow: none;
+        }
+
+        .result {
+            padding: 20px;
+            border-radius: 6px;
+            margin-top: 20px;
+            display: none;
+        }
+
+        .result.success {
+            background: #d4edda;
+            border: 1px solid #c3e6cb;
+            color: #155724;
+        }
+
+        .result.error {
+            background: #f8d7da;
+            border: 1px solid #f5c6cb;
+            color: #721c24;
+        }
+
+        .info-box {
+            background: #e3f2fd;
+            border-left: 4px solid #2196F3;
+            padding: 15px;
+            margin-bottom: 20px;
+            border-radius: 4px;
+        }
+
+        .ffp-link {
+            background: #fff3cd;
+            border-left: 4px solid #ffc107;
+            padding: 15px;
+            margin-bottom: 20px;
+            border-radius: 4px;
+        }
+
+        .ffp-btn {
+            background: #17a2b8;
             color: white;
             border: none;
             padding: 10px 20px;
-            border-radius: 4px;
-            cursor: pointer;
-            font-size: 14px;
+            border-radius: 6px;
+            text-decoration: none;
+            display: inline-block;
+            margin-top: 8px;
+            transition: background 0.3s ease;
         }
-        
-        .btn:hover {
-            background: #0056b3;
+
+        .ffp-btn:hover {
+            background: #138496;
+            color: white;
+            text-decoration: none;
         }
-        
-        .btn-success {
-            background: #28a745;
-        }
-        
-        .btn-success:hover {
-            background: #1e7e34;
-        }
-        
-        .btn-warning {
-            background: #ffc107;
-            color: #212529;
-        }
-        
-        .btn-warning:hover {
-            background: #e0a800;
-        }
-        
-        .summary-cards {
+
+        .stats-grid {
             display: grid;
             grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
             gap: 15px;
-            margin-bottom: 20px;
+            margin-top: 15px;
         }
-        
-        .summary-card {
+
+        .stat-item {
             background: #f8f9fa;
             padding: 15px;
             border-radius: 6px;
             text-align: center;
-            border-left: 4px solid #007bff;
-        }
-        
-        .summary-card.success {
-            border-left-color: #28a745;
-        }
-        
-        .summary-card.warning {
-            border-left-color: #ffc107;
-        }
-        
-        .summary-card.danger {
-            border-left-color: #dc3545;
-        }
-        
-        .summary-card h3 {
-            margin: 0 0 5px 0;
-            font-size: 24px;
-            color: #333;
-        }
-        
-        .summary-card p {
-            margin: 0;
-            color: #666;
-            font-size: 14px;
-        }
-        
-        .position-breakdown {
-            background: #f8f9fa;
-            padding: 15px;
-            border-radius: 6px;
-            margin-bottom: 20px;
-        }
-        
-        .position-breakdown h3 {
-            margin-top: 0;
-            color: #333;
-        }
-        
-        .position-grid {
-            display: grid;
-            grid-template-columns: repeat(auto-fit, minmax(100px, 1fr));
-            gap: 10px;
-        }
-        
-        .position-item {
-            text-align: center;
-            padding: 10px;
-            background: white;
-            border-radius: 4px;
             border: 1px solid #dee2e6;
         }
-        
-        .needs-review-section {
-            margin-top: 20px;
-        }
-        
-        .player-review-item {
-            background: #fff3cd;
-            border: 1px solid #ffeaa7;
-            border-radius: 6px;
-            padding: 15px;
-            margin-bottom: 15px;
-        }
-        
-        .player-review-item.no-match {
-            background: #f8d7da;
-            border-color: #f5c6cb;
-        }
-        
-        .player-info {
-            display: flex;
-            justify-content: space-between;
-            align-items: center;
-            margin-bottom: 10px;
-        }
-        
-        .player-name {
+
+        .stat-number {
+            font-size: 1.8em;
             font-weight: bold;
-            font-size: 16px;
+            color: #28a745;
         }
-        
-        .player-details {
-            color: #666;
-            font-size: 14px;
+
+        .stat-label {
+            color: #6c757d;
+            font-size: 0.9em;
+            margin-top: 5px;
         }
-        
-        .current-match {
-            background: #d1ecf1;
-            padding: 8px 12px;
-            border-radius: 4px;
-            margin-bottom: 10px;
-        }
-        
-        .suggestions-section {
-            margin-top: 10px;
-        }
-        
-        .suggestions-section h4 {
-            margin: 0 0 10px 0;
-            color: #333;
-            font-size: 14px;
-        }
-        
-        .suggestion-item {
-            display: flex;
-            justify-content: space-between;
-            align-items: center;
-            padding: 8px 12px;
-            background: white;
-            border: 1px solid #dee2e6;
-            border-radius: 4px;
-            margin-bottom: 5px;
-            cursor: pointer;
-            transition: background-color 0.2s;
-        }
-        
-        .suggestion-item:hover {
-            background: #f8f9fa;
-        }
-        
-        .suggestion-item.selected {
-            background: #e3f2fd;
-            border-color: #2196f3;
-        }
-        
-        .suggestion-info {
-            flex-grow: 1;
-        }
-        
-        .suggestion-name {
+
+        .back-link {
+            display: inline-block;
+            margin-bottom: 20px;
+            color: #667eea;
+            text-decoration: none;
             font-weight: 500;
         }
-        
-        .suggestion-details {
-            font-size: 12px;
-            color: #666;
+
+        .back-link:hover {
+            text-decoration: underline;
         }
-        
-        .suggestion-confidence {
-            background: #007bff;
-            color: white;
-            padding: 2px 8px;
-            border-radius: 12px;
-            font-size: 12px;
-            font-weight: 500;
-        }
-        
-        .no-suggestions {
-            color: #dc3545;
-            font-style: italic;
-            padding: 10px;
-            text-align: center;
-            background: #f8d7da;
-            border-radius: 4px;
-        }
-        
-        .apply-section {
-            background: #d4edda;
-            border: 1px solid #c3e6cb;
-            border-radius: 6px;
-            padding: 20px;
-            text-align: center;
-            margin-top: 20px;
-        }
-        
+
         .loading {
             display: none;
             text-align: center;
             padding: 20px;
         }
-        
-        .spinner {
+
+        .loading-spinner {
             border: 3px solid #f3f3f3;
-            border-top: 3px solid #007bff;
+            border-top: 3px solid #667eea;
             border-radius: 50%;
             width: 30px;
             height: 30px;
             animation: spin 1s linear infinite;
             margin: 0 auto 10px;
         }
-        
+
         @keyframes spin {
             0% { transform: rotate(0deg); }
             100% { transform: rotate(360deg); }
-        }
-        
-        .hidden {
-            display: none;
-        }
-        
-        .error-message {
-            background: #f8d7da;
-            border: 1px solid #f5c6cb;
-            color: #721c24;
-            padding: 12px;
-            border-radius: 4px;
-            margin-bottom: 15px;
-        }
-        
-        .success-message {
-            background: #d4edda;
-            border: 1px solid #c3e6cb;
-            color: #155724;
-            padding: 12px;
-            border-radius: 4px;
-            margin-bottom: 15px;
         }
     </style>
 </head>
 <body>
     <div class="container">
-        <h1>Import Validation</h1>
-        <p>Upload and validate player data before importing. Review suggestions for unmatched players.</p>
-        
-        <!-- Upload Section -->
+        <a href="/" class="back-link">← Back to Dashboard</a>
+
+        <h1>⚽ Lineup Predictions Upload</h1>
+
+        <div class="ffp-link">
+            <strong>📥 Step 1: Get CSV from Fantasy Football Pundit</strong>
+            <p>Go to Fantasy Football Pundit and download the latest team news CSV:</p>
+            <a href="https://www.fantasyfootballpundit.com/fantasy-premier-league-team-news/"
+               target="_blank"
+               class="ffp-btn">
+                🔗 Open Fantasy Football Pundit Team News
+            </a>
+            <small style="display: block; margin-top: 5px; color: #6c757d;">
+                Look for the latest gameweek lineup predictions and download the CSV
+            </small>
+        </div>
+
+        <div class="info-box">
+            <strong>📤 Step 2: Upload Instructions</strong>
+            <ul>
+                <li>Upload the CSV file from Fantasy Football Pundit</li>
+                <li>System will automatically match player names with database</li>
+                <li>If players can't be matched, you'll be taken to a validation page</li>
+                <li>Confidence percentages are automatically converted to multipliers</li>
+                <li>All player true values will be recalculated after import</li>
+            </ul>
+        </div>
+
         <div class="upload-section">
-            <div class="file-input">
-                <label for="csvFile"><strong>Select CSV File:</strong></label>
-                <input type="file" id="csvFile" accept=".csv" />
-                <div id="selectedFileName" style="margin-top: 8px; color: #666; font-size: 14px;">No file chosen</div>
-            </div>
-            <div>
-                <label for="sourceSystem"><strong>Source System:</strong></label>
-                <select id="sourceSystem">
-                    <option value="ffs">Fantasy Football Scout (FFS)</option>
-                    <option value="ffp">Fantasy Football Pundit (FFP)</option>
-                    <option value="understat">Understat</option>
-                    <option value="fbref">FBRef</option>
-                    <option value="other">Other</option>
-                </select>
-            </div>
-            <br>
-            <button class="btn" onclick="validateImport()">Validate Import</button>
+            <form id="uploadForm" enctype="multipart/form-data">
+                <div class="form-group">
+                    <label for="csvFile">Fantasy Football Pundit CSV File:</label>
+                    <input type="file" id="csvFile" name="lineups_csv" accept=".csv" required>
+                    <small style="color: #6c757d;">Select the CSV file downloaded from FFP</small>
+                </div>
+
+                <button type="submit" class="upload-btn">
+                    ⚽ Upload Lineup Predictions
+                </button>
+            </form>
         </div>
-        
-        <!-- Loading Indicator -->
-        <div class="loading" id="loadingIndicator">
-            <div class="spinner"></div>
-            <p>Validating import data...</p>
+
+        <div class="loading" id="loading">
+            <div class="loading-spinner"></div>
+            <div>Processing lineup data...</div>
         </div>
-        
-        <!-- Error/Success Messages -->
-        <div id="messageArea"></div>
-        
-        <!-- Validation Results -->
-        <div id="validationResults" class="hidden">
-            <!-- Summary Cards -->
-            <div class="summary-cards">
-                <div class="summary-card success">
-                    <h3 id="matchedCount">0</h3>
-                    <p>Matched Players</p>
-                </div>
-                <div class="summary-card warning">
-                    <h3 id="reviewCount">0</h3>
-                    <p>Need Review</p>
-                </div>
-                <div class="summary-card danger">
-                    <h3 id="failedCount">0</h3>
-                    <p>Failed to Match</p>
-                </div>
-                <div class="summary-card">
-                    <h3 id="matchRate">0%</h3>
-                    <p>Match Rate</p>
-                </div>
-            </div>
-            
-            <!-- Position Breakdown -->
-            <div class="position-breakdown">
-                <h3>Match Rate by Position</h3>
-                <div class="position-grid" id="positionGrid"></div>
-            </div>
-            
-            <!-- Players Needing Review -->
-            <div class="needs-review-section">
-                <h3>Players Requiring Review</h3>
-                <div id="reviewPlayers"></div>
-            </div>
-            
-            <!-- Apply Import Section -->
-            <div class="apply-section" id="applySection">
-                <h3>Ready to Apply Import</h3>
-                <p>All players have been matched or manually confirmed. Click below to apply the import.</p>
-                <button class="btn btn-success" onclick="applyImport()">Apply Import</button>
-                <button class="btn btn-warning" onclick="applyImport(true)">Preview Only (Dry Run)</button>
-            </div>
-        </div>
+
+        <div class="result" id="result"></div>
     </div>
-    
+
     <script>
-        let validationData = null;
-        let confirmedMappings = {};
-        
-        // Initialize page
-        document.addEventListener('DOMContentLoaded', function() {
-            // Handle file input change
-            document.getElementById('csvFile').addEventListener('change', function(e) {
-                const fileName = e.target.files[0] ? e.target.files[0].name : 'No file chosen';
-                document.getElementById('selectedFileName').textContent = fileName;
-            });
-            
-            // Check for source parameter (Understat integration)
-            const urlParams = new URLSearchParams(window.location.search);
-            const source = urlParams.get('source');
-            
-            if (source === 'understat') {
-                // Hide upload section and automatically load Understat data
-                document.querySelector('.upload-section').style.display = 'none';
-                showMessage('Loading unmatched Understat players for review...', 'success');
-                loadUnderstatData();
-            } else if (source === 'ffp') {
-                // Hide upload section and automatically load FFP data
-                document.querySelector('.upload-section').style.display = 'none';
-                showMessage('Loading unmatched FFP players for review...', 'success');
-                loadFFPData();
-            } else {
-                // Check if we have unmatched players from a recent import
-                checkForRecentImport();
+        document.getElementById('uploadForm').addEventListener('submit', async function(e) {
+            e.preventDefault();
+
+            const formData = new FormData(this);
+            const uploadBtn = document.querySelector('.upload-btn');
+            const loading = document.getElementById('loading');
+            const result = document.getElementById('result');
+
+            // Show loading state
+            uploadBtn.disabled = true;
+            uploadBtn.textContent = 'Uploading...';
+            loading.style.display = 'block';
+            result.style.display = 'none';
+
+            try {
+                const response = await fetch('/api/import-lineups', {
+                    method: 'POST',
+                    body: formData
+                });
+
+                const data = await response.json();
+
+                // Hide loading
+                loading.style.display = 'none';
+
+                if (data.success) {
+                    // Check if verification is needed (unmatched players)
+                    if (data.verification_needed && data.verification_url) {
+                        // Redirect to validation page for unmatched players
+                        window.location.href = data.verification_url;
+                        return;
+                    }
+
+                    result.className = 'result success';
+                    result.innerHTML = `
+                        <h3>✅ Upload Successful!</h3>
+                        <p>${data.message}</p>
+
+                        <div class="stats-grid">
+                            <div class="stat-item">
+                                <div class="stat-number">${data.matched_players || 0}</div>
+                                <div class="stat-label">Players Matched</div>
+                            </div>
+                            <div class="stat-item">
+                                <div class="stat-number">${data.starters_identified || 0}</div>
+                                <div class="stat-label">Starters Identified</div>
+                            </div>
+                            <div class="stat-item">
+                                <div class="stat-number">${data.rotation_risks || 0}</div>
+                                <div class="stat-label">Rotation Risks</div>
+                            </div>
+                            <div class="stat-item">
+                                <div class="stat-number">${Math.round(data.match_rate || 0)}%</div>
+                                <div class="stat-label">Match Rate</div>
+                            </div>
+                        </div>
+
+                        <div style="margin-top: 15px; padding: 15px; background: #d4edda; border-radius: 6px;">
+                            <strong>🔄 Next Step:</strong> Return to dashboard to see updated starter multipliers for all players!
+                        </div>
+                    `;
+                } else {
+                    result.className = 'result error';
+                    result.innerHTML = `
+                        <h3>❌ Upload Failed</h3>
+                        <p><strong>Error:</strong> ${data.error || 'Unknown error occurred'}</p>
+                    `;
+                }
+
+                result.style.display = 'block';
+
+            } catch (error) {
+                loading.style.display = 'none';
+                result.className = 'result error';
+                result.innerHTML = `
+                    <h3>❌ Upload Failed</h3>
+                    <p><strong>Network Error:</strong> ${error.message}</p>
+                `;
+                result.style.display = 'block';
+            } finally {
+                // Reset button
+                uploadBtn.disabled = false;
+                uploadBtn.textContent = '⚽ Upload Lineup Predictions';
             }
         });
-        
-        async function checkForRecentImport() {
-            try {
-                // Check for pending validation data in sessionStorage
-                const pendingData = sessionStorage.getItem('pendingValidation');
-                if (pendingData) {
-                    const importData = JSON.parse(pendingData);
-                    const ageMinutes = (Date.now() - importData.timestamp) / (1000 * 60);
-                    
-                    // Only use data if it's less than 10 minutes old
-                    if (ageMinutes < 10) {
-                        showMessage(`Found ${importData.unmatched_count} unmatched players from recent import. Loading for review...`, 'success');
-                        
-                        // Convert import data to validation data format
-                        validationData = {
-                            summary: {
-                                total: importData.total_players,
-                                matched: importData.matched_players,
-                                needs_review: importData.unmatched_count,
-                                failed: 0,
-                                match_rate: (importData.matched_players / importData.total_players * 100)
-                            },
-                            players: importData.unmatched_details.map(player => ({
-                                original_name: player.name,
-                                original_team: player.team,
-                                original_position: player.position,
-                                needs_review: true,
-                                match_result: {
-                                    fantrax_name: player.suggested_match || null,
-                                    confidence: player.confidence || 0,
-                                    suggested_matches: player.suggestions || []
-                                }
-                            })),
-                            position_breakdown: {},
-                            source_system: 'ffs'
-                        };
-                        
-                        if (validationData) {
-                            displayValidationResults();
-                        }
-                        
-                        // Clear the session data after using it
-                        sessionStorage.removeItem('pendingValidation');
-                        return;
-                    } else {
-                        // Data is too old, remove it
-                        sessionStorage.removeItem('pendingValidation');
-                    }
-                }
-                
-                console.log('No recent import data available');
-            } catch (error) {
-                console.log('Error checking for recent import:', error);
-                // Clean up potentially corrupted session data
-                sessionStorage.removeItem('pendingValidation');
-            }
-        }
-        
-        async function loadUnderstatData() {
-            try {
-                showLoading(true);
-                
-                const response = await fetch('/api/understat/get-unmatched-data');
-                if (!response.ok) {
-                    throw new Error(`Server error: ${response.status}`);
-                }
-                
-                const result = await response.json();
-                
-                if (result.status === 'success') {
-                    // Convert to validation data format
-                    validationData = {
-                        summary: {
-                            total: result.data.total_players,
-                            matched: result.data.matched_players,
-                            needs_review: result.data.unmatched_count,
-                            failed: 0,
-                            match_rate: (result.data.matched_players / result.data.total_players * 100)
-                        },
-                        players: result.data.unmatched_details.map(player => ({
-                            original_name: player.original_name,
-                            original_team: player.original_team,
-                            original_position: player.original_position,
-                            needs_review: true,
-                            original_data: player.original_data,
-                            match_result: {
-                                fantrax_name: player.match_result?.fantrax_name || null,
-                                confidence: player.match_result?.confidence || 0,
-                                suggested_matches: player.match_result?.suggested_matches || []
-                            }
-                        })),
-                        position_breakdown: {},
-                        source_system: 'understat'
-                    };
-                    
-                    // Set source system dropdown to understat
-                    document.getElementById('sourceSystem').value = 'understat';
-                    
-                    displayValidationResults();
-                    showMessage(`Loaded ${result.data.unmatched_count} unmatched Understat players for review.`, 'success');
-                } else {
-                    throw new Error(result.message || 'Failed to load Understat data');
-                }
-                
-            } catch (error) {
-                console.error('Error loading Understat data:', error);
-                showMessage(`Failed to load Understat data: ${error.message}`, 'error');
-                // Show upload section as fallback
-                document.querySelector('.upload-section').style.display = 'block';
-            } finally {
-                showLoading(false);
-            }
-        }
-        
-        async function loadFFPData() {
-            try {
-                showLoading(true);
-                
-                const response = await fetch('/api/ffp/get-unmatched-data');
-                if (!response.ok) {
-                    throw new Error(`Server error: ${response.status}`);
-                }
-                
-                const result = await response.json();
-                
-                if (result.status === 'success') {
-                    // Convert to validation data format
-                    validationData = {
-                        summary: {
-                            total: result.summary.total_players,
-                            matched: result.summary.matched_players,
-                            needs_review: result.unmatched_count,
-                            failed: 0,
-                            match_rate: result.summary.match_rate || 0
-                        },
-                        players: result.unmatched_details.map(player => ({
-                            original_name: player.original_name,
-                            original_team: player.original_team,
-                            original_position: player.original_position,
-                            needs_review: true,
-                            original_data: {
-                                name: player.original_name,
-                                team: player.original_team,
-                                position: player.original_position,
-                                status: player.status,
-                                line_number: player.line_number
-                            },
-                            match_result: {
-                                fantrax_name: player.suggested_match || null,
-                                confidence: player.confidence || 0,
-                                suggested_matches: player.suggestions || []
-                            }
-                        })),
-                        position_breakdown: result.position_breakdown || {},
-                        source_system: 'ffp'
-                    };
-                    
-                    // Set source system dropdown to ffp
-                    document.getElementById('sourceSystem').value = 'ffp';
-                    
-                    displayValidationResults();
-                    showMessage(`Loaded ${result.unmatched_count} unmatched FFP players for review.`, 'success');
-                } else {
-                    throw new Error(result.message || 'Failed to load FFP data');
-                }
-                
-            } catch (error) {
-                console.error('Error loading FFP data:', error);
-                showMessage(`Failed to load FFP data: ${error.message}`, 'error');
-                // Show upload section as fallback
-                document.querySelector('.upload-section').style.display = 'block';
-            } finally {
-                showLoading(false);
-            }
-        }
-        
-        function showMessage(message, type = 'error') {
-            const messageArea = document.getElementById('messageArea');
-            const className = type === 'error' ? 'error-message' : 'success-message';
-            messageArea.innerHTML = `<div class="${className}">${message}</div>`;
-        }
-        
-        function clearMessages() {
-            document.getElementById('messageArea').innerHTML = '';
-        }
-        
-        function showLoading(show = true) {
-            const loading = document.getElementById('loadingIndicator');
-            loading.style.display = show ? 'block' : 'none';
-        }
-        
-        function showResults(show = true) {
-            const results = document.getElementById('validationResults');
-            results.classList.toggle('hidden', !show);
-        }
-        
-        async function validateImport() {
-            const fileInput = document.getElementById('csvFile');
-            const sourceSystem = document.getElementById('sourceSystem').value;
-            
-            if (!fileInput.files[0]) {
-                showMessage('Please select a CSV file first.');
-                return;
-            }
-            
-            clearMessages();
-            showLoading(true);
-            showResults(false);
-            
-            try {
-                // Parse CSV file
-                const csvText = await fileInput.files[0].text();
-                const players = parseCSV(csvText);
-                
-                if (players.length === 0) {
-                    throw new Error('No valid player data found in CSV file.');
-                }
-                
-                // Send to validation API
-                const response = await fetch('/api/validate-import', {
-                    method: 'POST',
-                    headers: {
-                        'Content-Type': 'application/json',
-                    },
-                    body: JSON.stringify({
-                        source_system: sourceSystem,
-                        players: players
-                    })
-                });
-                
-                if (!response.ok) {
-                    throw new Error(`Server error: ${response.status}`);
-                }
-                
-                validationData = await response.json();
-                displayValidationResults();
-                
-            } catch (error) {
-                console.error('Validation error:', error);
-                showMessage(`Validation failed: ${error.message}`);
-            } finally {
-                showLoading(false);
-            }
-        }
-        
-        function parseCSV(csvText) {
-            const lines = csvText.trim().split('\n');
-            if (lines.length < 2) return [];
-            
-            const headers = lines[0].split(',').map(h => h.trim().toLowerCase());
-            const players = [];
-            
-            for (let i = 1; i < lines.length; i++) {
-                const values = lines[i].split(',').map(v => v.trim());
-                const player = {};
-                
-                headers.forEach((header, index) => {
-                    if (values[index]) {
-                        player[header] = values[index];
-                    }
-                });
-                
-                // Ensure required fields
-                if (player.name) {
-                    players.push({
-                        name: player.name,
-                        team: player.team || '',
-                        position: player.position || '',
-                        // Include other fields as they are
-                        ...player
-                    });
-                }
-            }
-            
-            return players;
-        }
-        
-        function displayValidationResults() {
-            // Update summary cards
-            document.getElementById('matchedCount').textContent = validationData.summary.matched;
-            document.getElementById('reviewCount').textContent = validationData.summary.needs_review;
-            document.getElementById('failedCount').textContent = validationData.summary.failed;
-            document.getElementById('matchRate').textContent = validationData.summary.match_rate.toFixed(1) + '%';
-            
-            // Update position breakdown
-            displayPositionBreakdown();
-            
-            // Display players needing review
-            displayReviewPlayers();
-            
-            // Show/hide apply section
-            updateApplySection();
-            
-            showResults(true);
-            showMessage(`Validation complete. ${validationData.summary.matched} players matched, ${validationData.summary.needs_review} need review.`, 'success');
-        }
-        
-        function displayPositionBreakdown() {
-            const grid = document.getElementById('positionGrid');
-            grid.innerHTML = '';
-            
-            Object.entries(validationData.position_breakdown).forEach(([position, stats]) => {
-                const item = document.createElement('div');
-                item.className = 'position-item';
-                item.innerHTML = `
-                    <strong>${position}</strong><br>
-                    ${stats.matched}/${stats.total}<br>
-                    <small>${stats.match_rate.toFixed(1)}%</small>
-                `;
-                grid.appendChild(item);
-            });
-        }
-        
-        function displayReviewPlayers() {
-            const container = document.getElementById('reviewPlayers');
-            container.innerHTML = '';
-            
-            const reviewPlayers = validationData.players.filter(p => p.needs_review);
-            
-            if (reviewPlayers.length === 0) {
-                container.innerHTML = '<p>No players require manual review.</p>';
-                return;
-            }
-            
-            reviewPlayers.forEach((player, index) => {
-                const item = document.createElement('div');
-                item.className = player.match_result.fantrax_name ? 'player-review-item' : 'player-review-item no-match';
-                
-                const hasMatch = player.match_result.fantrax_name;
-                const suggestions = player.match_result.suggested_matches || [];
-                
-                item.innerHTML = `
-                    <div class="player-info">
-                        <div>
-                            <div class="player-name">${player.original_name}</div>
-                            <div class="player-details">${player.original_team} - ${player.original_position}</div>
-                        </div>
-                    </div>
-                    
-                    ${hasMatch ? `
-                        <div class="current-match">
-                            Current match: <strong>${player.match_result.fantrax_name}</strong> 
-                            (${player.match_result.confidence.toFixed(1)}% confidence)
-                        </div>
-                    ` : ''}
-                    
-                    <div class="suggestions-section">
-                        <h4>Smart Suggestions:</h4>
-                        <div id="suggestions-${index}">
-                            ${suggestions.length > 0 ? '' : '<div class="no-suggestions">No suggestions available. This player may not exist in the database.</div>'}
-                        </div>
-                        <div style="margin-top: 10px;">
-                            <div style="margin-bottom: 10px;">
-                                <label for="manual-select-${index}" style="font-weight: bold;">Manual Selection (${player.original_team} players):</label>
-                                <select id="manual-select-${index}" style="width: 100%; margin-top: 5px; padding: 8px;">
-                                    <option value="">Select a player from ${player.original_team}...</option>
-                                </select>
-                            </div>
-                            <button class="btn" onclick="confirmManualSelection(${index})" style="background: #28a745; color: white;">Confirm Selection</button>
-                            <span id="status-${index}" style="margin-left: 10px; font-weight: bold;"></span>
-                        </div>
-                    </div>
-                `;
-                
-                container.appendChild(item);
-                
-                // Add suggestion items
-                if (suggestions.length > 0) {
-                    const suggestionsContainer = document.getElementById(`suggestions-${index}`);
-                    
-                    suggestions.forEach(suggestion => {
-                        const suggestionItem = document.createElement('div');
-                        suggestionItem.className = 'suggestion-item';
-                        suggestionItem.onclick = () => selectSuggestion(index, suggestion);
-                        
-                        suggestionItem.innerHTML = `
-                            <div class="suggestion-info">
-                                <div class="suggestion-name">${suggestion.name}</div>
-                                <div class="suggestion-details">${suggestion.team} - ${suggestion.position}</div>
-                            </div>
-                            <div class="suggestion-confidence">${suggestion.confidence.toFixed(1)}%</div>
-                        `;
-                        
-                        suggestionsContainer.appendChild(suggestionItem);
-                    });
-                }
-                
-                // Populate team-filtered dropdown
-                populateTeamDropdown(index, player.original_team);
-            });
-        }
-        
-        function selectSuggestion(playerIndex, suggestion) {
-            // Remove previous selections for this player
-            const allSuggestions = document.querySelectorAll(`#suggestions-${playerIndex} .suggestion-item`);
-            allSuggestions.forEach(item => item.classList.remove('selected'));
-            
-            // Select this suggestion
-            event.currentTarget.classList.add('selected');
-            
-            // Store the confirmed mapping
-            const reviewPlayers = validationData.players.filter(p => p.needs_review);
-            const player = reviewPlayers[playerIndex];
-            
-            confirmedMappings[player.original_name] = {
-                fantrax_id: suggestion.fantrax_id,
-                fantrax_name: suggestion.name,
-                confidence: suggestion.confidence
-            };
-            
-            // Show confirmation status
-            const statusElement = document.getElementById(`status-${playerIndex}`);
-            statusElement.textContent = `✓ Selected: ${suggestion.name}`;
-            statusElement.style.color = '#28a745';
-            
-            updateApplySection();
-        }
-        
-        function skipPlayer(playerIndex) {
-            // Remove any selections for this player
-            const allSuggestions = document.querySelectorAll(`#suggestions-${playerIndex} .suggestion-item`);
-            allSuggestions.forEach(item => item.classList.remove('selected'));
-            
-            // Remove from confirmed mappings
-            const reviewPlayers = validationData.players.filter(p => p.needs_review);
-            const player = reviewPlayers[playerIndex];
-            delete confirmedMappings[player.original_name];
-            
-            // Show skip status
-            const statusElement = document.getElementById(`status-${playerIndex}`);
-            statusElement.textContent = '⏭️ Skipped';
-            statusElement.style.color = '#6c757d';
-            
-            updateApplySection();
-        }
-        
-        function updateApplySection() {
-            const applySection = document.getElementById('applySection');
-            const reviewPlayers = validationData.players.filter(p => p.needs_review);
-            const confirmedCount = Object.keys(confirmedMappings).length;
-            const totalReviewNeeded = reviewPlayers.length;
-            
-            // Show apply section if user has made some progress (not requiring all players)
-            if (confirmedCount > 0 || totalReviewNeeded === 0) {
-                applySection.style.display = 'block';
-                
-                // Update the text to show progress
-                const progressText = document.querySelector('#applySection h3');
-                const detailText = document.querySelector('#applySection p');
-                
-                if (confirmedCount === totalReviewNeeded) {
-                    progressText.textContent = 'Ready to Apply Import - All Players Reviewed';
-                    detailText.textContent = `All ${totalReviewNeeded} players have been reviewed. Click below to apply the import.`;
-                } else {
-                    progressText.textContent = `Ready to Apply Import - ${confirmedCount}/${totalReviewNeeded} Players Confirmed`;
-                    detailText.textContent = `You've confirmed ${confirmedCount} out of ${totalReviewNeeded} players. You can apply now or continue reviewing.`;
-                }
-            } else {
-                applySection.style.display = 'none';
-            }
-        }
-        
-        async function populateTeamDropdown(playerIndex, teamName) {
-            try {
-                const response = await fetch(`/api/players-by-team?team=${encodeURIComponent(teamName)}`);
-                if (response.ok) {
-                    const players = await response.json();
-                    const dropdown = document.getElementById(`manual-select-${playerIndex}`);
-                    
-                    // Clear existing options except the first one
-                    dropdown.innerHTML = `<option value="">Select a player from ${teamName}...</option>`;
-                    
-                    // Add team players to dropdown
-                    players.forEach(player => {
-                        const option = document.createElement('option');
-                        option.value = JSON.stringify({
-                            fantrax_id: player.fantrax_id,
-                            name: player.name,
-                            team: player.team,
-                            position: player.position
-                        });
-                        option.textContent = `${player.name} - ${player.position}`;
-                        dropdown.appendChild(option);
-                    });
-                }
-            } catch (error) {
-                console.error('Error loading team players:', error);
-            }
-        }
-        
-        function confirmManualSelection(playerIndex) {
-            const dropdown = document.getElementById(`manual-select-${playerIndex}`);
-            const selectedValue = dropdown.value;
-            
-            if (!selectedValue) {
-                alert('Please select a player from the dropdown first.');
-                return;
-            }
-            
-            try {
-                const selectedPlayer = JSON.parse(selectedValue);
-                
-                // Clear any existing suggestion selections
-                const allSuggestions = document.querySelectorAll(`#suggestions-${playerIndex} .suggestion-item`);
-                allSuggestions.forEach(item => item.classList.remove('selected'));
-                
-                // Store the confirmed mapping
-                const reviewPlayers = validationData.players.filter(p => p.needs_review);
-                const player = reviewPlayers[playerIndex];
-                
-                confirmedMappings[player.original_name] = {
-                    fantrax_id: selectedPlayer.fantrax_id,
-                    fantrax_name: selectedPlayer.name,
-                    confidence: 100.0 // Manual selection gets 100% confidence
-                };
-                
-                // Show confirmation status
-                const statusElement = document.getElementById(`status-${playerIndex}`);
-                statusElement.textContent = `✓ Manually Selected: ${selectedPlayer.name}`;
-                statusElement.style.color = '#28a745';
-                
-                // Reset dropdown to default
-                dropdown.selectedIndex = 0;
-                
-                updateApplySection();
-                
-            } catch (error) {
-                console.error('Error processing manual selection:', error);
-                alert('Error processing selection. Please try again.');
-            }
-        }
 
-        async function applyImport(dryRun = false) {
-            console.log('applyImport called with dryRun:', dryRun);
-            console.log('validationData:', validationData);
-            console.log('confirmedMappings:', confirmedMappings);
-            
-            if (!validationData) {
-                showMessage('No validation data available.');
-                return;
+        // File input validation
+        document.getElementById('csvFile').addEventListener('change', function(e) {
+            const file = e.target.files[0];
+            if (file && !file.name.toLowerCase().endsWith('.csv')) {
+                alert('Please select a CSV file');
+                this.value = '';
             }
-            
-            showLoading(true);
-            clearMessages();
-            
-            try {
-                const sourceSystem = document.getElementById('sourceSystem').value;
-                const requestData = {
-                    source_system: sourceSystem,
-                    players: validationData.players.map(p => p.original_data || {
-                        name: p.original_name,
-                        team: p.original_team,
-                        position: p.original_position
-                    }),
-                    confirmed_mappings: confirmedMappings,
-                    dry_run: dryRun
-                };
-                
-                // Use specific Understat endpoint if source is understat
-                const endpoint = sourceSystem === 'understat' ? '/api/understat/apply-mappings' : '/api/apply-import';
-                
-                console.log('Sending request data:', requestData);
-                console.log('Number of players:', requestData.players.length);
-                console.log('Number of confirmed mappings:', Object.keys(requestData.confirmed_mappings).length);
-                
-                const response = await fetch(endpoint, {
-                    method: 'POST',
-                    headers: {
-                        'Content-Type': 'application/json',
-                    },
-                    body: JSON.stringify(requestData)
-                });
-                
-                if (!response.ok) {
-                    throw new Error(`Server error: ${response.status}`);
-                }
-                
-                const result = await response.json();
-                
-                if (dryRun) {
-                    showMessage(`Preview: Would import ${result.import_count} players. ${result.message}`, 'success');
-                } else {
-                    showMessage(`Import successful! Imported ${result.import_count} players. ${result.message}`, 'success');
-                    // Reset form
-                    validationData = null;
-                    confirmedMappings = {};
-                    showResults(false);
-                    document.getElementById('csvFile').value = '';
-                }
-                
-            } catch (error) {
-                console.error('Apply import error:', error);
-                showMessage(`Import failed: ${error.message}`);
-            } finally {
-                showLoading(false);
-            }
-        }
+        });
     </script>
 </body>
 </html>

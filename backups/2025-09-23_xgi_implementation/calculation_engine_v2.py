@@ -183,14 +183,14 @@ class FormulaEngineV2:
     
     def _calculate_form_multiplier(self, player_data: Dict[str, Any]) -> float:
         """
-        SPRINT 2: Calculate form multiplier using EWMA with Î±=0.87
+        SPRINT 2: Calculate form multiplier using EWMA with α=0.87
         """
         return self._calculate_exponential_form_multiplier(player_data)
     
     def _calculate_exponential_form_multiplier(self, player_data: Dict[str, Any]) -> float:
         """
         SPRINT 2: Calculate form using Exponential Weighted Moving Average (EWMA)
-        Algorithm: More recent games have exponentially higher weights (Î±=0.87)
+        Algorithm: More recent games have exponentially higher weights (α=0.87)
         """
         try:
             alpha = self.v2_config.get('exponential_form', {}).get('alpha', 0.87)
@@ -217,7 +217,7 @@ class FormulaEngineV2:
             # Generate exponential decay weights (most recent = highest weight)
             weights = []
             for i in range(len(numeric_games)):
-                weight = alpha ** i  # Exponential decay: Î±^0, Î±^1, Î±^2, ...
+                weight = alpha ** i  # Exponential decay: α^0, α^1, α^2, ...
                 weights.append(weight)
             
             # Normalize weights to sum to 1
@@ -250,16 +250,16 @@ class FormulaEngineV2:
                 # Use dynamic progressive ranges based on form cap parameter
                 # Scale the ranges based on sample size, respecting the form cap
                 if games_played <= 2:
-                    # Early season: Â±5% range
+                    # Early season: ±5% range
                     range_factor = 0.05
                 elif games_played <= 4:
-                    # Building confidence: Â±15% range
+                    # Building confidence: ±15% range
                     range_factor = 0.15
                 elif games_played <= 6:
-                    # Moderate confidence: Â±25% range
+                    # Moderate confidence: ±25% range
                     range_factor = 0.25
                 elif games_played <= 8:
-                    # Good confidence: Â±40% range
+                    # Good confidence: ±40% range
                     range_factor = 0.40
                 else:
                     # Full confidence: Use full form cap range
@@ -389,7 +389,7 @@ class FormulaEngineV2:
         if not xgi_config.get('enabled', False):
             return 1.0
             
-        return self._calculate_positional_xgi_multiplier(player_data)
+        return self._calculate_normalized_xgi_multiplier(player_data)
     
     def _calculate_normalized_xgi_multiplier(self, player_data: Dict[str, Any]) -> float:
         """
@@ -544,74 +544,6 @@ class FormulaEngineV2:
 
 
 
-    def _get_positional_average(self, position: str) -> float:
-        """Get the appropriate positional average for a player"""
-        pos_config = self.params.get('formula_optimization_v2', {}).get('positional_xgi', {})
-        position_averages = pos_config.get('position_averages', {})
-        fallback_values = pos_config.get('fallback_values', {})
-        mf_weight = pos_config.get('mf_position_weight', 0.7)
-
-        # Handle multi-position players
-        if ',' in position or '/' in position:
-            # Split position string
-            positions = position.replace('/', ',').split(',')
-            primary = positions[0].strip()
-            secondary = positions[1].strip() if len(positions) > 1 else None
-
-            # D/M or D,M -> Use D average (defensive players)
-            if primary == 'D' and secondary == 'M':
-                return position_averages.get('D', fallback_values.get('D', 0.20))
-
-            # M/F or M,F -> Weighted average (attacking mids)
-            elif primary == 'M' and secondary == 'F':
-                m_avg = position_averages.get('M', fallback_values.get('M', 0.40))
-                f_avg = position_averages.get('F', fallback_values.get('F', 0.55))
-                return (1 - mf_weight) * m_avg + mf_weight * f_avg
-
-            # Other combinations -> Use primary position
-            else:
-                return position_averages.get(primary, fallback_values.get(primary, 0.40))
-
-        # Single position
-        return position_averages.get(position, fallback_values.get(position, 0.40))
-
-    def _calculate_positional_xgi_multiplier(self, player_data: Dict[str, Any]) -> float:
-        """
-        Calculate xGI multiplier using positional averages
-        Formula: 1 + ((player_xGI90 / position_avg_xGI90) - 1) × weight
-        """
-        try:
-            pos_config = self.params.get('formula_optimization_v2', {}).get('positional_xgi', {})
-
-            # Get player data
-            current_xgi = float(player_data.get('xgi90', 0.0) or 0.0)
-            position = player_data.get('position', 'M')
-
-            # Goalkeepers always get 1.0 (xGI disabled)
-            if position.startswith('G'):
-                return 1.0
-
-            # Get positional average
-            position_avg = self._get_positional_average(position)
-
-            # Calculate multiplier
-            if position_avg > 0.01:  # Avoid division by very small numbers
-                xgi_weight = pos_config.get('xgi_weight', 0.5)
-                ratio = current_xgi / position_avg
-                multiplier = 1.0 + (ratio - 1.0) * xgi_weight
-
-                # Apply bounds (0.5x to 2.5x)
-                return max(0.5, min(2.5, multiplier))
-            else:
-                return 1.0
-
-        except Exception as e:
-            import logging
-            logger = logging.getLogger(__name__)
-            logger.warning(f"Error calculating positional xGI multiplier: {e}")
-            return 1.0
-
-
 def load_system_parameters(config_path: str = 'config/system_parameters.json') -> Dict[str, Any]:
     """Load system parameters from JSON file with validation and fallback handling"""
     try:
@@ -652,8 +584,7 @@ def get_db_connection(db_config: Dict[str, Any]) -> psycopg2.extensions.connecti
     return psycopg2.connect(**db_config)
 
 
-
-
+# Example usage and testing
 if __name__ == "__main__":
     # Test configuration
     db_config = {

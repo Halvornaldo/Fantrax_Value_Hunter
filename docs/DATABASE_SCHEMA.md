@@ -235,6 +235,10 @@ SELECT MAX(gameweek) FROM raw_player_snapshots WHERE gameweek IS NOT NULL
 - `true_value` (DECIMAL) - **V2.0 True Value** calculation result
 - `last_updated` (TIMESTAMP) - Last calculation time
 
+**Next Opponent Data** (populated from Fantrax CSV imports):
+- `next_opponent` (VARCHAR(3)) - Next opponent team code (BUR, EVE, etc.)
+- `is_home` (BOOLEAN) - Home/away indicator for next fixture
+
 **V2.0 Multiplier System**:
 - `form_multiplier` (DECIMAL 5,3, DEFAULT 1.0) - EWMA form calculation
 - `fixture_multiplier` (DECIMAL 5,3, DEFAULT 1.0) - Exponential fixture difficulty

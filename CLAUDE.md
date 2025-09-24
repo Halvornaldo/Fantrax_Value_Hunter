@@ -26,7 +26,7 @@ ROI = True Value ÷ Player_Price
 
 ## Key Tables
 - `players` - Core player data (714 players)
-- `player_metrics` - Live performance data (single table, continuously updated)
+- `player_metrics` - Live performance data with opponent info (includes next_opponent, is_home columns)
 - `player_games_data` - Games tracking for blending
 - `name_mappings` - Cross-source player resolution
 - `team_fixtures` - Fixture difficulty scores
@@ -52,10 +52,28 @@ python check_current_state.py
 ```
 
 ## Data Sources
-- **Fantrax**: Player data and pricing
+- **Fantrax**: Player data, pricing, and next opponent information
 - **Understat**: xG/xA statistics
 - **FFP (Fantasy Football Pundit)**: Starter predictions (replaced FFS)
 - **OddsPortal**: Fixture difficulty via betting odds upload
+
+## Recent Enhancements (September 2024)
+### Next Opponent Column
+- **Source**: Fantrax CSV "Opponent" column (format: "BUR Sat 4:00PM" or "@EVE Mon 9:00PM")
+- **Display**: Shows as "vs BUR" (home) or "@ EVE" (away) in compact 60px column
+- **Performance**: Stored directly in `player_metrics` table for fast retrieval
+- **Auto-Update**: Refreshes automatically with each Fantrax CSV import
+
+### Enhanced Color Coding
+- **Fixed Scale**: Colors based on full dataset, not filtered subset
+- **Consistent Reference**: Same player always shows same color intensity
+- **Better Comparisons**: Meaningful color comparison across different filters
+- **Affected Columns**: Minutes, Games Played, Total FPts, PPG, Price, ROI
+
+### Performance Optimization
+- **Query Speed**: Eliminated expensive `fixture_odds` JOIN
+- **Table Navigation**: Restored original fast performance (0.67s for 100 players)
+- **Data Storage**: Opponent data now stored directly in main table
 
 ## FFP CSV Import (Working)
 **IMPORTANT**: Only use the dashboard import button for FFP CSV imports:

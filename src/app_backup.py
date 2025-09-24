@@ -916,7 +916,69 @@ def update_parameters():
         # Save updated parameters
         if not save_system_parameters(current_params):
             return jsonify({'error': 'Failed to save parameters'}), 500
-        
+
+        # Recalculate starter multipliers for CSV-imported players with new parameters
+        # Always run this when any parameters change
+        try:
+            conn_param = get_db_connection()
+            cursor_param = conn_param.cursor()
+
+            # Get new parameter values
+            starter_config = current_params.get('starter_prediction', {})
+            likely_penalty = starter_config.get('likely_starter_penalty', 0.8)
+            rotation_penalty = starter_config.get('auto_rotation_penalty', 0.7)
+            unlikely_penalty = starter_config.get('unlikely_starter_penalty', 0.5)
+            bench_penalty = starter_config.get('force_bench_penalty', 0.15)
+            out_penalty = starter_config.get('force_out_penalty', 0.0)
+
+            # Get manual overrides to exclude them
+            manual_overrides = starter_config.get('manual_overrides', {})
+            manual_override_ids = list(manual_overrides.keys())
+
+            # Build exclusion clause for manual overrides
+            if manual_override_ids:
+                placeholders = ','.join(['%s'] * len(manual_override_ids))
+                exclusion_clause = f"AND pm.player_id NOT IN ({placeholders})"
+                query_params = [likely_penalty, rotation_penalty, unlikely_penalty, bench_penalty] + manual_override_ids
+            else:
+                exclusion_clause = ""
+                query_params = [likely_penalty, rotation_penalty, unlikely_penalty, bench_penalty]
+
+            # Recalculate multipliers based on stored confidence percentages
+            cursor_param.execute(f"""
+                UPDATE player_metrics pm
+                SET starter_multiplier =
+                    CASE
+                        WHEN csv_confidence_percentage >= 90 THEN 1.0
+                        WHEN csv_confidence_percentage >= 70 THEN %s
+                        WHEN csv_confidence_percentage >= 50 THEN %s
+                        WHEN csv_confidence_percentage >= 30 THEN %s
+                        WHEN csv_confidence_percentage > 0 THEN %s
+                        ELSE starter_multiplier
+                    END,
+                    csv_confidence_multiplier =
+                    CASE
+                        WHEN csv_confidence_percentage >= 90 THEN 1.0
+                        WHEN csv_confidence_percentage >= 70 THEN %s
+                        WHEN csv_confidence_percentage >= 50 THEN %s
+                        WHEN csv_confidence_percentage >= 30 THEN %s
+                        WHEN csv_confidence_percentage > 0 THEN %s
+                        ELSE csv_confidence_multiplier
+                    END
+                WHERE csv_confidence_percentage IS NOT NULL
+                {exclusion_clause}
+            """, query_params + query_params[:4])  # Duplicate params for both updates
+
+            updated_csv_players = cursor_param.rowcount
+            conn_param.commit()
+            cursor_param.close()
+            conn_param.close()
+
+            print(f"Updated {updated_csv_players} CSV players with new parameter values")
+
+        except Exception as e:
+            print(f"Error updating CSV multipliers: {e}")
+
         # Trigger True Value recalculation using live_data_system for default
         gameweek = data.get('gameweek')
         if gameweek is None:
@@ -1034,10 +1096,10 @@ def manual_override():
         # Load current system parameters to get penalties
         params = load_system_parameters()
         starter_config = params.get('starter_prediction', {})
-        likely_penalty = starter_config.get('likely_starter_penalty', 0.90)
-        rotation_penalty = starter_config.get('auto_rotation_penalty', 0.75)
+        likely_penalty = starter_config.get('likely_starter_penalty', 0.8)
+        rotation_penalty = starter_config.get('auto_rotation_penalty', 0.7)
         unlikely_penalty = starter_config.get('unlikely_starter_penalty', 0.50)
-        bench_penalty = starter_config.get('force_bench_penalty', 0.35)
+        bench_penalty = starter_config.get('force_bench_penalty', 0.15)
         out_penalty = starter_config.get('force_out_penalty', 0.0)
         
         # Establish database connection
@@ -1736,13 +1798,15 @@ def import_lineups():
             manual_overrides = manual_overrides_section if isinstance(manual_overrides_section, dict) else {}
         
         try:
-            # STEP 1: Set ALL players to lowest category (0.35x bench) - clean slate approach
+            # STEP 1: Set ALL players to lowest category (bench) - clean slate approach
             # This aligns with the weekly archive workflow where we start fresh each week
-            lowest_multiplier = 0.35
+            starter_config = params.get('starter_prediction', {})
+            lowest_multiplier = starter_config.get('force_bench_penalty', 0.15)
             cursor.execute("""
                 UPDATE player_metrics
                 SET starter_multiplier = %s,
-                    csv_confidence_multiplier = %s
+                    csv_confidence_multiplier = %s,
+                    csv_confidence_percentage = NULL
                 WHERE gameweek = %s
             """, [lowest_multiplier, lowest_multiplier, gameweek])
             
@@ -1759,11 +1823,12 @@ def import_lineups():
                 # Check if this player has a manual override - if so, skip CSV update
                 if player['player_id'] not in manual_overrides:
                     cursor.execute("""
-                        UPDATE player_metrics 
+                        UPDATE player_metrics
                         SET starter_multiplier = %s,
-                            csv_confidence_multiplier = %s
+                            csv_confidence_multiplier = %s,
+                            csv_confidence_percentage = %s
                         WHERE player_id = %s AND gameweek = %s
-                    """, [player['multiplier'], player['multiplier'], player['player_id'], gameweek])
+                    """, [player['multiplier'], player['multiplier'], player.get('confidence', None), player['player_id'], gameweek])
                     rows_affected = cursor.rowcount
                     starter_ids.append(player['player_id'])
                     updated_count += 1
@@ -1771,14 +1836,14 @@ def import_lineups():
                     print(f"Skipping {player['name']} - has manual override")
             
             print(f"Updated {len(starter_ids)} CSV players with confidence-based multipliers")
-            print(f"Remaining players stay at lowest category (0.35x) as expected")
+            print(f"Remaining players stay at lowest category ({lowest_multiplier:.2f}x) as expected")
             
             # STEP 3: Re-apply any existing manual overrides (5-category system)
             starter_config = params.get('starter_prediction', {})
-            likely_penalty = starter_config.get('likely_starter_penalty', 0.90)
-            rotation_penalty = starter_config.get('auto_rotation_penalty', 0.75)
+            likely_penalty = starter_config.get('likely_starter_penalty', 0.8)
+            rotation_penalty = starter_config.get('auto_rotation_penalty', 0.7)
             unlikely_penalty = starter_config.get('unlikely_starter_penalty', 0.50)
-            bench_penalty = starter_config.get('force_bench_penalty', 0.35)
+            bench_penalty = starter_config.get('force_bench_penalty', 0.15)
             out_penalty = starter_config.get('force_out_penalty', 0.0)
             
             for player_id, override in manual_overrides.items():
@@ -1904,6 +1969,7 @@ def export_players():
         max_price = request.args.get('max_price', type=float)
         team = request.args.get('team')
         search = request.args.get('search', '').strip()
+        include_all = request.args.get('include_all', 'false').lower() == 'true'
         # Use live_data_system for unified gameweek detection
         # Gameweek manager removed - using database queries
         # Using database query instead
@@ -1916,6 +1982,8 @@ def export_players():
         base_query = """
             SELECT 
                 p.name, p.team, p.position,
+                p.games_current_season,
+                COALESCE(pgd.games_played_historical, 0) as games_played_historical,
                 pm.price, pm.ppg, p.blended_ppg, COALESCE(pf.total_points, 0) as total_fpts, pm.true_value, p.roi,
                 pm.form_multiplier, pm.fixture_multiplier, pm.starter_multiplier, pm.xgi_multiplier,
                 p.current_season_weight,
@@ -1923,7 +1991,17 @@ def export_players():
                 (COALESCE(p.xg90, 0) + COALESCE(p.xa90, 0)) as xgi
             FROM players p
             JOIN player_metrics pm ON p.id = pm.player_id
-            LEFT JOIN player_form pf ON p.id = pf.player_id
+            LEFT JOIN (
+                SELECT player_id, MAX(points) as total_points
+                FROM player_form
+                GROUP BY player_id
+            ) pf ON p.id = pf.player_id
+            LEFT JOIN (
+                SELECT player_id,
+                       MAX(games_played_historical) as games_played_historical
+                FROM player_games_data
+                GROUP BY player_id
+            ) pgd ON p.id = pgd.player_id
             WHERE pm.gameweek = %s
         """
         
@@ -1970,7 +2048,7 @@ def export_players():
         # Generate CSV content with gameweek metadata
         csv_lines = []
         csv_lines.append(f"# Fantrax Value Hunter Export - Gameweek {gameweek} - Generated: {datetime.now().strftime('%Y-%m-%d %H:%M:%S')}")
-        csv_lines.append("Name,Team,Position 1,Position 2,Price,PPG,Blended PPG,Total FPts,True Value,ROI,Form Multiplier,Fixture Multiplier,Starter Multiplier,xGI Multiplier,Current Season Weight,Minutes,xG90,xA90,xGI90,xGI")
+        csv_lines.append("Name,Team,Position 1,Position 2,Price,PPG,Blended PPG,Total FPts,24-25,25-26,True Value,ROI,Form Multiplier,Fixture Multiplier,Starter Multiplier,xGI Multiplier,Current Season Weight,Minutes,xG90,xA90,xGI90,xGI")
         
         for player in players:
             current_weight = float(player['current_season_weight']) if player['current_season_weight'] else 0.0
@@ -1983,7 +2061,7 @@ def export_players():
             positions = player['position'].split(',') if player['position'] else ['']
             position1 = positions[0].strip() if len(positions) > 0 else ''
             position2 = positions[1].strip() if len(positions) > 1 else ''
-            csv_lines.append(f"{player['name']},{player['team']},{position1},{position2},{player['price']},{player['ppg']},{player['blended_ppg']:.2f},{player['total_fpts']:.3f},{player['true_value']:.3f},{player['roi']:.3f},{player['form_multiplier']:.2f},{player['fixture_multiplier']:.2f},{player['starter_multiplier']:.2f},{player['xgi_multiplier']:.2f},{current_weight:.3f},{minutes},{xg90:.3f},{xa90:.3f},{xgi90:.3f},{xgi:.3f}")
+            csv_lines.append(f"{player['name']},{player['team']},{position1},{position2},{player['price']},{player['ppg']},{player['blended_ppg']:.2f},{player["total_fpts"]:.3f},{player["games_played_historical"]},{player["games_current_season"]},{player["true_value"]:.3f},{player['roi']:.3f},{player['form_multiplier']:.2f},{player['fixture_multiplier']:.2f},{player['starter_multiplier']:.2f},{player['xgi_multiplier']:.2f},{current_weight:.3f},{minutes},{xg90:.3f},{xa90:.3f},{xgi90:.3f},{xgi:.3f}")
         
         csv_content = '\n'.join(csv_lines)
         
@@ -2644,22 +2722,18 @@ def import_form_data():
             SET ppg = (
                 SELECT 
                     CASE 
-                        WHEN COALESCE(p.games_current_season, 0) > 0 
-                        THEN COALESCE(pf_max.total_points, 0) / pgd.games_played_current
+                        WHEN COALESCE(players.games_current_season, 0) > 0 
+                        THEN COALESCE(pf_max.total_points, 0) / players.games_current_season
                         ELSE 0 
                     END
-                FROM (
+                FROM players
+                LEFT JOIN (
                     SELECT player_id, MAX(points) as total_points
                     FROM player_form
                     WHERE player_id = pm.player_id
                     GROUP BY player_id
-                ) pf_max
-                LEFT JOIN (
-                    SELECT player_id, SUM(games_played) as games_played_current
-                    FROM player_games_data 
-                    WHERE player_id = pm.player_id
-                    GROUP BY player_id
-                ) pgd ON pf_max.player_id = pgd.player_id
+                ) pf_max ON players.id = pf_max.player_id
+                WHERE players.id = pm.player_id
                 LIMIT 1
             )
             WHERE pm.gameweek = %s
@@ -3513,12 +3587,17 @@ def sync_understat_data():
         """)
         players_reset = cursor.rowcount
         
-        # Also reset starter_multiplier to default bench level (0.35) for consistency
+        # Load system parameters to get current bench penalty
+        params = load_system_parameters()
+        starter_config = params.get('starter_prediction', {})
+        bench_penalty = starter_config.get('force_bench_penalty', 0.15)
+
+        # Also reset starter_multiplier to default bench level for consistency
         cursor.execute("""
-            UPDATE player_metrics 
-            SET starter_multiplier = 0.35
+            UPDATE player_metrics
+            SET starter_multiplier = %s
             WHERE gameweek = 1
-        """)
+        """, [bench_penalty])
         starter_reset = cursor.rowcount
         
         reset_count = players_reset
@@ -5253,6 +5332,254 @@ def serve_react_assets():
         filename
     )
 
+@app.route('/api/validate-game-scores', methods=['POST'])
+def validate_game_scores():
+    """
+    Validate game scores using Understat participation data
+    Fetches players who actually played in the gameweek and matches them to Fantrax IDs
+    """
+    try:
+        data = request.get_json()
+
+        if not data or 'game_number' not in data:
+            return jsonify({'error': 'game_number is required'}), 400
+
+        game_number = int(data['game_number'])
+
+        # Check if integration package is available
+        if not INTEGRATION_AVAILABLE:
+            return jsonify({
+                'error': 'Integration package not available in production mode',
+                'message': 'Understat validation requires development environment'
+            }), 503
+
+        print(f"Starting validation for Game {game_number}...")
+
+        # Step 1: Extract Understat players who played in this gameweek
+        import ScraperFC as sfc
+        understat = sfc.Understat()
+
+        # Get match links for the season
+        match_links = understat.get_match_links("2025/2026", "EPL")
+
+        # Calculate match range for this gameweek (10 matches per gameweek)
+        start_match = (game_number - 1) * 10
+        end_match = start_match + 10
+
+        if end_match > len(match_links):
+            return jsonify({
+                'error': f'Game {game_number} not available yet',
+                'message': f'Only {len(match_links) // 10} gameweeks available'
+            }), 400
+
+        gameweek_matches = match_links[start_match:end_match]
+        players_who_played = set()
+
+        print(f"Processing {len(gameweek_matches)} matches for Game {game_number}...")
+
+        # Extract players from each match
+        for i, match_link in enumerate(gameweek_matches):
+            try:
+                match_data = understat.scrape_match(match_link)
+                lineup_data = match_data[2]  # Element 2 contains lineup data
+
+                # Extract players from both teams
+                for team_key in ['h', 'a']:  # home and away
+                    team_data = lineup_data[team_key]
+                    for player_id, player_data in team_data.items():
+                        player_name = player_data.get('player')
+                        minutes = player_data.get('time', 0)
+
+                        # Only include players who actually played (minutes > 0)
+                        if player_name and int(minutes) > 0:
+                            players_who_played.add(player_name)
+
+            except Exception as e:
+                print(f"Warning: Error processing match {i+1}: {e}")
+                continue
+
+        print(f"Found {len(players_who_played)} players who played in Game {game_number}")
+
+        # Step 2: Match Understat players to Fantrax IDs using UnifiedNameMatcher
+        matcher = UnifiedNameMatcher(DB_CONFIG)
+        matched_players = []
+        unmatched_players = []
+
+        for understat_name in players_who_played:
+            match_result = matcher.match_player(
+                source_name=understat_name,
+                source_system='understat',
+                team=None,
+                position=None
+            )
+
+            if match_result['fantrax_id'] is not None and match_result['confidence'] >= 70:
+                # High confidence match
+                matched_players.append({
+                    'understat_name': understat_name,
+                    'fantrax_id': match_result['fantrax_id'],
+                    'fantrax_name': match_result['fantrax_name'],
+                    'confidence': match_result['confidence']
+                })
+            else:
+                # Low confidence or no match - needs manual review
+                unmatched_players.append({
+                    'understat_name': understat_name,
+                    'suggestions': match_result.get('suggested_matches', []),
+                    'confidence': match_result.get('confidence', 0)
+                })
+
+        print(f"Matched {len(matched_players)}/{len(players_who_played)} players automatically")
+
+        # Step 3: Get current game scores for this gameweek
+        conn = get_db_connection()
+        cursor = conn.cursor(cursor_factory=psycopg2.extras.RealDictCursor)
+
+        cursor.execute("""
+            SELECT pgs.id, pgs.player_id, pgs.points_scored, pgs.did_play,
+                   p.name as player_name
+            FROM player_game_scores pgs
+            JOIN players p ON pgs.player_id = p.id
+            WHERE pgs.game_number = %s
+        """, (game_number,))
+
+        game_scores = cursor.fetchall()
+        cursor.close()
+        conn.close()
+
+        print(f"Found {len(game_scores)} game score records for Game {game_number}")
+
+        # Return validation data for frontend processing
+        return jsonify({
+            'success': True,
+            'game_number': game_number,
+            'understat_players_found': len(players_who_played),
+            'matched_automatically': len(matched_players),
+            'need_manual_matching': len(unmatched_players),
+            'matched_players': matched_players,
+            'unmatched_players': unmatched_players,
+            'game_scores_total': len(game_scores),
+            'message': f'Found {len(players_who_played)} players who played in Game {game_number}'
+        })
+
+    except Exception as e:
+        print(f"Error in validate_game_scores: {str(e)}")
+        import traceback
+        traceback.print_exc()
+        return jsonify({'error': f'Validation failed: {str(e)}'}), 500
+
+@app.route('/api/apply-game-validation', methods=['POST'])
+def apply_game_validation():
+    """
+    Apply the validation results to update did_play field and save new mappings
+    """
+    try:
+        data = request.get_json()
+
+        if not data or 'game_number' not in data:
+            return jsonify({'error': 'game_number is required'}), 400
+
+        game_number = int(data['game_number'])
+        confirmed_mappings = data.get('confirmed_mappings', {})
+        matched_players = data.get('matched_players', [])
+
+        print(f"Applying validation for Game {game_number}...")
+        print(f"Received {len(confirmed_mappings)} manual mappings")
+        print(f"Received {len(matched_players)} automatic matches")
+
+        # Combine automatic and manual mappings
+        all_mappings = {}
+
+        # Add automatic matches
+        for match in matched_players:
+            all_mappings[match['understat_name']] = match['fantrax_id']
+
+        # Add manual confirmations (these override automatic matches)
+        for understat_name, fantrax_id in confirmed_mappings.items():
+            if fantrax_id:  # Only if user selected a mapping
+                all_mappings[understat_name] = fantrax_id
+
+        print(f"Total mappings to apply: {len(all_mappings)}")
+
+        # Get all players who played according to Understat
+        played_fantrax_ids = set(all_mappings.values())
+
+        conn = get_db_connection()
+        cursor = conn.cursor()
+
+        # Step 1: Save new mappings to name_mappings table
+        saved_mappings = 0
+        for understat_name, fantrax_id in confirmed_mappings.items():
+            if fantrax_id:  # Only save if user made a selection
+                try:
+                    cursor.execute("""
+                        INSERT INTO name_mappings (source_name, fantrax_id, source_system, confidence_score, verified, created_at)
+                        VALUES (%s, %s, 'understat', 100, true, NOW())
+                        ON CONFLICT (source_name, source_system)
+                        DO UPDATE SET
+                            fantrax_id = EXCLUDED.fantrax_id,
+                            confidence_score = 100,
+                            verified = true,
+                            updated_at = NOW(),
+                            usage_count = name_mappings.usage_count + 1
+                    """, [understat_name, fantrax_id])
+                    saved_mappings += 1
+                except Exception as e:
+                    print(f"Warning: Error saving mapping {understat_name} -> {fantrax_id}: {e}")
+
+        print(f"Saved {saved_mappings} new/updated mappings")
+
+        # Step 2: Update did_play field in player_game_scores
+        cursor.execute("""
+            UPDATE player_game_scores
+            SET did_play = CASE
+                WHEN player_id = ANY(%s) THEN true
+                ELSE false
+            END
+            WHERE game_number = %s
+        """, [list(played_fantrax_ids), game_number])
+
+        updated_scores = cursor.rowcount
+
+        # Step 3: Get validation statistics
+        cursor.execute("""
+            SELECT
+                COUNT(*) as total_scores,
+                COUNT(CASE WHEN did_play = true THEN 1 END) as players_played,
+                COUNT(CASE WHEN did_play = false THEN 1 END) as players_benched,
+                COUNT(CASE WHEN did_play = true AND points_scored = 0 THEN 1 END) as legitimate_zeros,
+                COUNT(CASE WHEN did_play = false AND points_scored = 0 THEN 1 END) as excluded_zeros
+            FROM player_game_scores
+            WHERE game_number = %s
+        """, (game_number,))
+
+        stats = cursor.fetchone()
+
+        conn.commit()
+        cursor.close()
+        conn.close()
+
+        return jsonify({
+            'success': True,
+            'game_number': game_number,
+            'mappings_saved': saved_mappings,
+            'scores_updated': updated_scores,
+            'validation_stats': {
+                'total_scores': stats[0],
+                'players_played': stats[1],
+                'players_benched': stats[2],
+                'legitimate_zeros': stats[3],
+                'excluded_zeros': stats[4]
+            },
+            'message': f'Validation complete: {stats[1]} players marked as played, {stats[2]} as benched'
+        })
+
+    except Exception as e:
+        print(f"Error in apply_game_validation: {str(e)}")
+        import traceback
+        traceback.print_exc()
+
+        return jsonify({'error': f'Failed to apply validation: {str(e)}'}), 500
 @app.route('/')
 @app.route('/<path:path>')
 def serve_react_app(path=''):
@@ -5275,6 +5602,7 @@ def serve_react_app(path=''):
                 '3. Restart the Flask server'
             ]
         }), 404
+
 
 
 if __name__ == '__main__':
@@ -5324,8 +5652,18 @@ if __name__ == '__main__':
     port = int(os.getenv('PORT', 5001))  # Use 5001 to avoid conflict
     debug = os.getenv('FLASK_ENV') == 'development'
 
+    # File modification error mitigation: Allow disabling auto-reloader
+    disable_reloader = os.getenv('FLASK_NO_RELOAD', '').lower() in ('true', '1', 'yes')
+
     # DEVELOPMENT: Enable auto-reload for code changes
     # Set debug=True to auto-restart server when Python files change
     development_mode = False  # Production mode
+    use_reloader = development_mode and not disable_reloader
 
-    app.run(debug=development_mode, host='0.0.0.0', port=port, use_reloader=development_mode)
+    # Log reloader status (helps diagnose file modification conflicts)
+    if development_mode:
+        reloader_backend = "watchdog" if disable_reloader else "watchdog (if installed) or stat polling"
+        print(f"Flask reloader: {'disabled' if disable_reloader else 'enabled'} - backend: {reloader_backend}")
+
+    app.run(debug=development_mode, host='0.0.0.0', port=port, use_reloader=use_reloader)
+

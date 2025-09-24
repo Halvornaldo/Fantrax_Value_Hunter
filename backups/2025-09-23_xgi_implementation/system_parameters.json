@@ -6,9 +6,9 @@
   },
   "xgi_integration": {
     "enabled": true,
-    "last_sync": 1758700462.5295055,
-    "matched_players": 416,
-    "unmatched_players": 0,
+    "last_sync": 1758520347.2426536,
+    "matched_players": 404,
+    "unmatched_players": 12,
     "description": "xGI integration toggle and statistics"
   },
   "starter_prediction": {
@@ -41,13 +41,12 @@
     },
     "normalized_xgi": {
       "enabled": true,
-      "normalization_strength": 0.5,
+      "normalization_strength": 1,
       "position_adjustments": {
         "defenders": true,
         "midfielders": true,
         "forwards": true
-      },
-      "description": "Legacy individual baseline approach - replaced by positional_xgi"
+      }
     },
     "exponential_fixture": {
       "enabled": true,
@@ -104,25 +103,6 @@
     },
     "ewma_form": {
       "alpha": 0.44
-    },
-    "positional_xgi": {
-      "enabled": true,
-      "xgi_weight": 0.11,
-      "mf_position_weight": 0.2,
-      "position_averages": {
-        "G": 0.022,
-        "D": 0.099,
-        "M": 0.231,
-        "F": 0.425
-      },
-      "min_sample_size": 10,
-      "fallback_values": {
-        "G": 0.05,
-        "D": 0.2,
-        "M": 0.4,
-        "F": 0.55
-      },
-      "description": "Live positional xGI multiplier: 1 + ((player_xGI90 / position_avg) - 1) \u00d7 weight"
     }
   },
   "candidate_pools": {

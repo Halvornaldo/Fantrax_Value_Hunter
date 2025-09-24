@@ -39,7 +39,8 @@ const ParameterPanel = ({ systemConfig, onParametersUpdate, playersCount }) => {
     ewmaAlpha: 0.44,
     adaptationGameweek: 10,
     xgiEnabled: false,
-    xgiStrength: 1.0,
+    xgiWeight: 0.13,
+    mfPositionWeight: 0.3,
     formCap: 1.4,
     fixtureCap: 1.8,
     xgiCap: 2.5,
@@ -69,8 +70,9 @@ const ParameterPanel = ({ systemConfig, onParametersUpdate, playersCount }) => {
       setParameters({
         ewmaAlpha: v2Config.ewma_form?.alpha || 0.44,
         adaptationGameweek: v2Config.dynamic_blending?.full_adaptation_gw || 10,
-        xgiEnabled: v2Config.normalized_xgi?.enabled || false,
-        xgiStrength: v2Config.normalized_xgi?.normalization_strength || 1.0,
+        xgiEnabled: v2Config.positional_xgi?.enabled || false,
+        xgiWeight: v2Config.positional_xgi?.xgi_weight || 0.13,
+        mfPositionWeight: v2Config.positional_xgi?.mf_position_weight || 0.3,
         formCap: v2Config.multiplier_caps?.form || 1.4,
         fixtureCap: v2Config.multiplier_caps?.fixture || 1.8,
         xgiCap: v2Config.multiplier_caps?.xgi || 2.5,
@@ -118,14 +120,10 @@ const ParameterPanel = ({ systemConfig, onParametersUpdate, playersCount }) => {
           dynamic_blending: {
             full_adaptation_gw: parameters.adaptationGameweek
           },
-          normalized_xgi: {
+          positional_xgi: {
             enabled: parameters.xgiEnabled,
-            normalization_strength: parameters.xgiStrength,
-            position_adjustments: {
-              defenders: true,
-              midfielders: true,
-              forwards: true
-            }
+            xgi_weight: parameters.xgiWeight,
+            mf_position_weight: parameters.mfPositionWeight
           },
           multiplier_caps: {
             form: parameters.formCap,
@@ -332,22 +330,44 @@ const ParameterPanel = ({ systemConfig, onParametersUpdate, playersCount }) => {
 
         <Divider orientation="vertical" flexItem />
 
-        {/* xGI Strength Slider */}
+        {/* xGI Weight Slider */}
         {parameters.xgiEnabled && (
           <>
-            <Grid item>
-              <Typography variant="body2" gutterBottom>xGI Strength</Typography>
+            <Grid item xs={1.5}>
+              <Typography variant="body2" gutterBottom>xGI Weight</Typography>
               <Slider
-                value={parameters.xgiStrength}
-                onChange={(e, value) => handleParameterChange('xgiStrength', value)}
-                min={0.5}
-                max={2.0}
-                step={0.1}
+                value={parameters.xgiWeight}
+                onChange={(e, value) => handleParameterChange('xgiWeight', value)}
+                min={0.00}
+                max={0.25}
+                step={0.01}
                 size="small"
                 valueLabelDisplay="auto"
               />
               <Typography variant="caption" color="text.secondary">
-                {parameters.xgiStrength.toFixed(1)}x
+                {(parameters.xgiWeight * 100).toFixed(0)}%
+              </Typography>
+            </Grid>
+            <Divider orientation="vertical" flexItem />
+          </>
+        )}
+
+        {/* M/F Position Weight Slider */}
+        {parameters.xgiEnabled && (
+          <>
+            <Grid item xs={1.5}>
+              <Typography variant="body2" gutterBottom>M/F Split</Typography>
+              <Slider
+                value={parameters.mfPositionWeight}
+                onChange={(e, value) => handleParameterChange('mfPositionWeight', value)}
+                min={0.10}
+                max={0.50}
+                step={0.01}
+                size="small"
+                valueLabelDisplay="auto"
+              />
+              <Typography variant="caption" color="text.secondary">
+                {((1 - parameters.mfPositionWeight) * 100).toFixed(0)}:{(parameters.mfPositionWeight * 100).toFixed(0)}
               </Typography>
             </Grid>
             <Divider orientation="vertical" flexItem />

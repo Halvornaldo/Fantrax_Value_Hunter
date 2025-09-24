@@ -739,6 +739,7 @@ const PlayerTable = ({ playersData, gameweekInfo, systemConfig, onDataRefresh })
       type: 'number',
       renderCell: (params) => renderValueCell(params, getMultiplierColor),
       valueFormatter: (params) => params.value ? `${params.value.toFixed(2)}x` : '--',
+      headerClassName: 'multiplier-group',
     },
     {
       field: 'fixture_multiplier',
@@ -747,6 +748,16 @@ const PlayerTable = ({ playersData, gameweekInfo, systemConfig, onDataRefresh })
       type: 'number',
       renderCell: (params) => renderValueCell(params, getMultiplierColor),
       valueFormatter: (params) => params.value ? `${params.value.toFixed(2)}x` : '--',
+      headerClassName: 'multiplier-group',
+    },
+    {
+      field: 'xgi_multiplier',
+      headerName: 'xGI',
+      width: 90,
+      type: 'number',
+      renderCell: (params) => renderValueCell(params, getMultiplierColor),
+      valueFormatter: (params) => params.value ? `${params.value.toFixed(2)}x` : '--',
+      headerClassName: 'multiplier-group',
     },
     {
       field: 'starter_multiplier',
@@ -755,11 +766,12 @@ const PlayerTable = ({ playersData, gameweekInfo, systemConfig, onDataRefresh })
       type: 'number',
       renderCell: (params) => renderValueCell(params, getMultiplierColor),
       valueFormatter: (params) => params.value ? `${params.value.toFixed(2)}x` : '--',
+      headerClassName: 'multiplier-group',
     },
     {
       field: 'starter_override',
       headerName: 'Override',
-      width: 180,
+      width: 130,
       sortable: false,
       renderCell: (params) => {
         const playerId = params.row.id;
@@ -786,14 +798,14 @@ const PlayerTable = ({ playersData, gameweekInfo, systemConfig, onDataRefresh })
         const autoOption = { value: 'auto', label: 'A', title: 'Auto (CSV)', color: '#6c757d' };
 
         return (
-          <Box sx={{ display: 'flex', gap: 0.25, alignItems: 'center' }}>
+          <Box sx={{ display: 'flex', gap: 0.15, alignItems: 'center' }}>
             {/* 2x3 Grid for S/L/R/U/B/O */}
             <Box sx={{
               display: 'grid',
               gridTemplateColumns: 'repeat(3, 16px)',
               gridTemplateRows: 'repeat(2, 16px)',
-              gap: 0.25,
-              mr: 0.25
+              gap: 0.15,
+              mr: 0.15
             }}>
               {overrideOptions.map(option => (
                 <Button
@@ -853,14 +865,6 @@ const PlayerTable = ({ playersData, gameweekInfo, systemConfig, onDataRefresh })
           </Box>
         );
       },
-    },
-    {
-      field: 'xgi_multiplier',
-      headerName: 'xGI',
-      width: 90,
-      type: 'number',
-      renderCell: (params) => renderValueCell(params, getMultiplierColor),
-      valueFormatter: (params) => params.value ? `${params.value.toFixed(2)}x` : '--',
     },
     {
       field: 'xgi90',
@@ -1271,6 +1275,11 @@ const PlayerTable = ({ playersData, gameweekInfo, systemConfig, onDataRefresh })
             '& .MuiDataGrid-columnHeader': {
               bgcolor: isDark ? 'rgba(255,255,255,0.1)' : 'rgba(0,0,0,0.08)',
               fontWeight: 600,
+            },
+            '& .MuiDataGrid-columnHeader.multiplier-group': {
+              bgcolor: isDark ? 'rgba(76, 175, 80, 0.15)' : 'rgba(76, 175, 80, 0.1)',
+              borderLeft: isDark ? '2px solid rgba(76, 175, 80, 0.3)' : '2px solid rgba(76, 175, 80, 0.2)',
+              borderRight: isDark ? '2px solid rgba(76, 175, 80, 0.3)' : '2px solid rgba(76, 175, 80, 0.2)',
             },
             '& .MuiDataGrid-cell': {
               display: 'flex',
