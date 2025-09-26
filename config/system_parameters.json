@@ -31,7 +31,7 @@
     },
     "exponential_form": {
       "enabled": true,
-      "alpha": 0.44
+      "alpha": 0.54
     },
     "dynamic_blending": {
       "enabled": true,
@@ -51,7 +51,7 @@
     },
     "exponential_fixture": {
       "enabled": true,
-      "base": 1.3,
+      "base": 1.38,
       "position_weights": {
         "G": 1.25,
         "D": 1.2,
@@ -97,18 +97,18 @@
       "description": "Progressive form ranges based on sample size for balanced multiplier impact"
     },
     "multiplier_caps": {
-      "form": 1.4,
+      "form": 1.5,
       "fixture": 2.5,
       "xgi": 2.5,
       "global": 3
     },
     "ewma_form": {
-      "alpha": 0.44
+      "alpha": 0.54
     },
     "positional_xgi": {
       "enabled": true,
       "xgi_weight": 0.11,
-      "mf_position_weight": 0.2,
+      "mf_position_weight": 0.1,
       "position_averages": {
         "G": 0.022,
         "D": 0.099,

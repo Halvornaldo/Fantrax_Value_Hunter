@@ -60,7 +60,20 @@ const Dashboard = () => {
       }
 
       if (playersResponse.players && Array.isArray(playersResponse.players)) {
-        setPlayersData(playersResponse.players);
+        // Add PP90 calculation to each player
+        const playersWithPP90 = playersResponse.players.map(player => {
+          const minutes = player.minutes || 0;
+          const totalFpts = player.total_fpts || 0;
+          let pp90 = null;
+
+          if (minutes >= 90) {
+            pp90 = parseFloat(((totalFpts / minutes) * 90).toFixed(1));
+          }
+
+          return { ...player, pp90 };
+        });
+
+        setPlayersData(playersWithPP90);
         setGameweekInfo(playersResponse.gameweek_info);
         setTotalDatabaseCount(playersResponse.total_database_count || 0);
         console.log(`✅ Loaded ${playersResponse.players.length} players with V2.0 calculations`);

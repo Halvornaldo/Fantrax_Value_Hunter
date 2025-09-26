@@ -238,67 +238,6 @@ def get_data_freshness_info(gameweek: int) -> Dict:
     finally:
         conn.close()
 
-def calculate_form_multiplier(player_id: str, current_gameweek: int, lookback_period: int = 3):
-    """
-    Calculate weighted form multiplier using historical data from player_form table
-    Returns 1.0 if insufficient data (early season)
-    """
-    conn = get_db_connection()
-    try:
-        cursor = conn.cursor(cursor_factory=psycopg2.extras.RealDictCursor)
-        
-        # Get form data for lookback period
-        start_gw = max(1, current_gameweek - lookback_period + 1)
-        cursor.execute("""
-            SELECT points FROM player_form 
-            WHERE player_id = %s 
-            AND gameweek BETWEEN %s AND %s
-            ORDER BY gameweek DESC
-        """, [player_id, start_gw, current_gameweek])
-        
-        form_data = cursor.fetchall()
-        
-        # If insufficient data, return neutral multiplier
-        if len(form_data) < 2:
-            return 1.0
-            
-        # Apply weighted average based on lookback period
-        if lookback_period == 3:
-            weights = [0.5, 0.3, 0.2]
-        else:  # 5 games
-            weights = [0.4, 0.25, 0.2, 0.1, 0.05]
-            
-        # Calculate weighted average
-        weighted_sum = 0
-        weight_total = 0
-        for i, row in enumerate(form_data):
-            if i < len(weights):
-                weighted_sum += float(row['points']) * weights[i]
-                weight_total += weights[i]
-                
-        if weight_total == 0:
-            return 1.0
-            
-        weighted_avg = weighted_sum / weight_total
-        
-        # Get player's season average for comparison
-        cursor.execute("""
-            SELECT AVG(points) as season_avg FROM player_form 
-            WHERE player_id = %s
-        """, [player_id])
-        
-        result = cursor.fetchone()
-        season_avg = float(result['season_avg']) if result and result['season_avg'] else weighted_avg
-        
-        # Convert to multiplier (constrained between 0.5x and 1.5x)
-        if season_avg > 0:
-            form_multiplier = weighted_avg / season_avg
-            return max(0.5, min(1.5, form_multiplier))
-        
-        return 1.0
-        
-    finally:
-        conn.close()
 
 def calculate_fixture_difficulty_multiplier(team_code: str, position: str, gameweek: int, params: dict):
     """
@@ -2115,7 +2054,7 @@ def export_players():
         # Generate CSV content with gameweek metadata
         csv_lines = []
         csv_lines.append(f"# Fantrax Value Hunter Export - Gameweek {gameweek} - Generated: {datetime.now().strftime('%Y-%m-%d %H:%M:%S')}")
-        csv_lines.append("Name,Team,Position 1,Position 2,Price,PPG,Blended PPG,Total FPts,24-25,25-26,True Value,ROI,Form Multiplier,Fixture Multiplier,Starter Multiplier,xGI Multiplier,Current Season Weight,Minutes,xG90,xA90,xGI90,xGI")
+        csv_lines.append("Name,Team,Position 1,Position 2,Price,PPG,PP90,Blended PPG,Total FPts,24-25,25-26,True Value,ROI,Form Multiplier,Fixture Multiplier,Starter Multiplier,xGI Multiplier,Current Season Weight,Minutes,xG90,xA90,xGI90,xGI")
         
         for player in players:
             current_weight = float(player['current_season_weight']) if player['current_season_weight'] else 0.0
@@ -2124,11 +2063,16 @@ def export_players():
             xa90 = float(player['xa90']) if player['xa90'] else 0.0
             xgi90 = float(player['xgi90']) if player['xgi90'] else 0.0
             xgi = float(player['xgi']) if player['xgi'] else 0.0
+
+            # Calculate PP90 (Points Per 90 minutes)
+            total_fpts = float(player['total_fpts']) if player['total_fpts'] else 0.0
+            pp90 = (total_fpts / minutes * 90) if minutes >= 90 else 0.0
+
             # Split positions to prevent Excel data shifting
             positions = player['position'].split(',') if player['position'] else ['']
             position1 = positions[0].strip() if len(positions) > 0 else ''
             position2 = positions[1].strip() if len(positions) > 1 else ''
-            csv_lines.append(f"{player['name']},{player['team']},{position1},{position2},{player['price']},{player['ppg']},{player['blended_ppg']:.2f},{player['total_fpts']:.3f},{player['games_played_historical']},{player['games_current_season']},{player['true_value']:.3f},{player['roi']:.3f},{player['form_multiplier']:.2f},{player['fixture_multiplier']:.2f},{player['starter_multiplier']:.2f},{player['xgi_multiplier']:.2f},{current_weight:.3f},{minutes},{xg90:.3f},{xa90:.3f},{xgi90:.3f},{xgi:.3f}")
+            csv_lines.append(f"{player['name']},{player['team']},{position1},{position2},{player['price']},{player['ppg']},{pp90:.1f},{player['blended_ppg']:.2f},{player['total_fpts']:.3f},{player['games_played_historical']},{player['games_current_season']},{player['true_value']:.3f},{player['roi']:.3f},{player['form_multiplier']:.2f},{player['fixture_multiplier']:.2f},{player['starter_multiplier']:.2f},{player['xgi_multiplier']:.2f},{current_weight:.3f},{minutes},{xg90:.3f},{xa90:.3f},{xgi90:.3f},{xgi:.3f}")
         
         csv_content = '\n'.join(csv_lines)
         

@@ -52,6 +52,8 @@ const PlayerTable = ({ playersData, gameweekInfo, systemConfig, onDataRefresh })
   const [historicalDataFilter, setHistoricalDataFilter] = useState('All');
   const [minutesFilterEnabled, setMinutesFilterEnabled] = useState(false);
   const [minutesThreshold, setMinutesThreshold] = useState(180);
+  const [starterFilterEnabled, setStarterFilterEnabled] = useState(false);
+  const [starterThreshold, setStarterThreshold] = useState(0.8);
   const [overrideFilter, setOverrideFilter] = useState('All');
   const [includeAllPlayers, setIncludeAllPlayers] = useState(false);
 
@@ -74,6 +76,11 @@ const PlayerTable = ({ playersData, gameweekInfo, systemConfig, onDataRefresh })
   // Helper function to adjust minutes threshold
   const adjustMinutesThreshold = (increment) => {
     setMinutesThreshold(prev => Math.max(0, prev + (increment ? 45 : -45)));
+  };
+
+  // Helper function to adjust starter threshold
+  const adjustStarterThreshold = (increment) => {
+    setStarterThreshold(prev => Math.max(0, Math.min(1, prev + (increment ? 0.05 : -0.05))));
   };
 
   // Gradient color functions
@@ -312,6 +319,13 @@ const PlayerTable = ({ playersData, gameweekInfo, systemConfig, onDataRefresh })
         formula: 'Total Points ÷ Games Played',
         interpretation: 'Current season form indicator. Compare with Dynamic PPG to see historical context.'
       },
+      pp90: {
+        title: 'Points Per 90',
+        description: 'Fantasy points per 90 minutes played',
+        formula: '(Total FPts ÷ Minutes) × 90',
+        interpretation: 'Rate statistic showing efficiency per full match. Shows "-" if < 90 mins played.',
+        details: 'Higher PP90 indicates better scoring rate when on the pitch. Useful for identifying high-impact substitutes.'
+      },
       blended_ppg: {
         title: 'Dynamic PPG (V2.0)',
         description: 'Enhanced PPG blending current season with historical data',
@@ -342,10 +356,10 @@ const PlayerTable = ({ playersData, gameweekInfo, systemConfig, onDataRefresh })
       },
       form_multiplier: {
         title: 'Form Multiplier (V2.0)',
-        description: 'Recent performance trend using exponential weighting',
-        formula: 'EWMA (α=0.87) of last 6 games',
-        interpretation: 'Purple (≥1.5): Hot • Blue (1.2-1.5): Good • Green (1.0-1.2): Average • Red (<0.8): Poor',
-        details: 'Alpha adjustable via "EWMA α" in parameter panel. Use 0.5-0.7 early season.'
+        description: 'Recent performance trend using exponential decay weighting',
+        formula: 'Exponentially weighted average of recent games',
+        interpretation: 'Measures current form relative to season average. Range automatically adjusts based on games played.',
+        details: 'Controlled by "EWMA α" slider (decay rate) and "Form Cap" parameter (maximum range). Lower α = faster decay, more focus on recent games. Form Cap sets the maximum multiplier possible.'
       },
       fixture_multiplier: {
         title: 'Fixture Difficulty (V2.0)',
@@ -433,7 +447,7 @@ const PlayerTable = ({ playersData, gameweekInfo, systemConfig, onDataRefresh })
           fontWeight: 600,
           textAlign: 'center',
           py: 0.5,
-          px: 1,
+          px: 0.25,
           borderRadius: 1,
           background: `linear-gradient(135deg, ${color}15, ${color}08)`,
           border: `1px solid ${color}30`,
@@ -662,6 +676,35 @@ const PlayerTable = ({ playersData, gameweekInfo, systemConfig, onDataRefresh })
       renderCell: (params) => renderDynamicColorCell(params, columnMaxValues.maxPpg),
     },
     {
+      field: 'pp90',
+      headerName: 'PP90',
+      width: 80,
+      type: 'number',
+      renderCell: (params) => {
+        const pp90Value = params.row.pp90;
+        if (pp90Value === null || pp90Value === undefined || pp90Value === 0) {
+          return (
+            <Box sx={{ color: 'text.secondary', fontStyle: 'italic' }}>-</Box>
+          );
+        }
+        // Format to 1 decimal place and use custom display
+        const formattedValue = pp90Value.toFixed(1);
+        const color = getDynamicColor(pp90Value, columnMaxValues.maxPp90);
+        return (
+          <Box sx={{ color, fontWeight: 500 }}>
+            {formattedValue}
+          </Box>
+        );
+      }
+    },
+    {
+      field: 'minutes',
+      headerName: 'Min',
+      width: 70,
+      type: 'number',
+      renderCell: (params) => renderDynamicColorCell(params, columnMaxValues.maxMinutes),
+    },
+    {
       field: 'blended_ppg',
       headerName: 'Dynamic PPG',
       width: 120,
@@ -798,7 +841,7 @@ const PlayerTable = ({ playersData, gameweekInfo, systemConfig, onDataRefresh })
         const autoOption = { value: 'auto', label: 'A', title: 'Auto (CSV)', color: '#6c757d' };
 
         return (
-          <Box sx={{ display: 'flex', gap: 0.15, alignItems: 'center' }}>
+          <Box sx={{ display: 'flex', gap: 0.1, alignItems: 'center' }}>
             {/* 2x3 Grid for S/L/R/U/B/O */}
             <Box sx={{
               display: 'grid',
@@ -887,13 +930,6 @@ const PlayerTable = ({ playersData, gameweekInfo, systemConfig, onDataRefresh })
       type: 'number',
       renderCell: renderXA90Cell,
     },
-    {
-      field: 'minutes',
-      headerName: 'Min',
-      width: 70,
-      type: 'number',
-      renderCell: (params) => renderDynamicColorCell(params, columnMaxValues.maxMinutes),
-    },
   ];
 
   // Filter data
@@ -927,6 +963,12 @@ const PlayerTable = ({ playersData, gameweekInfo, systemConfig, onDataRefresh })
         if (minutes < minutesThreshold) return false;
       }
 
+      // Starter threshold filter
+      if (starterFilterEnabled) {
+        const starterMultiplier = player.starter_multiplier || 0;
+        if (starterMultiplier < starterThreshold) return false;
+      }
+
       // Override filter
       if (overrideFilter !== 'All') {
         const hasOverride = player.override_type && player.override_type !== 'auto';
@@ -936,7 +978,7 @@ const PlayerTable = ({ playersData, gameweekInfo, systemConfig, onDataRefresh })
 
       return true;
     });
-  }, [playersData, positionFilter, priceMin, priceMax, teamFilter, searchTerm, historicalDataFilter, minutesFilterEnabled, minutesThreshold, overrideFilter]);
+  }, [playersData, positionFilter, priceMin, priceMax, teamFilter, searchTerm, historicalDataFilter, minutesFilterEnabled, minutesThreshold, starterFilterEnabled, starterThreshold, overrideFilter]);
 
   // Calculate maximum values for dynamic color coding
   const columnMaxValues = useMemo(() => {
@@ -945,6 +987,7 @@ const PlayerTable = ({ playersData, gameweekInfo, systemConfig, onDataRefresh })
       maxGamesPlayed: Math.max(...playersData.map(p => p.games_played || 0)),
       maxTotalFpts: Math.max(...playersData.map(p => p.total_fpts || 0)),
       maxPpg: Math.max(...playersData.map(p => p.ppg || 0)),
+      maxPp90: Math.max(...playersData.map(p => p.pp90 || 0)),
       maxPrice: Math.max(...playersData.map(p => p.price || 0)),
       maxRoi: Math.max(...playersData.map(p => p.roi || 0))
     };
@@ -1045,7 +1088,7 @@ const PlayerTable = ({ playersData, gameweekInfo, systemConfig, onDataRefresh })
           <CardContent sx={{ pt: 0 }}>
             <Grid container spacing={1.5}>
               {[
-                'name', 'team', 'position', 'price', 'total_fpts', 'ppg', 'blended_ppg',
+                'name', 'team', 'position', 'price', 'total_fpts', 'ppg', 'pp90', 'blended_ppg',
                 'games_played_historical', 'games_played', 'true_value', 'roi',
                 'form_multiplier', 'fixture_multiplier', 'starter_multiplier', 'starter_override',
                 'xgi_multiplier', 'xgi90', 'xg90', 'xa90', 'minutes'
@@ -1232,6 +1275,49 @@ const PlayerTable = ({ playersData, gameweekInfo, systemConfig, onDataRefresh })
                 size="small"
                 onClick={() => adjustMinutesThreshold(true)}
                 disabled={!minutesFilterEnabled}
+                sx={{ bgcolor: isDark ? 'rgba(255,255,255,0.1)' : 'rgba(0,0,0,0.1)' }}
+              >
+                <Add fontSize="small" />
+              </IconButton>
+            </Box>
+          </Grid>
+
+          {/* Starter Filter */}
+          <Grid item>
+            <FormControlLabel
+              control={
+                <Checkbox
+                  checked={starterFilterEnabled}
+                  onChange={(e) => setStarterFilterEnabled(e.target.checked)}
+                  size="small"
+                />
+              }
+              label="Min Starter"
+            />
+          </Grid>
+          <Grid item>
+            <Box sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
+              <IconButton
+                size="small"
+                onClick={() => adjustStarterThreshold(false)}
+                disabled={!starterFilterEnabled}
+                sx={{ bgcolor: isDark ? 'rgba(255,255,255,0.1)' : 'rgba(0,0,0,0.1)' }}
+              >
+                <Remove fontSize="small" />
+              </IconButton>
+              <TextField
+                type="number"
+                value={starterThreshold.toFixed(2)}
+                onChange={(e) => setStarterThreshold(parseFloat(e.target.value) || 0.8)}
+                size="small"
+                disabled={!starterFilterEnabled}
+                sx={{ width: 80 }}
+                inputProps={{ step: 0.05, min: 0, max: 1 }}
+              />
+              <IconButton
+                size="small"
+                onClick={() => adjustStarterThreshold(true)}
+                disabled={!starterFilterEnabled}
                 sx={{ bgcolor: isDark ? 'rgba(255,255,255,0.1)' : 'rgba(0,0,0,0.1)' }}
               >
                 <Add fontSize="small" />
