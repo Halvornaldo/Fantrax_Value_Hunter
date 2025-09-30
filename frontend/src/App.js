@@ -1,7 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { ThemeProvider, createTheme } from '@mui/material/styles';
 import { CssBaseline, Box, IconButton, Toolbar, AppBar, Button, Menu, MenuItem, Divider } from '@mui/material';
-import { Brightness4, Brightness7, Upload, CloudSync, Archive, SportsEsports } from '@mui/icons-material';
+import { Brightness4, Brightness7, Upload, CloudSync, Archive, SportsEsports, Sports } from '@mui/icons-material';
 import Banner from './components/Banner';
 import Dashboard from './components/Dashboard';
 import './App.css';
@@ -110,6 +110,22 @@ const App = () => {
     handleUploadMenuClose();
   };
 
+  const handleSyncNPxGTeams = async () => {
+    try {
+      const response = await fetch('/api/npxg/sync-team-stats', { method: 'POST' });
+      const result = await response.json();
+
+      if (result.success) {
+        alert(`NPxG sync completed successfully!\n\nTeams updated: ${result.teams_updated}\nLeague avg NPxG: ${result.league_avg_npxg}\nLeague avg NPxGA: ${result.league_avg_npxga}`);
+      } else {
+        alert('NPxG sync failed: ' + (result.error || 'Unknown error'));
+      }
+    } catch (error) {
+      alert('NPxG sync failed: ' + error.message);
+    }
+    handleUploadMenuClose();
+  };
+
   const handleRunValidation = () => {
     window.open('http://localhost:5001/api/validation-dashboard', '_blank');
     handleUploadMenuClose();
@@ -176,12 +192,19 @@ const App = () => {
                 },
               }}
             >
-              <MenuItem 
+              <MenuItem
                 onClick={handleSyncUnderstat}
                 sx={{ color: darkMode ? '#ffffff' : '#333333' }}
               >
                 <CloudSync sx={{ mr: 1 }} />
                 Sync Understat
+              </MenuItem>
+              <MenuItem
+                onClick={handleSyncNPxGTeams}
+                sx={{ color: darkMode ? '#ffffff' : '#333333' }}
+              >
+                <Sports sx={{ mr: 1 }} />
+                Sync NPxG Teams
               </MenuItem>
               <MenuItem
                 onClick={() => { window.open('http://localhost:5001/form-upload', '_blank'); handleUploadMenuClose(); }}

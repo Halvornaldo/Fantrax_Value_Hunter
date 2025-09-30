@@ -335,6 +335,88 @@ export const importOddsCSV = async (csvFile, gameweek) => {
   }
 };
 
+
+// NPxG team stats sync
+export const syncNPxGTeamStats = async () => {
+  try {
+    const data = await makeRequest('/api/npxg/sync-team-stats', {
+      method: 'POST',
+    });
+
+    return {
+      success: true,
+      message: data.message || 'NPxG team stats synced successfully',
+      teams_updated: data.teams_updated || 0,
+      league_avg_npxg: data.league_avg_npxg || 0,
+      league_avg_npxga: data.league_avg_npxga || 0
+    };
+  } catch (error) {
+    return {
+      success: false,
+      error: error.message
+    };
+  }
+};
+
+// Get current NPxG team statistics
+export const fetchNPxGTeamStats = async () => {
+  try {
+    const data = await makeRequest('/api/npxg/team-stats');
+
+    return {
+      success: true,
+      teams: data.teams || [],
+      total_teams: data.total_teams || 0
+    };
+  } catch (error) {
+    return {
+      success: false,
+      error: error.message,
+      teams: [],
+      total_teams: 0
+    };
+  }
+};
+
+// Get NPxG configuration
+export const fetchNPxGConfig = async () => {
+  try {
+    const data = await makeRequest('/api/npxg/config');
+
+    return {
+      success: true,
+      config: data.config || {}
+    };
+  } catch (error) {
+    return {
+      success: false,
+      error: error.message,
+      config: {}
+    };
+  }
+};
+
+// Update NPxG configuration
+export const updateNPxGConfig = async (config) => {
+  try {
+    const data = await makeRequest('/api/npxg/config', {
+      method: 'PUT',
+      body: JSON.stringify(config),
+    });
+
+    return {
+      success: true,
+      message: data.message || 'NPxG configuration updated successfully',
+      config: data.config || {}
+    };
+  } catch (error) {
+    return {
+      success: false,
+      error: error.message
+    };
+  }
+};
+
 export default {
   fetchPlayersData,
   fetchSystemConfig,
@@ -347,4 +429,8 @@ export default {
   applyStarterOverride,
   importLineupCSV,
   importOddsCSV,
+  syncNPxGTeamStats,
+  fetchNPxGTeamStats,
+  fetchNPxGConfig,
+  updateNPxGConfig,
 };

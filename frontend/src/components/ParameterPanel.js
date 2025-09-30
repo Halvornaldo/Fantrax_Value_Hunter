@@ -23,7 +23,6 @@ import {
   CloudSync,
   FileUpload,
   SportsFootball,
-  SportsSoccer,
   Restore
 } from '@mui/icons-material';
 import { useTheme as useMuiTheme } from '@mui/material/styles';
@@ -464,9 +463,9 @@ const ParameterPanel = ({ systemConfig, onParametersUpdate, playersCount }) => {
 
         <Divider orientation="vertical" flexItem />
 
-        {/* Fixture Base */}
+        {/* NPxG Weight */}
         <Grid item xs={1.5}>
-          <Typography variant="body2" gutterBottom>Fixture Base</Typography>
+          <Typography variant="body2" gutterBottom>NPxG Weight</Typography>
           <Slider
             value={parameters.fixtureBase || 1.3}
             onChange={(e, value) => handleParameterChange('fixtureBase', value)}
@@ -475,9 +474,17 @@ const ParameterPanel = ({ systemConfig, onParametersUpdate, playersCount }) => {
             step={0.01}
             size="small"
             valueLabelDisplay="auto"
+            valueLabelFormat={(value) => {
+              // Convert to percentage: (value - 1.15) / 0.35 * 40 - 20
+              const percentage = ((value - 1.15) / 0.35 * 40 - 20);
+              return `${percentage.toFixed(0)}%`;
+            }}
           />
           <Typography variant="caption" color="text.secondary">
-            {(parameters.fixtureBase || 1.3).toFixed(2)}
+            {(() => {
+              const percentage = ((parameters.fixtureBase - 1.15) / 0.35 * 40 - 20);
+              return `${percentage.toFixed(0)}%`;
+            })()}
           </Typography>
         </Grid>
 
@@ -631,11 +638,6 @@ const ParameterPanel = ({ systemConfig, onParametersUpdate, playersCount }) => {
               </IconButton>
             </Tooltip>
             
-            <Tooltip title="Upload Fixture Odds">
-              <IconButton size="small" onClick={() => window.open('http://localhost:5001/odds-upload', '_blank')}>
-                <SportsSoccer />
-              </IconButton>
-            </Tooltip>
             
             <Tooltip title="Run Validation">
               <IconButton size="small" onClick={() => window.open('/api/validation-dashboard', '_blank')}>

@@ -362,10 +362,11 @@ const PlayerTable = ({ playersData, gameweekInfo, systemConfig, onDataRefresh })
         details: 'Controlled by "EWMA α" slider (decay rate) and "Form Cap" parameter (maximum range). Lower α = faster decay, more focus on recent games. Form Cap sets the maximum multiplier possible.'
       },
       fixture_multiplier: {
-        title: 'Fixture Difficulty (V2.0)',
-        description: 'Upcoming fixture difficulty from betting odds',
-        formula: 'Position-weighted difficulty from betting markets',
-        interpretation: 'Higher = easier fixtures. Weights: G(1.1), D(1.2), M(1.0), F(1.05)'
+        title: 'NPxG Fixture System (V2.0)',
+        description: 'Upcoming fixture difficulty based on team NPxG strength',
+        formula: 'Position-specific calculations using team attacking/defensive NPxG metrics',
+        interpretation: 'Higher = easier fixtures. Includes home/away adjustments. Weight controlled by NPxG Weight slider (-20% to +20%)',
+        details: 'Uses Non-Penalty Expected Goals data to assess team strength. Automatic team code aliasing (BRF→BRE, NOT→NFO) ensures accurate mappings.'
       },
       starter_multiplier: {
         title: 'Starter Prediction (V2.0)',
