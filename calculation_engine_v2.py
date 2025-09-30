@@ -21,6 +21,7 @@ import psycopg2.extras
 from typing import Dict, List, Optional, Tuple, Any
 from datetime import datetime
 import logging
+from src.npxg_fixture_multiplier import get_npxg_multiplier_for_player
 
 # Set up logging
 logging.basicConfig(level=logging.INFO)
@@ -84,7 +85,7 @@ class FormulaEngineV2:
             formula_toggles = self.v2_config.get('formula_toggles', {})
             
             form_mult = self._calculate_form_multiplier(player_data) if formula_toggles.get('form_enabled', False) else 1.0
-            fixture_mult = self._calculate_exponential_fixture_multiplier(player_data) if formula_toggles.get('fixture_enabled', True) else 1.0
+            fixture_mult = self._calculate_npxg_fixture_multiplier(player_data) if formula_toggles.get('fixture_enabled', True) else 1.0
             starter_mult = player_data.get('starter_multiplier', 1.0) if formula_toggles.get('starter_enabled', True) else 1.0
             xgi_mult = self._calculate_xgi_multiplier(player_data) if formula_toggles.get('xgi_enabled', True) else 1.0
             
@@ -149,7 +150,7 @@ class FormulaEngineV2:
                     },
                     'caps_applied': {
                         'form': form_mult != self._calculate_form_multiplier(player_data) if formula_toggles.get('form_enabled', False) else False,
-                        'fixture': fixture_mult != self._calculate_exponential_fixture_multiplier_raw(player_data) if formula_toggles.get('fixture_enabled', True) else False,
+                        'fixture': fixture_mult != self._calculate_npxg_fixture_multiplier(player_data) if formula_toggles.get('fixture_enabled', True) else False,
                         'xgi': xgi_mult != self._calculate_xgi_multiplier_raw(player_data) if formula_toggles.get('xgi_enabled', True) else False,
                         'global': true_value == max_allowed
                     },
@@ -329,7 +330,7 @@ class FormulaEngineV2:
             logger.warning(f"Error fetching recent points for player {player_id}: {e}")
             return []
     
-    def _calculate_exponential_fixture_multiplier(self, player_data: Dict[str, Any]) -> float:
+    def _calculate_exponential_fixture_multiplier_legacy(self, player_data: Dict[str, Any]) -> float:
         """
         NEW v2.0: Calculate fixture multiplier using exponential transformation
         Research formula: multiplier = base^(-difficulty_score)
@@ -378,6 +379,42 @@ class FormulaEngineV2:
             adjusted_score = (-difficulty_score * pos_weight) / 10.0
             return base ** adjusted_score
         except:
+            return 1.0
+
+    def _calculate_npxg_fixture_multiplier(self, player_data: Dict[str, Any]) -> float:
+        """
+        NPxG-based fixture multiplier with position-specific formulas and home/away adjustments
+        """
+        # Check if NPxG fixture is enabled
+        npxg_config = self.params.get('npxg_fixture', {})
+        if not npxg_config.get('enabled', False):
+            # Fallback to stored npxg_fixture_multiplier if available
+            stored_multiplier = player_data.get('npxg_fixture_multiplier')
+            if stored_multiplier is not None:
+                return float(stored_multiplier)
+            return 1.0
+
+        # Use stored npxg_fixture_multiplier if available
+        stored_multiplier = player_data.get('npxg_fixture_multiplier')
+        if stored_multiplier is not None:
+            return float(stored_multiplier)
+
+        try:
+            # Get fixture base parameter to use as NPxG weight
+            fixture_config = self.params.get('formula_optimization_v2', {}).get('exponential_fixture', {})
+            npxg_weight = fixture_config.get('base', 1.45)
+
+            # Convert from 1.15-1.50 range to 0.80-1.20 range (80%-120%)
+            # Formula: weight = (base - 1.15) / (1.50 - 1.15) * (1.20 - 0.80) + 0.80
+            # Simplified: weight = (base - 1.15) / 0.35 * 0.40 + 0.80
+            npxg_weight = (npxg_weight - 1.15) / 0.35 * 0.40 + 0.80
+            npxg_weight = max(0.80, min(1.20, npxg_weight))  # Clamp to bounds
+
+            # Calculate multiplier using NPxG module with weight
+            multiplier = get_npxg_multiplier_for_player(player_data, self.db_config, npxg_weight)
+            return multiplier
+        except Exception as e:
+            logger.warning(f"Error calculating NPxG fixture multiplier: {e}")
             return 1.0
     
     def _calculate_xgi_multiplier(self, player_data: Dict[str, Any]) -> float:

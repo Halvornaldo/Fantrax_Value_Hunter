@@ -361,23 +361,24 @@ def recalculate_true_values(gameweek: int = None):
         conn = get_db_connection()
         cursor = conn.cursor(cursor_factory=psycopg2.extras.RealDictCursor)
         
-        # Enhanced query for v2.0 with all required data
+        # Enhanced query for v2.0 with all required data including NPxG fields
         cursor.execute("""
-            SELECT 
+            SELECT
                 p.id as player_id, p.name, p.team, p.position,
-                pm.price, 
+                pm.price,
                 COALESCE(pf.total_points, 0) as total_fpts,
-                CASE 
-                    WHEN COALESCE(p.games_current_season, 0) > 0 
+                CASE
+                    WHEN COALESCE(p.games_current_season, 0) > 0
                     THEN COALESCE(pf.total_points, 0) / p.games_current_season
-                    ELSE 0 
-                END as ppg, 
+                    ELSE 0
+                END as ppg,
                 pm.form_multiplier, pm.fixture_multiplier, pm.starter_multiplier,
                 p.xgi90, p.baseline_xgi,
                 p.games_current_season,
                 pgd.total_points_historical, pgd.games_played_historical,
                 pgd.total_points_current, pgd.games_played_current,
-                tf.difficulty_score as fixture_difficulty
+                tf.difficulty_score as fixture_difficulty,
+                pm.next_opponent, pm.is_home
             FROM players p
             JOIN player_metrics pm ON p.id = pm.player_id
             LEFT JOIN (
@@ -415,7 +416,11 @@ def recalculate_true_values(gameweek: int = None):
                 'baseline_xgi': float(player['baseline_xgi']) if player['baseline_xgi'] else None,
                 'fixture_difficulty': float(player['fixture_difficulty']) if player['fixture_difficulty'] else 0.0,
                 'starter_multiplier': float(player['starter_multiplier']) if player['starter_multiplier'] else 1.0,
-                
+
+                # NPxG fixture fields for opponent-based calculations
+                'next_opponent': player['next_opponent'],
+                'is_home': player['is_home'],
+
                 # Historical data for dynamic blending
                 'total_points_historical': float(player['total_points_historical']) if player['total_points_historical'] else 0.0,
                 'games_played_historical': int(player['games_played_historical']) if player['games_played_historical'] else 0,
@@ -5638,6 +5643,232 @@ def serve_react_app(path=''):
                 '3. Restart the Flask server'
             ]
         }), 404
+
+
+
+
+@app.route('/api/npxg/sync-team-stats', methods=['POST'])
+def sync_npxg_team_stats():
+    """Sync NPxG team statistics from Understat for all 20 Premier League teams"""
+    try:
+        # Check if integration package is available
+        if not INTEGRATION_AVAILABLE:
+            return jsonify({
+                'error': 'Integration package not available in production mode',
+                'message': 'This feature is only available in development environment'
+            }), 503
+
+        # Import ScraperFC using the same pattern as UnderstatIntegrator
+        try:
+            import ScraperFC as sfc
+        except ImportError:
+            return jsonify({
+                'error': 'ScraperFC library not available',
+                'message': 'Please install ScraperFC: pip install ScraperFC'
+            }), 503
+
+        # Initialize scraper
+        understat = sfc.Understat()
+
+        # Fetch current season team stats (NPxG/NPxGA directly available)
+        try:
+            # Returns 3 tables: overall, home, away - we want overall (index 0)
+            tables = understat.scrape_league_tables(year='2025/2026', league='EPL')
+            team_stats_df = tables[0] if tables else None
+        except Exception as e:
+            return jsonify({
+                'error': f'Failed to fetch team NPxG data: {str(e)}',
+                'message': 'Unable to retrieve team statistics from Understat'
+            }), 500
+
+        if team_stats_df is None or team_stats_df.empty:
+            return jsonify({'error': 'No NPxG team data available for 2025/2026 season'}), 500
+
+        # Connect to database
+        conn = get_db_connection()
+        cursor = conn.cursor()
+
+        # Clear existing team metrics
+        cursor.execute("DELETE FROM team_metrics")
+
+        updated_teams = 0
+        league_totals = {'npxg': 0, 'npxga': 0, 'matches': 0}
+
+        for idx, team in team_stats_df.iterrows():
+            # Extract team data using correct column names from ScraperFC
+            team_name = team.get('Team', '')
+            npxg = float(team.get('NPxG', 0))
+            npxga = float(team.get('NPxGA', 0))
+            matches_played = int(team.get('M', 0))
+
+            # Calculate NPxGD (Difference)
+            npxgd = npxg - npxga
+
+            # Generate 3-letter team code from team name
+            # Use first 3 letters, converting common names
+            team_code_mapping = {
+                'Manchester United': 'MUN',
+                'Manchester City': 'MCI',
+                'Arsenal': 'ARS',
+                'Liverpool': 'LIV',
+                'Chelsea': 'CHE',
+                'Tottenham': 'TOT',
+                'Newcastle United': 'NEW',
+                'Brighton': 'BHA',
+                'Aston Villa': 'AVL',
+                'West Ham': 'WHU',
+                'Crystal Palace': 'CRY',
+                'Fulham': 'FUL',
+                'Brentford': 'BRE',
+                'Wolverhampton Wanderers': 'WOL',
+                'Wolverhampton': 'WOL',  # Alternative name
+                'Everton': 'EVE',
+                'Bournemouth': 'BOU',
+                'Nottingham Forest': 'NFO',
+                # Current 2025-26 season promoted teams
+                'Leeds United': 'LEE',
+                'Burnley': 'BUR',
+                'Sunderland': 'SUN',
+                # Relegated teams (may still appear in data)
+                'Leicester City': 'LEI',
+                'Ipswich Town': 'IPS',
+                'Southampton': 'SOU'
+            }
+
+            team_code = team_code_mapping.get(team_name, team_name[:3].upper())
+
+            # Insert team metrics
+            cursor.execute("""
+                INSERT INTO team_metrics (team_code, team_name, npxg, npxga, npxgd, matches_played, last_updated)
+                VALUES (%s, %s, %s, %s, %s, %s, CURRENT_TIMESTAMP)
+                ON CONFLICT (team_code) DO UPDATE SET
+                    team_name = EXCLUDED.team_name,
+                    npxg = EXCLUDED.npxg,
+                    npxga = EXCLUDED.npxga,
+                    npxgd = EXCLUDED.npxgd,
+                    matches_played = EXCLUDED.matches_played,
+                    last_updated = EXCLUDED.last_updated
+            """, [team_code, team_name, npxg, npxga, npxgd, matches_played])
+
+            # Accumulate league totals for averaging
+            league_totals['npxg'] += npxg
+            league_totals['npxga'] += npxga
+            league_totals['matches'] += matches_played
+            updated_teams += 1
+
+        # Calculate league averages
+        total_teams = updated_teams
+        league_avg_npxg = league_totals['npxg'] / total_teams if total_teams > 0 else 0
+        league_avg_npxga = league_totals['npxga'] / total_teams if total_teams > 0 else 0
+
+        conn.commit()
+        conn.close()
+
+        # Update system parameters with sync timestamp
+        system_params = load_system_parameters()
+        if 'npxg_fixture' not in system_params:
+            system_params['npxg_fixture'] = {}
+
+        system_params['npxg_fixture']['last_sync'] = time.time()
+        system_params['npxg_fixture']['teams_updated'] = updated_teams
+        system_params['npxg_fixture']['league_avg_npxg'] = round(league_avg_npxg, 3)
+        system_params['npxg_fixture']['league_avg_npxga'] = round(league_avg_npxga, 3)
+        save_system_parameters(system_params)
+
+        return jsonify({
+            'success': True,
+            'teams_updated': updated_teams,
+            'league_avg_npxg': round(league_avg_npxg, 3),
+            'league_avg_npxga': round(league_avg_npxga, 3),
+            'total_matches': league_totals['matches'],
+            'message': f'Successfully synced NPxG data for {updated_teams} Premier League teams'
+        })
+
+    except Exception as e:
+        return jsonify({'error': str(e)}), 500
+
+@app.route('/api/npxg/team-stats', methods=['GET'])
+def get_npxg_team_stats():
+    """Retrieve current NPxG team statistics from database"""
+    try:
+        conn = get_db_connection()
+        cursor = conn.cursor(cursor_factory=psycopg2.extras.RealDictCursor)
+
+        cursor.execute("""
+            SELECT team_code, team_name, npxg, npxga, npxgd,
+                   matches_played, last_updated
+            FROM team_metrics
+            ORDER BY npxg DESC
+        """)
+
+        teams = cursor.fetchall()
+        cursor.close()
+        conn.close()
+
+        # Convert to list of dictionaries for JSON response
+        team_stats = []
+        for team in teams:
+            team_stats.append({
+                'team_code': team['team_code'],
+                'team_name': team['team_name'],
+                'npxg': float(team['npxg']),
+                'npxga': float(team['npxga']),
+                'npxgd': float(team['npxgd']),
+                'matches_played': team['matches_played'],
+                'last_updated': team['last_updated'].isoformat() if team['last_updated'] else None
+            })
+
+        return jsonify({
+            'success': True,
+            'teams': team_stats,
+            'total_teams': len(team_stats)
+        })
+
+    except Exception as e:
+        return jsonify({'error': str(e)}), 500
+
+@app.route('/api/npxg/config', methods=['GET', 'PUT'])
+def manage_npxg_config():
+    """Get or update NPxG fixture configuration parameters"""
+    try:
+        if request.method == 'GET':
+            # Return current NPxG configuration
+            system_params = load_system_parameters()
+            npxg_config = system_params.get('npxg_fixture', {})
+
+            return jsonify({
+                'success': True,
+                'config': npxg_config
+            })
+
+        elif request.method == 'PUT':
+            # Update NPxG configuration
+            data = request.get_json()
+            if not data:
+                return jsonify({'error': 'No configuration data provided'}), 400
+
+            system_params = load_system_parameters()
+
+            # Update NPxG config section
+            if 'npxg_fixture' not in system_params:
+                system_params['npxg_fixture'] = {}
+
+            # Update provided fields
+            for key, value in data.items():
+                if key in ['enabled', 'weight', 'home_away_adjustments', 'position_mappings', 'bounds']:
+                    system_params['npxg_fixture'][key] = value
+
+            # Save updated parameters
+            save_system_parameters(system_params)
+
+            return jsonify({
+                'success': True,
+                'message': 'NPxG configuration updated successfully',
+                'config': system_params['npxg_fixture']
+            })
+
+    except Exception as e:
+        return jsonify({'error': str(e)}), 500
 
 
 
