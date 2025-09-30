@@ -20,7 +20,7 @@ start_dashboard_safe.bat  # RECOMMENDED: Starts backend (5001) + React dashboard
 
 ## V2.0 Formula
 ```
-True Value = Blended_PPG × Form × Fixture × Starter × xGI
+True Value = Blended_PPG × Form × NPxG_Fixture × Starter × xGI
 ROI = True Value ÷ Player_Price
 ```
 
@@ -29,7 +29,7 @@ ROI = True Value ÷ Player_Price
 - `player_metrics` - Live performance data with opponent info (includes next_opponent, is_home columns)
 - `player_games_data` - Games tracking for blending
 - `name_mappings` - Cross-source player resolution
-- `team_fixtures` - Fixture difficulty scores
+- `team_metrics` - NPxG team strength data for fixture multipliers
 
 ## Documentation
 - `docs/API_REFERENCE.md` - API endpoints
@@ -55,7 +55,21 @@ python check_current_state.py
 - **Fantrax**: Player data, pricing, and next opponent information
 - **Understat**: xG/xA statistics
 - **FFP (Fantasy Football Pundit)**: Starter predictions (replaced FFS)
-- **OddsPortal**: Fixture difficulty via betting odds upload
+- **NPxG Database**: Team strength metrics for fixture difficulty (replaced betting odds)
+
+## NPxG Fixture System (September 2025)
+### NPxG Replaces Betting Odds
+- **Migration**: Replaced betting odds-based fixture difficulty with NPxG team strength analysis
+- **Weight Control**: Repurposed "Fixture Base" slider to control NPxG weight (-20% to +20% range)
+- **Position-Specific**: Attacking/defensive components based on player position
+- **Team Aliases**: Automatic resolution of team code mismatches (BRF→BRE, NOT→NFO)
+- **Home/Away Adjustments**: Built-in location modifiers (±10% attacking, ±15% defensive)
+
+### Implementation Benefits
+- **No Manual Import**: Eliminates need for weekly betting odds CSV uploads
+- **Real-Time**: Fixture multipliers calculated automatically using database team metrics
+- **Accurate Mapping**: Team alias system ensures proper opponent matching
+- **User Control**: NPxG Weight slider provides fine-tuning control over fixture impact
 
 ## Recent Enhancements (September 2024)
 ### Next Opponent Column

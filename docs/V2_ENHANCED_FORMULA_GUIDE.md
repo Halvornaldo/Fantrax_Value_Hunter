@@ -94,18 +94,25 @@ Progressive multiplier boundaries based on statistical confidence of sample size
 
 **Implementation**: `calculation_engine_v2.py:_calculate_exponential_form_multiplier`
 
-### **3. Exponential Fixture Difficulty**
-**Purpose**: Advanced difficulty scaling using exponential transformation
+### **3. NPxG Fixture System**
+**Purpose**: Team strength assessment using Non-Penalty Expected Goals data
 
-**Formula**: `multiplier = base^(-difficulty_score × position_weight)`
-- **Base**: 1.05 (configurable 1.02-1.10)
-- **Position Weights**: G=1.1, D=1.2, M=1.0, F=1.05
-- **Range**: 0.5x - 1.8x
+**Formula**: Position-specific calculations with home/away adjustments
+- **Attacking**: `(opponent_npxga / league_avg_npxga) × home_away_multiplier × npxg_weight`
+- **Defensive**: `(league_avg_npxg / opponent_npxg) × home_away_multiplier × npxg_weight`
+- **NPxG Weight**: Controlled by repurposed Fixture Base slider (80%-120% range)
+- **Range**: 0.4x - 2.5x (bounded)
 
-**Examples**:
-- Easy fixture (-8.0): 1.05^8.0 = 1.477x
-- Hard fixture (+6.0): 1.05^(-6.0) = 0.746x
-- Neutral (0.0): 1.000x
+**Position Calculations**:
+- **Goalkeepers/Defenders**: 100% defensive component
+- **Forwards**: 100% attacking component
+- **Midfielders**: 75% attacking + 25% defensive blend
+
+**Home/Away Adjustments**:
+- **Home Attacking**: +10% boost, **Away**: -10% penalty
+- **Home Defensive**: +15% boost, **Away**: -15% penalty
+
+**Team Alias Resolution**: Automatic handling of team code mismatches (BRF→BRE, NOT→NFO)
 
 ### **4. Normalized xGI Integration**
 **Purpose**: Expected Goals Involvement using ratio-based comparisons
@@ -220,9 +227,27 @@ Progressive ranges are enabled via `config/system_parameters.json`:
       "enabled": true
     },
     "exponential_fixture": {
-      "base": 1.05,
-      "position_weights": {
-        "G": 1.1, "D": 1.2, "M": 1.0, "F": 1.05
+      "base": 1.34
+    },
+    "npxg_fixture": {
+      "enabled": true,
+      "home_away_adjustments": {
+        "attacking": {
+          "home_boost": 1.1,
+          "away_penalty": 0.9
+        },
+        "defensive": {
+          "home_boost": 1.15,
+          "away_penalty": 0.85
+        }
+      },
+      "position_mappings": {
+        "pure_mid_attack_weight": 0.75,
+        "pure_mid_defense_weight": 0.25
+      },
+      "bounds": {
+        "min": 0.4,
+        "max": 2.5
       }
     },
     "multiplier_caps": {
@@ -306,10 +331,10 @@ last_updated TIMESTAMP            -- Calculation timestamp
    - Recent games weighted exponentially
    - Form Multiplier: 1.57x
 
-3. **Exponential Fixture**:
-   - Difficulty: -7.2 (easy fixture)
-   - Position weight: 1.05 (Forward)
-   - Fixture Multiplier: 1.038x
+3. **NPxG Fixture**:
+   - Opponent: Brentford (away)
+   - NPxG calculation with away penalty
+   - Fixture Multiplier: 0.866x
 
 4. **Starter Prediction**: 1.0x (predicted starter)
 
@@ -318,8 +343,8 @@ last_updated TIMESTAMP            -- Calculation timestamp
    - xGI Multiplier: 2.288x
 
 **Final Result**:
-- **True Value**: 12.11 × 1.57 × 1.038 × 1.0 × 2.288 = **36.32**
-- **ROI**: 36.32 ÷ 22.12 = **0.891**
+- **True Value**: 12.11 × 1.57 × 0.866 × 1.0 × 2.288 = **30.26**
+- **ROI**: 30.26 ÷ 22.12 = **0.742**
 
 ---
 

@@ -208,28 +208,29 @@ The system dynamically adjusts Form multiplier boundaries based on games played 
 - **Late Season (15 games)**: Raw EWMA 0.70 → Applied as 0.70 (±30% maximum range)
 - **Neutral Form**: Form matches expectation = 1.0x multiplier regardless of games played
 
-### **Exponential Fixture Difficulty**
-**Purpose**: Advanced fixture difficulty using exponential scaling for more accurate impact assessment
+### **NPxG Fixture System**
+**Purpose**: Team strength assessment using Non-Penalty Expected Goals data for fixture difficulty
 
 **V2.0 Enhanced Controls**:
-- **Enable Exponential Fixtures**: Toggle for advanced difficulty (default: enabled)
-- **Base Parameter**: Exponential base slider (1.02-1.10, default: 1.05)
-- **Position Adjustments**: Enhanced position-specific modifiers
-- **Fixture Caps**: 0.5-1.8x range for controlled impact
+- **Enable NPxG Fixtures**: Toggle for NPxG-based difficulty (default: enabled)
+- **NPxG Weight**: Repurposed "Fixture Base" slider controls strength (-20% to +20%)
+- **Position-Specific Calculations**: Automatic attacking/defensive component weighting
+- **Home/Away Adjustments**: Built-in location-based modifiers
 
 **Technical Implementation**:
-- **Formula**: `multiplier = base^(-difficulty_score)`
-- **21-Point Scale**: Converts betting odds to difficulty (-10 to +10)
-- **Position Weights**:
-  - **Defenders**: 120% impact (clean sheet dependency)
-  - **Goalkeepers**: 110% impact (save opportunities)
-  - **Forwards**: 105% impact (scoring vs weaker defenses)
-  - **Midfielders**: 100% baseline (balanced role)
+- **Attacking Component**: `(opponent_npxga / league_avg_npxga) × home_away_mult × weight`
+- **Defensive Component**: `(league_avg_npxg / opponent_npxg) × home_away_mult × weight`
+- **Position Mapping**:
+  - **Goalkeepers/Defenders**: 100% defensive component
+  - **Forwards**: 100% attacking component
+  - **Midfielders**: 75% attacking + 25% defensive blend
+- **Home/Away Adjustments**: Attacking (±10%), Defensive (±15%)
+- **Team Alias Resolution**: Automatic BRF→BRE, NOT→NFO mapping
 
 **Examples**:
-- **Easy Fixture (-8.0 difficulty)**: 1.05^8 = 1.477x multiplier
-- **Hard Fixture (+6.0 difficulty)**: 1.05^(-6) = 0.746x multiplier
-- **Neutral Fixture (0.0 difficulty)**: 1.05^0 = 1.000x multiplier
+- **vs Weak Defense (home)**: High NPxGA opponent + home boost = 1.2x multiplier
+- **@ Strong Defense (away)**: Low NPxGA opponent + away penalty = 0.7x multiplier
+- **Neutral Matchup**: Average team strength = 1.0x multiplier
 
 ### **Normalized xGI Integration**
 **Purpose**: Advanced Expected Goals Involvement using ratio-based comparisons with position-specific adjustments
@@ -409,16 +410,13 @@ Erling Haaland Override: B → S
 
 **Expected Performance**: Name mapping persistence ensures no repeated validations. Confidence parsing works correctly (90% CSV = 90% system = 1.0x multiplier).
 
-### **Advanced Fixture Odds Import**
+### **NPxG Fixture Data Integration**
 
-**V2.0 Process**:
-1. Click "⚽ Upload Fixture Odds"
-2. Upload betting odds CSV from OddsPortal
-3. **V2.0 Enhanced Processing**:
-   - Exponential difficulty calculation (base^(-difficulty))
-   - Position-specific multiplier adjustments
-   - Real-time fixture multiplier updates
-   - Performance optimization (2x speed improvement)
+**Automatic Process**:
+- NPxG fixture multipliers are calculated automatically using team metrics
+- No manual CSV import required (replaced the old betting odds workflow)
+- Team strength data is maintained in the database
+- Automatic team code alias resolution ensures accurate mappings
 
 ### **Starter Predictions with V2.0 Integration**
 
@@ -446,16 +444,16 @@ Price: £15.00
 Components:
 - Blended PPG: 8.45 (6.7% current + 93.3% historical)
 - Form Multiplier: 0.952 (EWMA below baseline)
-- Fixture Multiplier: 1.006 (neutral difficulty)
+- NPxG Fixture Multiplier: 0.866 (away vs Brentford)
 - Starter Multiplier: 1.000 (predicted starter)
 - xGI Multiplier: 0.895 (normalized xGI ratio)
 
 Calculation:
-True Value = 8.45 × 0.952 × 1.006 × 1.000 × 0.895 = 7.25
+True Value = 8.45 × 0.952 × 0.866 × 1.000 × 0.895 = 6.24
 
-ROI = 7.25 ÷ 15.00 = 0.483
+ROI = 6.24 ÷ 15.00 = 0.416
 
-Result: Moderate True Value with below-average ROI due to premium pricing
+Result: Moderate True Value with below-average ROI due to premium pricing and difficult away fixture
 ```
 
 ### **V2.0 Calculation Features**

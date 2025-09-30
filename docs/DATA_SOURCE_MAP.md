@@ -63,7 +63,7 @@ This document provides a comprehensive map of where each piece of data in the pl
 | Frontend Column | Database Source | Primary Data Source | Import Method | Critical Notes |
 |----------------|-----------------|-------------------|---------------|----------------|
 | **Form** | `pm.form_multiplier` | V2.0 EWMA Calculation | Live calculation with α=0.87 | Progressive ranges based on sample size |
-| **Fixture** | `pm.fixture_multiplier` | Betting odds → difficulty | `/api/import-odds` CSV | Exponential formula: `1.05^(-difficulty)` |
+| **Fixture** | `pm.fixture_multiplier` | NPxG team strength | Automatic from team_metrics | Position-specific: attacking/defensive components |
 | **Starter** | `pm.starter_multiplier` | FFP predictions | `/api/import-lineups` + manual overrides | User-controllable via dashboard |
 | **xGI** | `pm.xgi_multiplier` | Normalized calculation | `current_xgi90 ÷ baseline_xgi` | Position-adjusted ratios |
 
@@ -96,15 +96,15 @@ Database Updates:
     • players.minutes → Playing time
 ```
 
-### **3. Odds-Based Fixture Difficulty Flow**
+### **3. NPxG Fixture System Flow**
 ```
-Betting Odds CSV
-    ↓ [Manual Upload via /odds-upload]
-Odds Processing (/api/import-odds)
-    ↓ [Implied probability calculations]
+Team NPxG Data (Database: team_metrics)
+    ↓ [Automatic calculation during player processing]
+NPxG Processing (npxg_fixture_multiplier.py)
+    ↓ [Position-specific attacking/defensive calculations]
 Database Updates:
-    • team_fixtures.difficulty_score → Fixture multiplier input
-    • Exponential calculation: 1.05^(-difficulty_score)
+    • player_metrics.fixture_multiplier → Real-time calculation
+    • Team alias resolution: BRF→BRE, NOT→NFO
 ```
 
 ### **4. V2.0 Calculation Engine Flow**
@@ -117,7 +117,7 @@ Raw Data Sources:
     • Normalized xGI ratios
         ↓ [calculation_engine_v2.py]
 V2.0 Enhanced Formula:
-    True Value = Blended_PPG × Form × Fixture × Starter × xGI
+    True Value = Blended_PPG × Form × NPxG_Fixture × Starter × xGI
     ROI = True Value ÷ Price
         ↓ [Database storage]
 Display in Frontend:
@@ -175,18 +175,17 @@ abc123,Erling Haaland,MCI,F,1,NEW,15.0,12.5,90,1,0,...
 - PPG calculations (prevents 2x Dynamic PPG issue)
 - xGI normalization in V2.0 formula
 
-### **3. Betting Odds Import** (`/api/import-odds`)
-**Expected Format**:
-```csv
-Gameweek,Home Team,Away Team,Home Odds,Draw Odds,Away Odds
-2,Arsenal,Brighton,1.65,4.20,5.50
-```
+### **3. NPxG Fixture System** (Automatic)
+**Data Source**: Database team_metrics table with NPxG/NPxGA values
 
 **Calculation**:
 ```python
-difficulty_score = calculate_difficulty_from_odds(home_odds, away_odds, is_home)
-fixture_multiplier = 1.05 ** (-difficulty_score)
+attacking_component = (opponent_npxga / league_avg_npxga) * home_away_mult * weight
+defensive_component = (league_avg_npxg / opponent_npxg) * home_away_mult * weight
+fixture_multiplier = position_blend(attacking_component, defensive_component)
 ```
+
+**Team Alias Resolution**: BRF→BRE, NOT→NFO (automatic)
 
 ### **4. FFP Lineup Predictions** (`/api/import-lineups`)
 **Expected Format**:
@@ -282,8 +281,8 @@ Arsenal,Odegaard,85,Saka,90,Rice,95,...
 ### **From V2.0 Calculation Engine**
 - True Value, ROI, Dynamic PPG, Form/Fixture/Starter/xGI multipliers
 
-### **From Betting Odds**
-- Fixture difficulty → Fixture multiplier
+### **From NPxG Team Metrics**
+- Team attacking/defensive strength → NPxG fixture multiplier
 
 ### **From FFP Predictions**
 - Starting likelihood → Starter multiplier
@@ -383,7 +382,7 @@ SELECT * FROM player_game_scores WHERE did_play = true;
 **Persistence**: Stored in `system_parameters.json`
 
 ### **Data Refresh**
-**Action**: New imports (Fantrax CSV, Understat sync, odds)
+**Action**: New imports (Fantrax CSV, Understat sync, FFP lineups)
 **Impact**: Updates source data, triggers recalculation
 **Validation**: Name matching UI for edge cases
 

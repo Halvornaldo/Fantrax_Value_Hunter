@@ -295,7 +295,7 @@ ORDER BY gameweek
       "xgi90": 1.845,
       "multipliers": {
         "form": 0.952,
-        "fixture": 1.006,
+        "fixture": 0.866,
         "starter": 1.000,
         "xgi": 0.895
       },
@@ -421,7 +421,7 @@ WHERE ...
       "blended_ppg": 8.45,
       "multipliers": {
         "form": 0.952,
-        "fixture": 1.006,
+        "fixture": 0.866,
         "starter": 1.000,
         "xgi": 0.895
       },
