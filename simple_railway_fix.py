@@ -5,9 +5,10 @@ Simple Railway schema fix using connection string from environment variables
 import psycopg2
 import os
 
-# Railway database connection (from the variables we saw)
+# Railway database connection - try environment first, fallback to default
 # Format from Railway variables: postgresql://postgres:PASSWORD@HOST:PORT/railway
-database_url = "postgresql://postgres:PaTNNWrtNvFRYFYppIRjjJoaGSiwmyfg@gondola.proxy.rlwy.net:17291/railway"
+database_url = os.getenv('RAILWAY_DATABASE_URL',
+                        "postgresql://postgres:PaTNNWrtNvFRYFYppIRjjJoaGSiwmyfg@gondola.proxy.rlwy.net:17291/railway")
 
 print("Connecting to Railway database...")
 

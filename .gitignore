@@ -108,6 +108,8 @@ docs/_build/
 *token*
 *api_key*
 *password*
+*database_url*
+*DATABASE_URL*
 # Backup and temporary files (enhanced)
 *_backup_*
 *_backup.py

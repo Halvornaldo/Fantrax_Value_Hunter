@@ -42,8 +42,17 @@ class RailwayDatabaseSyncer:
         ]
 
     def _get_railway_url(self) -> str:
-        """Get Railway database URL - using external connection"""
-        # External Railway database connection (updated with correct host)
+        """Get Railway database URL from environment or default"""
+        import os
+
+        # Try to get from environment first (production best practice)
+        railway_url = os.getenv('RAILWAY_DATABASE_URL')
+
+        if railway_url:
+            return railway_url
+
+        # Fallback for local development (friends access)
+        # Note: In production, this should be set via environment variables
         return "postgresql://postgres:PaTNNWrtNvFRYFYppIRjjJoaGSiwmyfg@gondola.proxy.rlwy.net:17291/railway"
 
     def fix_railway_schema(self) -> bool:
