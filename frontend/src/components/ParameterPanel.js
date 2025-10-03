@@ -466,20 +466,29 @@ const ParameterPanel = ({ systemConfig, onParametersUpdate, playersCount }) => {
         {/* NPxG Weight */}
         <Grid item xs={1.5}>
           <Typography variant="body2" gutterBottom>NPxG Weight</Typography>
-          <Slider
-            value={parameters.fixtureBase || 1.3}
-            onChange={(e, value) => handleParameterChange('fixtureBase', value)}
-            min={1.15}
-            max={1.50}
-            step={0.01}
-            size="small"
-            valueLabelDisplay="auto"
-            valueLabelFormat={(value) => {
-              // Convert to percentage: (value - 1.15) / 0.35 * 40 - 20
-              const percentage = ((value - 1.15) / 0.35 * 40 - 20);
-              return `${percentage.toFixed(0)}%`;
-            }}
-          />
+          <Box display="flex" alignItems="center" gap={0.5}>
+            <Typography variant="caption" color="text.secondary" sx={{ fontSize: '0.6rem', minWidth: '32px' }}>
+              Tighten
+            </Typography>
+            <Slider
+              value={parameters.fixtureBase || 1.3}
+              onChange={(e, value) => handleParameterChange('fixtureBase', value)}
+              min={1.15}
+              max={1.50}
+              step={0.01}
+              size="small"
+              valueLabelDisplay="auto"
+              valueLabelFormat={(value) => {
+                // Convert to percentage: (value - 1.15) / 0.35 * 40 - 20
+                const percentage = ((value - 1.15) / 0.35 * 40 - 20);
+                return `${percentage.toFixed(0)}%`;
+              }}
+              sx={{ flex: 1 }}
+            />
+            <Typography variant="caption" color="text.secondary" sx={{ fontSize: '0.6rem', minWidth: '30px' }}>
+              Widen
+            </Typography>
+          </Box>
           <Typography variant="caption" color="text.secondary">
             {(() => {
               const percentage = ((parameters.fixtureBase - 1.15) / 0.35 * 40 - 20);

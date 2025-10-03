@@ -122,3 +122,10 @@ docs/_build/
 frontend_updates.txt
 *_working_*.js
 *_working_*.py
+
+# Temporary verification scripts
+apply_npxg_fix.py
+calculation_engine_v2_fixed.py
+calculation_engine_v2_patched.py
+verify_true_value.py
+verify_true_value_correct.py

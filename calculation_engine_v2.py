@@ -402,14 +402,21 @@ class FormulaEngineV2:
         try:
             # Get fixture base parameter to use as NPxG weight
             fixture_config = self.params.get('formula_optimization_v2', {}).get('exponential_fixture', {})
-            npxg_weight = fixture_config.get('base', 1.45)
+            slider_value = fixture_config.get('base', 1.45)
 
-            # Convert from 1.15-1.50 range to 0.80-1.20 range (80%-120%)
-            # Formula: weight = (base - 1.15) / (1.50 - 1.15) * (1.20 - 0.80) + 0.80
-            # Simplified: weight = (base - 1.15) / 0.35 * 0.40 + 0.80
-            npxg_weight = (npxg_weight - 1.15) / 0.35 * 0.40 + 0.80
-            npxg_weight = max(0.80, min(1.20, npxg_weight))  # Clamp to bounds
+            # Convert from slider range (1.15-1.50) to weight (0.80-1.20)
+            # Middle point 1.325 = 1.0 (neutral, no change)
+            # 1.15 = 0.80 (tighten by 20%, brings values closer to 1.0)
+            # 1.50 = 1.20 (widen by 20%, increases range)
+            middle = 1.325
+            if slider_value <= middle:
+                # Tightening range: 1.15-1.325 maps to 0.80-1.00
+                npxg_weight = 0.80 + (slider_value - 1.15) / (middle - 1.15) * 0.20
+            else:
+                # Widening range: 1.325-1.50 maps to 1.00-1.20
+                npxg_weight = 1.00 + (slider_value - middle) / (1.50 - middle) * 0.20
 
+            npxg_weight = max(0.80, min(1.20, npxg_weight))  # Ensure bounds
             # Calculate multiplier using NPxG module with weight
             multiplier = get_npxg_multiplier_for_player(player_data, self.db_config, npxg_weight)
             return multiplier
@@ -521,8 +528,8 @@ class FormulaEngineV2:
             w_current = 1.0
             logger.debug(f"Player without historical data - using 100% current PPG: {current_ppg:.2f}")
         else:
-            # Get transition period from config (default 12 games)
-            transition_period = self.v2_config.get('dynamic_blending', {}).get('transition_period', 12)
+            # Get transition period from config (default 10 games) - controlled by Adaptation GW slider
+            transition_period = self.v2_config.get('dynamic_blending', {}).get('full_adaptation_gw', 10)
 
             # Step 1: Calculate Weight_A (games-based ratio)
             total_games = games_current + games_historical

@@ -713,25 +713,33 @@ const PlayerTable = ({ playersData, gameweekInfo, systemConfig, onDataRefresh })
       renderCell: (params) => {
         const value = parseFloat(params.value);
         const weight = parseFloat(params.row.current_season_weight || 0);
-        const isReliable = weight > 0.5; // More than 50% current season data
+        const percentage = weight * 100;
 
-        const cellColor = isReliable ? '#dc3545' : weight > 0.2 ? '#28a745' : '#6c757d';
-        const bgColor = isReliable ? 'rgba(220, 53, 69, 0.1)' : weight > 0.2 ? 'rgba(40, 167, 69, 0.1)' : 'rgba(108, 117, 125, 0.1)';
+        // Gradient color based on current season weight (higher % = more current data = better)
+        let cellColor;
+        if (percentage >= 90) cellColor = '#00cc66';       // Deep green (90-100%)
+        else if (percentage >= 75) cellColor = '#28a745';  // Green (75-90%)
+        else if (percentage >= 50) cellColor = '#a4c639';  // Yellow-green (50-75%)
+        else if (percentage >= 25) cellColor = '#ffc107';  // Yellow (25-50%)
+        else if (percentage >= 10) cellColor = '#ff9800';  // Orange (10-25%)
+        else cellColor = '#dc3545';                        // Red (<10%)
 
         return (
           <Box sx={{
             color: cellColor,
-            backgroundColor: bgColor,
+            backgroundColor: `${cellColor}15`,
             padding: '4px 8px',
             borderRadius: 1,
             fontWeight: 500,
             display: 'flex',
             alignItems: 'center',
-            gap: 0.5
+            gap: 0.5,
+            border: `1px solid ${cellColor}30`,
+            textShadow: isDark ? `0 0 4px ${cellColor}40` : 'none',
           }}>
             {isNaN(value) ? '0.0' : value.toFixed(1)}
             <Typography variant="caption" sx={{ opacity: 0.8, fontSize: '0.7rem' }}>
-              ({Math.round(weight * 100)}% curr)
+              ({Math.round(percentage)}% curr)
             </Typography>
           </Box>
         );
