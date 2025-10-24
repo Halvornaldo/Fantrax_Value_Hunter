@@ -207,6 +207,13 @@ const App = () => {
                 Sync NPxG Teams
               </MenuItem>
               <MenuItem
+                onClick={() => { window.open('http://localhost:5001/railway-sync', '_blank'); handleUploadMenuClose(); }}
+                sx={{ color: darkMode ? '#ffffff' : '#333333' }}
+              >
+                <CloudSync sx={{ mr: 1, color: '#0ea5e9' }} />
+                Sync to Railway
+              </MenuItem>
+              <MenuItem
                 onClick={() => { window.open('http://localhost:5001/form-upload', '_blank'); handleUploadMenuClose(); }}
                 sx={{ color: darkMode ? '#ffffff' : '#333333' }}
               >

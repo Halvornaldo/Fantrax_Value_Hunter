@@ -3418,6 +3418,11 @@ def import_validation_ui():
     """Serve the import validation UI"""
     return render_template('import_validation.html')
 
+@app.route('/railway-sync')
+def railway_sync_ui():
+    """Serve the Railway sync progress UI"""
+    return render_template('railway_sync.html')
+
 @app.route('/form-upload')
 def form_upload_ui():
     """Serve the form data upload UI"""
@@ -5844,6 +5849,121 @@ def sync_npxg_team_stats():
 
     except Exception as e:
         return jsonify({'error': str(e)}), 500
+
+@app.route('/api/railway/sync', methods=['POST'])
+def sync_to_railway():
+    """Sync all essential tables to Railway database with progress tracking"""
+    try:
+        import subprocess
+        import threading
+        import queue
+        from optimized_railway_sync import OptimizedRailwaySync
+
+        # Store progress updates
+        progress_queue = queue.Queue()
+        sync_results = []
+
+        def progress_callback(progress_data):
+            """Callback to receive progress updates"""
+            progress_queue.put(progress_data)
+            sync_results.append(progress_data)
+
+        def run_sync():
+            """Run sync in background thread"""
+            try:
+                syncer = OptimizedRailwaySync(progress_callback=progress_callback)
+                result = syncer.sync_all()
+                progress_queue.put({'type': 'complete', 'result': result})
+            except Exception as e:
+                progress_queue.put({'type': 'error', 'error': str(e)})
+
+        # Start sync in background thread
+        sync_thread = threading.Thread(target=run_sync)
+        sync_thread.start()
+
+        # Store thread and queue in session for progress checking
+        import secrets
+        sync_id = secrets.token_urlsafe(16)
+
+        # Store in global dict (in production, use Redis or similar)
+        if not hasattr(app, 'sync_sessions'):
+            app.sync_sessions = {}
+
+        app.sync_sessions[sync_id] = {
+            'thread': sync_thread,
+            'queue': progress_queue,
+            'results': sync_results,
+            'started_at': time.time()
+        }
+
+        # Clean up old sessions (older than 1 hour)
+        current_time = time.time()
+        app.sync_sessions = {
+            k: v for k, v in app.sync_sessions.items()
+            if current_time - v['started_at'] < 3600
+        }
+
+        return jsonify({
+            'success': True,
+            'sync_id': sync_id,
+            'message': 'Railway sync started',
+            'check_progress_url': f'/api/railway/sync-progress/{sync_id}'
+        })
+
+    except Exception as e:
+        return jsonify({'error': f'Failed to start sync: {str(e)}'}), 500
+
+@app.route('/api/railway/sync-progress/<sync_id>', methods=['GET'])
+def get_railway_sync_progress(sync_id):
+    """Get progress of ongoing Railway sync"""
+    try:
+        if not hasattr(app, 'sync_sessions') or sync_id not in app.sync_sessions:
+            return jsonify({'error': 'Invalid or expired sync ID'}), 404
+
+        session = app.sync_sessions[sync_id]
+        progress_updates = []
+
+        # Get all available progress updates (non-blocking)
+        while not session['queue'].empty():
+            try:
+                update = session['queue'].get_nowait()
+                progress_updates.append(update)
+
+                # Check if sync is complete
+                if update.get('type') == 'complete':
+                    result = update.get('result', {})
+                    # Clean up session
+                    del app.sync_sessions[sync_id]
+                    return jsonify({
+                        'status': 'complete',
+                        'success': result.get('success', False),
+                        'tables_synced': result.get('tables_synced', 0),
+                        'total_tables': result.get('total_tables', 0),
+                        'results': result.get('results', {}),
+                        'updates': progress_updates
+                    })
+                elif update.get('type') == 'error':
+                    # Clean up session
+                    del app.sync_sessions[sync_id]
+                    return jsonify({
+                        'status': 'error',
+                        'error': update.get('error', 'Unknown error'),
+                        'updates': progress_updates
+                    })
+            except:
+                break
+
+        # Check if thread is still alive
+        is_running = session['thread'].is_alive()
+
+        return jsonify({
+            'status': 'running' if is_running else 'unknown',
+            'updates': progress_updates,
+            'all_results': session['results']
+        })
+
+    except Exception as e:
+        return jsonify({'error': f'Failed to get progress: {str(e)}'}), 500
 
 @app.route('/api/npxg/team-stats', methods=['GET'])
 def get_npxg_team_stats():
