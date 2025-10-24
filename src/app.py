@@ -437,7 +437,7 @@ def recalculate_true_values(gameweek: int = None):
             
             # Use v2.0 engine for calculation
             v2_result = v2_engine.calculate_player_value(player_data)
-            
+
             # Prepare batch update
             batch_updates.append((
                 v2_result['true_value'],
@@ -1038,12 +1038,70 @@ def update_system_parameters():
         if not save_system_parameters(current_params):
             return jsonify({'error': 'Failed to save parameters'}), 500
         
-        # Trigger recalculation
+        # First update fixture multipliers with new parameters
+        # This ensures correct values are calculated with the new slider setting
+        from calculation_engine_v2 import FormulaEngineV2
+
+        engine = FormulaEngineV2(DB_CONFIG, current_params)
+        conn = get_db_connection()
+        cursor = conn.cursor(cursor_factory=psycopg2.extras.RealDictCursor)
+
+        # Get all players with opponents
+        cursor.execute("""
+            SELECT p.id as player_id, p.position, pm.next_opponent, pm.is_home
+            FROM players p
+            JOIN player_metrics pm ON p.id = pm.player_id
+            WHERE pm.next_opponent IS NOT NULL AND pm.next_opponent != ''
+        """)
+
+        updates = []
+        for row in cursor.fetchall():
+            player_data = {
+                'player_id': row['player_id'],
+                'name': '',
+                'position': row['position'],
+                'next_opponent': row['next_opponent'],
+                'is_home': row['is_home'],
+                # Dummy data
+                'price': 10.0,
+                'ppg': 5.0,
+                'xgi90': 0.3,
+                'baseline_xgi': None,
+                'fixture_difficulty': 0.0,
+                'starter_multiplier': 1.0,
+                'total_points_historical': 0,
+                'games_played_historical': 0,
+                'games_historical': 0,
+                'total_points_current': 50,
+                'games_current': 10,
+                'historical_ppg': None
+            }
+
+            new_mult = engine._calculate_npxg_fixture_multiplier(player_data)
+            updates.append((new_mult, row['player_id']))
+
+        # Update all fixture multipliers
+        cursor.executemany("""
+            UPDATE player_metrics
+            SET fixture_multiplier = %s,
+                last_updated = NOW()
+            WHERE player_id = %s
+        """, updates)
+
+        conn.commit()
+        cursor.close()
+        conn.close()
+
+        # Now trigger full recalculation with updated fixture multipliers
         # Gameweek manager removed - using database queries
         # Using database query instead
         gameweek = 1  # Fixed for live data system
         recalc_result = recalculate_true_values(gameweek)
-        
+
+        # Clear the cache so frontend gets fresh data immediately
+        # Without this, the /api/players endpoint returns 60-second cached data
+        cache.clear()
+
         return jsonify({
             'success': True,
             'message': 'Parameters updated successfully',

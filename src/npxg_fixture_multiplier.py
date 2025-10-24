@@ -385,7 +385,7 @@ class NPxGFixtureMultiplier:
         Calculate complete NPxG fixture multiplier for a player
 
         Args:
-            player_data: Dictionary containing player info (position, next_opponent, etc.)
+            player_data: Dictionary containing player info (position, next_opponent, is_home, etc.)
 
         Returns:
             Final fixture multiplier
@@ -394,9 +394,19 @@ class NPxGFixtureMultiplier:
             return 1.0
 
         try:
-            # Parse opponent and home/away status
+            # Get opponent code and home/away status
             next_opponent = player_data.get('next_opponent', '')
-            opponent_code, is_home = self.parse_opponent_info(next_opponent)
+
+            # Use is_home from database if available, otherwise parse from next_opponent
+            if 'is_home' in player_data and player_data['is_home'] is not None:
+                # Use the is_home flag from database
+                opponent_code = next_opponent  # Direct team code (e.g., "EVE")
+                is_home = player_data['is_home']
+                logger.debug(f"Using is_home flag from database: opponent={opponent_code}, is_home={is_home}")
+            else:
+                # Fallback to parsing (for backward compatibility)
+                opponent_code, is_home = self.parse_opponent_info(next_opponent)
+                logger.debug(f"Parsing opponent string: '{next_opponent}' -> opponent={opponent_code}, is_home={is_home}")
 
             if not opponent_code:
                 logger.debug(f"No opponent found for player {player_data.get('player_id', 'unknown')}")

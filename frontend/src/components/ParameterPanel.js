@@ -467,9 +467,6 @@ const ParameterPanel = ({ systemConfig, onParametersUpdate, playersCount }) => {
         <Grid item xs={1.5}>
           <Typography variant="body2" gutterBottom>NPxG Weight</Typography>
           <Box display="flex" alignItems="center" gap={0.5}>
-            <Typography variant="caption" color="text.secondary" sx={{ fontSize: '0.6rem', minWidth: '32px' }}>
-              Tighten
-            </Typography>
             <Slider
               value={parameters.fixtureBase || 1.3}
               onChange={(e, value) => handleParameterChange('fixtureBase', value)}
@@ -485,9 +482,6 @@ const ParameterPanel = ({ systemConfig, onParametersUpdate, playersCount }) => {
               }}
               sx={{ flex: 1 }}
             />
-            <Typography variant="caption" color="text.secondary" sx={{ fontSize: '0.6rem', minWidth: '30px' }}>
-              Widen
-            </Typography>
           </Box>
           <Typography variant="caption" color="text.secondary">
             {(() => {

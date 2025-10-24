@@ -22,6 +22,7 @@ from typing import Dict, List, Optional, Tuple, Any
 from datetime import datetime
 import logging
 from src.npxg_fixture_multiplier import get_npxg_multiplier_for_player
+from src.npxg_fixture_multiplier_optimized import NPxGFixtureSession
 
 # Set up logging
 logging.basicConfig(level=logging.INFO)
@@ -39,7 +40,22 @@ class FormulaEngineV2:
         self.params = parameters
         self.v2_config = parameters.get('formula_optimization_v2', {})
         self.current_gameweek = self._get_current_gameweek()
-        
+
+        # Initialize NPxG session for efficient batch processing
+        self.npxg_session = None
+        if parameters.get('npxg_fixture', {}).get('enabled', False):
+            # Calculate NPxG weight from slider value
+            slider_value = self.v2_config.get('exponential_fixture', {}).get('base', 1.45)
+            middle = 1.325
+            if slider_value <= middle:
+                npxg_weight = 0.80 + (slider_value - 1.15) / (middle - 1.15) * 0.20
+            else:
+                npxg_weight = 1.00 + (slider_value - middle) / (1.50 - middle) * 0.20
+            npxg_weight = max(0.80, min(1.20, npxg_weight))
+
+            # Create session with all data pre-loaded
+            self.npxg_session = NPxGFixtureSession(db_config, npxg_weight)
+
         logger.info(f"FormulaEngineV2 initialized - GW{self.current_gameweek}")  
     def _get_primary_position(self, position: str) -> str:
         """
@@ -388,41 +404,44 @@ class FormulaEngineV2:
         # Check if NPxG fixture is enabled
         npxg_config = self.params.get('npxg_fixture', {})
         if not npxg_config.get('enabled', False):
-            # Fallback to stored npxg_fixture_multiplier if available
-            stored_multiplier = player_data.get('npxg_fixture_multiplier')
-            if stored_multiplier is not None:
-                return float(stored_multiplier)
+            logger.debug(f"NPxG fixture disabled for player {player_data.get('name', 'unknown')}")
             return 1.0
 
-        # Use stored npxg_fixture_multiplier if available
-        stored_multiplier = player_data.get('npxg_fixture_multiplier')
-        if stored_multiplier is not None:
-            return float(stored_multiplier)
+        # Use the pre-initialized session for efficient calculation
+        if self.npxg_session:
+            try:
+                multiplier = self.npxg_session.calculate_multiplier(player_data)
 
-        try:
-            # Get fixture base parameter to use as NPxG weight
-            fixture_config = self.params.get('formula_optimization_v2', {}).get('exponential_fixture', {})
-            slider_value = fixture_config.get('base', 1.45)
+                # Debug logging to track what's being calculated
+                if player_data.get('name', '').startswith('Erling'):
+                    logger.info(f"NPxG calc for {player_data.get('name')}: "
+                              f"multiplier={multiplier:.3f}, is_home={player_data.get('is_home')}")
 
-            # Convert from slider range (1.15-1.50) to weight (0.80-1.20)
-            # Middle point 1.325 = 1.0 (neutral, no change)
-            # 1.15 = 0.80 (tighten by 20%, brings values closer to 1.0)
-            # 1.50 = 1.20 (widen by 20%, increases range)
-            middle = 1.325
-            if slider_value <= middle:
-                # Tightening range: 1.15-1.325 maps to 0.80-1.00
-                npxg_weight = 0.80 + (slider_value - 1.15) / (middle - 1.15) * 0.20
-            else:
-                # Widening range: 1.325-1.50 maps to 1.00-1.20
-                npxg_weight = 1.00 + (slider_value - middle) / (1.50 - middle) * 0.20
+                return multiplier
+            except Exception as e:
+                logger.warning(f"Error calculating NPxG fixture multiplier with session: {e}")
+                return 1.0
+        else:
+            # Fallback to old method if session not initialized (shouldn't happen)
+            try:
+                # Get fixture base parameter to use as NPxG weight
+                fixture_config = self.params.get('formula_optimization_v2', {}).get('exponential_fixture', {})
+                slider_value = fixture_config.get('base', 1.45)
 
-            npxg_weight = max(0.80, min(1.20, npxg_weight))  # Ensure bounds
-            # Calculate multiplier using NPxG module with weight
-            multiplier = get_npxg_multiplier_for_player(player_data, self.db_config, npxg_weight)
-            return multiplier
-        except Exception as e:
-            logger.warning(f"Error calculating NPxG fixture multiplier: {e}")
-            return 1.0
+                middle = 1.325
+                if slider_value <= middle:
+                    npxg_weight = 0.80 + (slider_value - 1.15) / (middle - 1.15) * 0.20
+                else:
+                    npxg_weight = 1.00 + (slider_value - middle) / (1.50 - middle) * 0.20
+
+                npxg_weight = max(0.80, min(1.20, npxg_weight))
+                multiplier = get_npxg_multiplier_for_player(player_data, self.db_config, npxg_weight)
+
+                logger.warning("Using fallback NPxG calculation (not optimized)")
+                return multiplier
+            except Exception as e:
+                logger.warning(f"Error calculating NPxG fixture multiplier: {e}")
+                return 1.0
     
     def _calculate_xgi_multiplier(self, player_data: Dict[str, Any]) -> float:
         """
