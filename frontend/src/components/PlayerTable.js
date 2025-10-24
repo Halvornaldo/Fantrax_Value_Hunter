@@ -54,6 +54,8 @@ const PlayerTable = ({ playersData, gameweekInfo, systemConfig, onDataRefresh })
   const [minutesThreshold, setMinutesThreshold] = useState(180);
   const [starterFilterEnabled, setStarterFilterEnabled] = useState(false);
   const [starterThreshold, setStarterThreshold] = useState(0.8);
+  const [roiFilterEnabled, setRoiFilterEnabled] = useState(false);
+  const [roiThreshold, setRoiThreshold] = useState(0.75);
   const [overrideFilter, setOverrideFilter] = useState('All');
   const [includeAllPlayers, setIncludeAllPlayers] = useState(false);
 
@@ -81,6 +83,11 @@ const PlayerTable = ({ playersData, gameweekInfo, systemConfig, onDataRefresh })
   // Helper function to adjust starter threshold
   const adjustStarterThreshold = (increment) => {
     setStarterThreshold(prev => Math.max(0, Math.min(1, prev + (increment ? 0.05 : -0.05))));
+  };
+
+  // Helper function to adjust ROI threshold
+  const adjustRoiThreshold = (increment) => {
+    setRoiThreshold(prev => Math.max(0, prev + (increment ? 0.05 : -0.05)));
   };
 
   // Gradient color functions
@@ -978,6 +985,12 @@ const PlayerTable = ({ playersData, gameweekInfo, systemConfig, onDataRefresh })
         if (starterMultiplier < starterThreshold) return false;
       }
 
+      // ROI threshold filter
+      if (roiFilterEnabled) {
+        const roi = player.roi || 0;
+        if (roi < roiThreshold) return false;
+      }
+
       // Override filter
       if (overrideFilter !== 'All') {
         const hasOverride = player.override_type && player.override_type !== 'auto';
@@ -987,7 +1000,7 @@ const PlayerTable = ({ playersData, gameweekInfo, systemConfig, onDataRefresh })
 
       return true;
     });
-  }, [playersData, positionFilter, priceMin, priceMax, teamFilter, searchTerm, historicalDataFilter, minutesFilterEnabled, minutesThreshold, starterFilterEnabled, starterThreshold, overrideFilter]);
+  }, [playersData, positionFilter, priceMin, priceMax, teamFilter, searchTerm, historicalDataFilter, minutesFilterEnabled, minutesThreshold, starterFilterEnabled, starterThreshold, roiFilterEnabled, roiThreshold, overrideFilter]);
 
   // Calculate maximum values for dynamic color coding
   const columnMaxValues = useMemo(() => {
@@ -1327,6 +1340,49 @@ const PlayerTable = ({ playersData, gameweekInfo, systemConfig, onDataRefresh })
                 size="small"
                 onClick={() => adjustStarterThreshold(true)}
                 disabled={!starterFilterEnabled}
+                sx={{ bgcolor: isDark ? 'rgba(255,255,255,0.1)' : 'rgba(0,0,0,0.1)' }}
+              >
+                <Add fontSize="small" />
+              </IconButton>
+            </Box>
+          </Grid>
+
+          {/* ROI Filter */}
+          <Grid item>
+            <FormControlLabel
+              control={
+                <Checkbox
+                  checked={roiFilterEnabled}
+                  onChange={(e) => setRoiFilterEnabled(e.target.checked)}
+                  size="small"
+                />
+              }
+              label="Min ROI"
+            />
+          </Grid>
+          <Grid item>
+            <Box sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
+              <IconButton
+                size="small"
+                onClick={() => adjustRoiThreshold(false)}
+                disabled={!roiFilterEnabled}
+                sx={{ bgcolor: isDark ? 'rgba(255,255,255,0.1)' : 'rgba(0,0,0,0.1)' }}
+              >
+                <Remove fontSize="small" />
+              </IconButton>
+              <TextField
+                type="number"
+                value={roiThreshold.toFixed(2)}
+                onChange={(e) => setRoiThreshold(parseFloat(e.target.value) || 0.75)}
+                size="small"
+                disabled={!roiFilterEnabled}
+                sx={{ width: 80 }}
+                inputProps={{ step: 0.05, min: 0 }}
+              />
+              <IconButton
+                size="small"
+                onClick={() => adjustRoiThreshold(true)}
+                disabled={!roiFilterEnabled}
                 sx={{ bgcolor: isDark ? 'rgba(255,255,255,0.1)' : 'rgba(0,0,0,0.1)' }}
               >
                 <Add fontSize="small" />
