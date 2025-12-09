@@ -6,9 +6,9 @@
   },
   "xgi_integration": {
     "enabled": true,
-    "last_sync": 1761035432.3060126,
-    "matched_players": 438,
-    "unmatched_players": 1,
+    "last_sync": 1764939499.7350483,
+    "matched_players": 456,
+    "unmatched_players": 5,
     "description": "xGI integration toggle and statistics"
   },
   "starter_prediction": {
@@ -31,7 +31,7 @@
     },
     "exponential_form": {
       "enabled": true,
-      "alpha": 0.54
+      "alpha": 0.64
     },
     "dynamic_blending": {
       "enabled": true,
@@ -97,13 +97,13 @@
       "description": "Progressive form ranges based on sample size for balanced multiplier impact"
     },
     "multiplier_caps": {
-      "form": 1.8,
-      "fixture": 2.2,
+      "form": 1.9,
+      "fixture": 2.1,
       "xgi": 2,
       "global": 3
     },
     "ewma_form": {
-      "alpha": 0.54
+      "alpha": 0.64
     },
     "positional_xgi": {
       "enabled": true,
@@ -160,9 +160,9 @@
       "max": 2.5
     },
     "description": "NPxG-based fixture difficulty with position-specific formulas and home/away adjustments. Weight controlled by exponential_fixture.base parameter (mapped from Fixture Base slider).",
-    "last_sync": 1761035694.1750338,
+    "last_sync": 1764939569.3525772,
     "teams_updated": 20,
-    "league_avg_npxg": 10.568,
-    "league_avg_npxga": 10.568
+    "league_avg_npxg": 18.841,
+    "league_avg_npxga": 18.841
   }
 }

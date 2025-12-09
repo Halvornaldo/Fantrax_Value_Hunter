@@ -335,7 +335,8 @@ src/
 ├── fixture_difficulty_v2.py       # Exponential difficulty calculation
 ├── form_tracker_v2.py             # EWMA form calculation
 └── name_matching/                  # Enhanced name matching system
-    ├── unified_matcher_v2.py       # V2.0 matching service
+    ├── 
+       # V2.0 matching service
     ├── matching_strategies.py      # Advanced matching algorithms
     └── suggestion_engine_v2.py     # AI-powered suggestions
 ```
