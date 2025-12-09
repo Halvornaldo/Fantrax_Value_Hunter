@@ -1,7 +1,7 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import { ThemeProvider, createTheme } from '@mui/material/styles';
 import { CssBaseline, Box, IconButton, Toolbar, AppBar, Button, Menu, MenuItem, Divider } from '@mui/material';
-import { Brightness4, Brightness7, Upload, CloudSync, Archive, SportsEsports, Sports } from '@mui/icons-material';
+import { Brightness4, Brightness7, Upload, CloudSync, Archive, SportsEsports, Sports, FileUpload } from '@mui/icons-material';
 import Banner from './components/Banner';
 import Dashboard from './components/Dashboard';
 import './App.css';
@@ -11,8 +11,12 @@ const App = () => {
     const saved = localStorage.getItem('darkMode');
     return saved !== null ? JSON.parse(saved) : true;
   });
-  
+
   const [uploadMenuAnchor, setUploadMenuAnchor] = useState(null);
+
+  // Refs for hidden file inputs
+  const npxgCsvInputRef = useRef(null);
+  const understatCsvInputRef = useRef(null);
 
   useEffect(() => {
     localStorage.setItem('darkMode', JSON.stringify(darkMode));
@@ -140,7 +144,7 @@ const App = () => {
     try {
       const response = await fetch('http://localhost:5001/api/archive-week', { method: 'POST' });
       const result = await response.json();
-      
+
       if (result.success) {
         alert(`${result.message}\n\nArchived ${result.archived_data.players} players, ${result.archived_data.form_records} form records\n\n${result.next_steps}`);
       } else {
@@ -149,6 +153,90 @@ const App = () => {
     } catch (error) {
       alert('Archive failed: ' + error.message);
     }
+    handleUploadMenuClose();
+  };
+
+  // CSV Import Handlers (Workaround for broken ScraperFC)
+  const handleNPxGCsvUpload = async (event) => {
+    const file = event.target.files[0];
+    if (!file) return;
+
+    const formData = new FormData();
+    formData.append('file', file);
+
+    try {
+      const response = await fetch('/api/npxg/import-team-csv', {
+        method: 'POST',
+        body: formData,
+      });
+      const result = await response.json();
+
+      if (result.success) {
+        alert(`NPxG CSV import completed!\n\nTeams updated: ${result.teams_updated}\nLeague avg NPxG: ${result.league_avg_npxg}\nLeague avg NPxGA: ${result.league_avg_npxga}`);
+      } else {
+        alert('NPxG CSV import failed: ' + (result.error || 'Unknown error'));
+      }
+    } catch (error) {
+      alert('NPxG CSV import failed: ' + error.message);
+    }
+
+    // Reset file input
+    event.target.value = '';
+    handleUploadMenuClose();
+  };
+
+  const handleUnderstatCsvUpload = async (event) => {
+    const file = event.target.files[0];
+    if (!file) return;
+
+    const formData = new FormData();
+    formData.append('file', file);
+
+    try {
+      const response = await fetch('/api/understat/import-player-csv', {
+        method: 'POST',
+        body: formData,
+      });
+      const result = await response.json();
+
+      if (result.verification_needed && result.unmatched_players > 0) {
+        // Show confirmation with stats, then redirect to validation page
+        const shouldVerify = window.confirm(
+          `CSV parsed successfully!\n\nMatched: ${result.successfully_matched} players\nNeed verification: ${result.unmatched_players} players\n\nWould you like to verify unmatched players now?`
+        );
+
+        if (shouldVerify) {
+          // Store matched data for later application
+          sessionStorage.setItem('understat_csv_matched', JSON.stringify(result.matched_data));
+          window.location.href = 'http://localhost:5001/import-validation?source=understat_csv';
+        } else {
+          // Apply only matched players immediately
+          const applyResponse = await fetch('/api/understat/apply-player-csv', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ matched_players: result.matched_data, confirmed_mappings: {} }),
+          });
+          const applyResult = await applyResponse.json();
+          alert(`Applied ${applyResult.players_updated} matched players. ${result.unmatched_players} players skipped.`);
+        }
+      } else if (result.success) {
+        // All players matched - apply immediately
+        const applyResponse = await fetch('/api/understat/apply-player-csv', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ matched_players: result.matched_data, confirmed_mappings: {} }),
+        });
+        const applyResult = await applyResponse.json();
+        alert(`Understat CSV import completed!\n\nPlayers updated: ${applyResult.players_updated}`);
+      } else {
+        alert('Understat CSV import failed: ' + (result.error || 'Unknown error'));
+      }
+    } catch (error) {
+      alert('Understat CSV import failed: ' + error.message);
+    }
+
+    // Reset file input
+    event.target.value = '';
     handleUploadMenuClose();
   };
 
@@ -181,6 +269,22 @@ const App = () => {
               Upload & Sync
             </Button>
             
+            {/* Hidden file inputs for CSV uploads */}
+            <input
+              type="file"
+              ref={npxgCsvInputRef}
+              style={{ display: 'none' }}
+              accept=".csv"
+              onChange={handleNPxGCsvUpload}
+            />
+            <input
+              type="file"
+              ref={understatCsvInputRef}
+              style={{ display: 'none' }}
+              accept=".csv"
+              onChange={handleUnderstatCsvUpload}
+            />
+
             <Menu
               anchorEl={uploadMenuAnchor}
               open={Boolean(uploadMenuAnchor)}
@@ -197,14 +301,28 @@ const App = () => {
                 sx={{ color: darkMode ? '#ffffff' : '#333333' }}
               >
                 <CloudSync sx={{ mr: 1 }} />
-                Sync Understat
+                Sync Understat (API)
+              </MenuItem>
+              <MenuItem
+                onClick={() => understatCsvInputRef.current?.click()}
+                sx={{ color: darkMode ? '#ffffff' : '#333333', pl: 4 }}
+              >
+                <FileUpload sx={{ mr: 1, fontSize: '1rem' }} />
+                Import Understat CSV
               </MenuItem>
               <MenuItem
                 onClick={handleSyncNPxGTeams}
                 sx={{ color: darkMode ? '#ffffff' : '#333333' }}
               >
                 <Sports sx={{ mr: 1 }} />
-                Sync NPxG Teams
+                Sync NPxG Teams (API)
+              </MenuItem>
+              <MenuItem
+                onClick={() => npxgCsvInputRef.current?.click()}
+                sx={{ color: darkMode ? '#ffffff' : '#333333', pl: 4 }}
+              >
+                <FileUpload sx={{ mr: 1, fontSize: '1rem' }} />
+                Import NPxG CSV
               </MenuItem>
               <MenuItem
                 onClick={() => { window.open('http://localhost:5001/railway-sync', '_blank'); handleUploadMenuClose(); }}

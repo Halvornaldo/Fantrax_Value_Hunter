@@ -4386,6 +4386,303 @@ def apply_understat_mappings():
             'debug': True
         }), 500
 
+
+@app.route('/api/understat/import-player-csv', methods=['POST'])
+def import_understat_player_csv():
+    """
+    Import Understat player xGI data from CSV export.
+    Workaround for broken ScraperFC library.
+
+    Expected CSV format (semicolon-delimited):
+    "number";"player";"team";"apps";"min";"goals";"a";"xG";"xA";"xG90";"xA90";"xG90xA90"
+    """
+    try:
+        if 'file' not in request.files:
+            return jsonify({'error': 'No file uploaded'}), 400
+
+        file = request.files['file']
+        if file.filename == '':
+            return jsonify({'error': 'No file selected'}), 400
+
+        # Read CSV content
+        import io
+        import csv
+
+        content = file.read().decode('utf-8-sig')  # Handle BOM
+        reader = csv.DictReader(io.StringIO(content), delimiter=';')
+
+        # Extract player data from CSV
+        csv_players = []
+        for row in reader:
+            player_name = row.get('player', '').strip('"')
+            team = row.get('team', '').strip('"')
+
+            # Skip empty rows
+            if not player_name:
+                continue
+
+            csv_players.append({
+                'player_name': player_name,
+                'team': team,
+                'apps': int(row.get('apps', 0)),
+                'minutes': int(row.get('min', 0)),
+                'xG': float(row.get('xG', 0)),
+                'xA': float(row.get('xA', 0)),
+                'xG90': float(row.get('xG90', 0)),
+                'xA90': float(row.get('xA90', 0)),
+                'xGI90': float(row.get('xG90xA90', 0))  # CSV calls it xG90xA90
+            })
+
+        # Use Global Name Matching System for player matching
+        matcher = UnifiedNameMatcher(DB_CONFIG)
+        matched_players = []
+        unmatched_players = []
+
+        for player in csv_players:
+            match_result = matcher.match_player(
+                source_name=player['player_name'],
+                source_system='understat',
+                team=player['team'],
+                position=None
+            )
+
+            if match_result['fantrax_id'] is not None and match_result['confidence'] >= 70:
+                # High confidence match
+                player['fantrax_id'] = match_result['fantrax_id']
+                player['fantrax_name'] = match_result['fantrax_name']
+                player['confidence'] = match_result['confidence']
+                matched_players.append(player)
+            else:
+                # Low confidence or no match - needs manual review
+                player['suggestions'] = match_result.get('suggested_matches', [])
+                player['needs_review'] = True
+                player['confidence'] = match_result.get('confidence', 0)
+                unmatched_players.append(player)
+
+        # Save unmatched players for validation UI
+        if unmatched_players:
+            validation_data = {
+                'source_system': 'understat_csv',
+                'unmatched_players': unmatched_players,
+                'matched_players': matched_players,
+                'timestamp': time.time()
+            }
+
+            temp_dir = os.path.join(os.path.dirname(__file__), '..', 'temp')
+            os.makedirs(temp_dir, exist_ok=True)
+            with open(os.path.join(temp_dir, 'understat_csv_unmatched.json'), 'w') as f:
+                json.dump(validation_data, f)
+
+        # Calculate match rate
+        total_players = len(matched_players) + len(unmatched_players)
+        match_rate = (len(matched_players) / total_players * 100) if total_players > 0 else 0
+
+        response_data = {
+            'success': True,
+            'total_csv_players': total_players,
+            'successfully_matched': len(matched_players),
+            'unmatched_players': len(unmatched_players),
+            'match_rate': match_rate,
+            'matched_data': matched_players,
+            'unmatched_data': unmatched_players
+        }
+
+        if len(unmatched_players) > 0:
+            response_data['verification_needed'] = True
+            response_data['message'] = f'CSV parsed. {len(unmatched_players)} players need manual verification.'
+        else:
+            response_data['verification_needed'] = False
+            response_data['message'] = f'All {total_players} players matched successfully.'
+
+        return jsonify(response_data)
+
+    except Exception as e:
+        import traceback
+        traceback.print_exc()
+        return jsonify({'error': f'CSV import failed: {str(e)}'}), 500
+
+
+@app.route('/api/understat/apply-player-csv', methods=['POST'])
+def apply_understat_player_csv():
+    """
+    Apply Understat CSV data to database after validation.
+    Accepts both auto-matched and manually confirmed players.
+    """
+    try:
+        data = request.get_json()
+        matched_players = data.get('matched_players', [])
+        confirmed_mappings = data.get('confirmed_mappings', {})
+
+        if not matched_players and not confirmed_mappings:
+            return jsonify({'error': 'No player data to apply'}), 400
+
+        conn = get_db_connection()
+        cursor = conn.cursor()
+
+        # Load system parameters to get current bench penalty
+        params = load_system_parameters()
+        starter_config = params.get('starter_prediction', {})
+        bench_penalty = starter_config.get('force_bench_penalty', 0.15)
+
+        # First, reset all players to baseline (same as regular sync)
+        cursor.execute("""
+            UPDATE players
+            SET minutes = 0,
+                games_current_season = 0,
+                xg90 = 0,
+                xa90 = 0,
+                xgi90 = 0,
+                last_understat_update = CURRENT_TIMESTAMP
+        """)
+        players_reset = cursor.rowcount
+
+        # Reset starter_multiplier to default
+        cursor.execute("""
+            UPDATE player_metrics
+            SET starter_multiplier = %s
+            WHERE gameweek = 1
+        """, [bench_penalty])
+
+        updated_count = 0
+
+        # Apply auto-matched players
+        for player in matched_players:
+            fantrax_id = player.get('fantrax_id')
+            if not fantrax_id:
+                continue
+
+            xg90_val = round(float(player.get('xG90', 0)), 3)
+            xa90_val = round(float(player.get('xA90', 0)), 3)
+            xgi90_val = round(float(player.get('xGI90', xg90_val + xa90_val)), 3)
+            minutes = int(player.get('minutes', 0))
+            games = int(player.get('apps', 0))
+
+            cursor.execute("""
+                UPDATE players
+                SET minutes = %s, xg90 = %s, xa90 = %s, xgi90 = %s,
+                    games_current_season = %s,
+                    last_understat_update = CURRENT_TIMESTAMP
+                WHERE id = %s
+            """, [minutes, xg90_val, xa90_val, xgi90_val, games, fantrax_id])
+
+            # Also update raw snapshots
+            cursor.execute("""
+                UPDATE raw_player_snapshots
+                SET minutes_played = %s, xg90 = %s, xa90 = %s, xgi90 = %s,
+                    games_current_season = %s,
+                    understat_import = TRUE, import_timestamp = NOW()
+                WHERE player_id = %s
+            """, [minutes, xg90_val, xa90_val, xgi90_val, games, fantrax_id])
+
+            updated_count += 1
+
+        # Apply manually confirmed mappings
+        # Load saved unmatched data to get the original xGI data
+        temp_file = os.path.join(os.path.dirname(__file__), '..', 'temp', 'understat_csv_unmatched.json')
+        saved_data = None
+        if os.path.exists(temp_file):
+            with open(temp_file, 'r') as f:
+                saved_data = json.load(f)
+
+        for original_name, mapping in confirmed_mappings.items():
+            fantrax_id = mapping.get('fantrax_id')
+            fantrax_name = mapping.get('fantrax_name')
+
+            if not fantrax_id:
+                continue
+
+            # Find the original CSV data for this player
+            player_data = None
+            if saved_data:
+                for player in saved_data.get('unmatched_players', []):
+                    if player.get('player_name') == original_name:
+                        player_data = player
+                        break
+
+            if not player_data:
+                print(f"Warning: Could not find CSV data for {original_name}")
+                continue
+
+            xg90_val = round(float(player_data.get('xG90', 0)), 3)
+            xa90_val = round(float(player_data.get('xA90', 0)), 3)
+            xgi90_val = round(float(player_data.get('xGI90', xg90_val + xa90_val)), 3)
+            minutes = int(player_data.get('minutes', 0))
+            games = int(player_data.get('apps', 0))
+
+            cursor.execute("""
+                UPDATE players
+                SET minutes = %s, xg90 = %s, xa90 = %s, xgi90 = %s,
+                    games_current_season = %s,
+                    last_understat_update = CURRENT_TIMESTAMP
+                WHERE id = %s
+            """, [minutes, xg90_val, xa90_val, xgi90_val, games, fantrax_id])
+
+            cursor.execute("""
+                UPDATE raw_player_snapshots
+                SET minutes_played = %s, xg90 = %s, xa90 = %s, xgi90 = %s,
+                    games_current_season = %s,
+                    understat_import = TRUE, import_timestamp = NOW()
+                WHERE player_id = %s
+            """, [minutes, xg90_val, xa90_val, xgi90_val, games, fantrax_id])
+
+            # Save mapping to name_mappings table for future use
+            cursor.execute("""
+                INSERT INTO name_mappings (
+                    source_system, source_name, fantrax_id, fantrax_name,
+                    confidence_score, match_type, verified, verification_date,
+                    verified_by, last_used, usage_count
+                )
+                VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s)
+                ON CONFLICT (source_system, source_name) DO UPDATE SET
+                    fantrax_id = EXCLUDED.fantrax_id,
+                    fantrax_name = EXCLUDED.fantrax_name,
+                    confidence_score = EXCLUDED.confidence_score,
+                    verified = EXCLUDED.verified,
+                    verification_date = EXCLUDED.verification_date,
+                    last_used = EXCLUDED.last_used,
+                    usage_count = name_mappings.usage_count + 1,
+                    updated_at = CURRENT_TIMESTAMP
+            """, (
+                'understat', original_name, fantrax_id, fantrax_name,
+                mapping.get('confidence', 100.0), 'manual', True,
+                datetime.now(), 'csv_import', datetime.now(), 1
+            ))
+
+            updated_count += 1
+
+        conn.commit()
+        cursor.close()
+        conn.close()
+
+        # Clean up temp file
+        if os.path.exists(temp_file):
+            os.remove(temp_file)
+
+        # Update system parameters
+        system_params = load_system_parameters()
+        if 'xgi_integration' not in system_params:
+            system_params['xgi_integration'] = {}
+        system_params['xgi_integration']['last_sync'] = time.time()
+        system_params['xgi_integration']['source'] = 'csv_import'
+        system_params['xgi_integration']['matched_players'] = len(matched_players)
+        system_params['xgi_integration']['manual_mappings'] = len(confirmed_mappings)
+        save_system_parameters(system_params)
+
+        return jsonify({
+            'success': True,
+            'players_updated': updated_count,
+            'players_reset': players_reset,
+            'auto_matched': len(matched_players),
+            'manual_mapped': len(confirmed_mappings),
+            'message': f'Successfully updated {updated_count} players with Understat CSV data'
+        })
+
+    except Exception as e:
+        import traceback
+        traceback.print_exc()
+        return jsonify({'error': f'Failed to apply CSV data: {str(e)}'}), 500
+
+
 def parse_formation_csv(lines, cursor):
     """
     Parse formation matrix CSV format from FFS scraping.
@@ -5572,6 +5869,127 @@ def validate_game_scores():
         traceback.print_exc()
         return jsonify({'error': f'Validation failed: {str(e)}'}), 500
 
+
+@app.route('/api/validate-game-scores-csv', methods=['POST'])
+def validate_game_scores_csv():
+    """
+    Validate game scores using Understat CSV export (filtered by gameweek dates).
+    Workaround for broken ScraperFC library.
+
+    Expected CSV format (semicolon-delimited, filtered by gameweek dates on Understat):
+    "number";"player";"team";"apps";"min";"goals";"a";"xG";"xA";"xG90";"xA90";"xG90xA90"
+
+    Players with min > 0 are considered to have played in the gameweek.
+    """
+    try:
+        if 'file' not in request.files:
+            return jsonify({'error': 'No file uploaded'}), 400
+
+        file = request.files['file']
+        if file.filename == '':
+            return jsonify({'error': 'No file selected'}), 400
+
+        # Get game_number from form data
+        game_number = request.form.get('game_number')
+        if not game_number:
+            return jsonify({'error': 'game_number is required'}), 400
+        game_number = int(game_number)
+
+        # Read CSV content
+        import io
+        import csv
+
+        content = file.read().decode('utf-8-sig')  # Handle BOM
+        reader = csv.DictReader(io.StringIO(content), delimiter=';')
+
+        # Extract players who played (min > 0)
+        players_who_played = []
+        for row in reader:
+            player_name = row.get('player', '').strip('"')
+            team = row.get('team', '').strip('"')
+            minutes = int(row.get('min', 0))
+
+            # Only include players who actually played
+            if player_name and minutes > 0:
+                players_who_played.append({
+                    'player_name': player_name,
+                    'team': team,
+                    'minutes': minutes
+                })
+
+        print(f"CSV Validation: Found {len(players_who_played)} players who played in Game {game_number}")
+
+        # Use Global Name Matching System for player matching
+        matcher = UnifiedNameMatcher(DB_CONFIG)
+        matched_players = []
+        unmatched_players = []
+
+        for player in players_who_played:
+            match_result = matcher.match_player(
+                source_name=player['player_name'],
+                source_system='understat',
+                team=player['team'],
+                position=None
+            )
+
+            if match_result['fantrax_id'] is not None and match_result['confidence'] >= 70:
+                matched_players.append({
+                    'understat_name': player['player_name'],
+                    'fantrax_id': match_result['fantrax_id'],
+                    'fantrax_name': match_result['fantrax_name'],
+                    'confidence': match_result['confidence'],
+                    'minutes': player['minutes']
+                })
+            else:
+                unmatched_players.append({
+                    'understat_name': player['player_name'],
+                    'team': player['team'],
+                    'minutes': player['minutes'],
+                    'suggestions': match_result.get('suggested_matches', []),
+                    'confidence': match_result.get('confidence', 0)
+                })
+
+        print(f"CSV Validation: Matched {len(matched_players)}/{len(players_who_played)} players automatically")
+
+        # Get current game scores for this gameweek
+        conn = get_db_connection()
+        cursor = conn.cursor(cursor_factory=psycopg2.extras.RealDictCursor)
+
+        cursor.execute("""
+            SELECT pgs.id, pgs.player_id, pgs.points_scored, pgs.did_play,
+                   p.name as player_name
+            FROM player_game_scores pgs
+            JOIN players p ON pgs.player_id = p.id
+            WHERE pgs.game_number = %s
+        """, (game_number,))
+
+        game_scores = cursor.fetchall()
+        cursor.close()
+        conn.close()
+
+        print(f"CSV Validation: Found {len(game_scores)} game score records for Game {game_number}")
+
+        # Return validation data in same format as ScraperFC endpoint
+        return jsonify({
+            'success': True,
+            'game_number': game_number,
+            'understat_players_found': len(players_who_played),
+            'matched_automatically': len(matched_players),
+            'need_manual_matching': len(unmatched_players),
+            'matched_players': matched_players,
+            'unmatched_players': unmatched_players,
+            'game_scores_total': len(game_scores),
+            'message': f'Found {len(players_who_played)} players who played in Game {game_number} (from CSV)',
+            'source': 'csv_import'
+        })
+
+    except Exception as e:
+        print(f"Error in validate_game_scores_csv: {str(e)}")
+        import traceback
+        traceback.print_exc()
+        return jsonify({'error': f'CSV validation failed: {str(e)}'}), 500
+
+
 @app.route('/api/apply-game-validation', methods=['POST'])
 def apply_game_validation():
     """
@@ -5849,6 +6267,137 @@ def sync_npxg_team_stats():
 
     except Exception as e:
         return jsonify({'error': str(e)}), 500
+
+
+@app.route('/api/npxg/import-team-csv', methods=['POST'])
+def import_npxg_team_csv():
+    """
+    Import NPxG team statistics from Understat CSV export.
+    Workaround for broken ScraperFC library.
+
+    Expected CSV format (semicolon-delimited):
+    "number";"team";"matches";"wins";"draws";"loses";"goals";"ga";"points";"xG";"NPxG";"xGA";"NPxGA";"xPTS"
+    """
+    try:
+        if 'file' not in request.files:
+            return jsonify({'error': 'No file uploaded'}), 400
+
+        file = request.files['file']
+        if file.filename == '':
+            return jsonify({'error': 'No file selected'}), 400
+
+        # Read CSV content
+        import io
+        import csv
+
+        content = file.read().decode('utf-8-sig')  # Handle BOM
+        reader = csv.DictReader(io.StringIO(content), delimiter=';')
+
+        # Team name to code mapping (same as ScraperFC endpoint)
+        team_code_mapping = {
+            'Manchester United': 'MUN',
+            'Manchester City': 'MCI',
+            'Arsenal': 'ARS',
+            'Liverpool': 'LIV',
+            'Chelsea': 'CHE',
+            'Tottenham': 'TOT',
+            'Newcastle United': 'NEW',
+            'Brighton': 'BHA',
+            'Aston Villa': 'AVL',
+            'West Ham': 'WHU',
+            'Crystal Palace': 'CRY',
+            'Fulham': 'FUL',
+            'Brentford': 'BRE',
+            'Wolverhampton Wanderers': 'WOL',
+            'Wolverhampton': 'WOL',
+            'Everton': 'EVE',
+            'Bournemouth': 'BOU',
+            'Nottingham Forest': 'NFO',
+            'Leeds United': 'LEE',
+            'Leeds': 'LEE',
+            'Burnley': 'BUR',
+            'Sunderland': 'SUN',
+            'Leicester City': 'LEI',
+            'Ipswich Town': 'IPS',
+            'Southampton': 'SOU'
+        }
+
+        conn = get_db_connection()
+        cursor = conn.cursor()
+
+        # Clear existing team metrics
+        cursor.execute("DELETE FROM team_metrics")
+
+        updated_teams = 0
+        league_totals = {'npxg': 0, 'npxga': 0, 'matches': 0}
+
+        for row in reader:
+            # Extract data from CSV columns
+            team_name = row.get('team', '').strip('"')
+            npxg = float(row.get('NPxG', 0))
+            npxga = float(row.get('NPxGA', 0))
+            matches_played = int(row.get('matches', 0))
+
+            # Calculate NPxGD (Difference)
+            npxgd = npxg - npxga
+
+            # Get team code
+            team_code = team_code_mapping.get(team_name, team_name[:3].upper())
+
+            # Insert team metrics
+            cursor.execute("""
+                INSERT INTO team_metrics (team_code, team_name, npxg, npxga, npxgd, matches_played, last_updated)
+                VALUES (%s, %s, %s, %s, %s, %s, CURRENT_TIMESTAMP)
+                ON CONFLICT (team_code) DO UPDATE SET
+                    team_name = EXCLUDED.team_name,
+                    npxg = EXCLUDED.npxg,
+                    npxga = EXCLUDED.npxga,
+                    npxgd = EXCLUDED.npxgd,
+                    matches_played = EXCLUDED.matches_played,
+                    last_updated = EXCLUDED.last_updated
+            """, [team_code, team_name, npxg, npxga, npxgd, matches_played])
+
+            # Accumulate league totals
+            league_totals['npxg'] += npxg
+            league_totals['npxga'] += npxga
+            league_totals['matches'] += matches_played
+            updated_teams += 1
+
+        # Calculate league averages
+        total_teams = updated_teams
+        league_avg_npxg = league_totals['npxg'] / total_teams if total_teams > 0 else 0
+        league_avg_npxga = league_totals['npxga'] / total_teams if total_teams > 0 else 0
+
+        conn.commit()
+        cursor.close()
+        conn.close()
+
+        # Update system parameters with sync timestamp
+        system_params = load_system_parameters()
+        if 'npxg_fixture' not in system_params:
+            system_params['npxg_fixture'] = {}
+
+        system_params['npxg_fixture']['last_sync'] = time.time()
+        system_params['npxg_fixture']['teams_updated'] = updated_teams
+        system_params['npxg_fixture']['league_avg_npxg'] = round(league_avg_npxg, 3)
+        system_params['npxg_fixture']['league_avg_npxga'] = round(league_avg_npxga, 3)
+        system_params['npxg_fixture']['source'] = 'csv_import'
+        save_system_parameters(system_params)
+
+        return jsonify({
+            'success': True,
+            'teams_updated': updated_teams,
+            'league_avg_npxg': round(league_avg_npxg, 3),
+            'league_avg_npxga': round(league_avg_npxga, 3),
+            'total_matches': league_totals['matches'],
+            'message': f'Successfully imported NPxG data for {updated_teams} Premier League teams from CSV'
+        })
+
+    except Exception as e:
+        import traceback
+        traceback.print_exc()
+        return jsonify({'error': f'CSV import failed: {str(e)}'}), 500
+
 
 @app.route('/api/railway/sync', methods=['POST'])
 def sync_to_railway():

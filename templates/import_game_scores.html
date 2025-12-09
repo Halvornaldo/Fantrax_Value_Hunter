@@ -106,6 +106,23 @@
             box-shadow: 0 5px 15px rgba(23, 162, 184, 0.4);
         }
 
+        .validate-csv-btn {
+            background: linear-gradient(135deg, #fd7e14, #dc3545);
+            color: white;
+            border: none;
+            padding: 12px 25px;
+            font-size: 14px;
+            border-radius: 6px;
+            cursor: pointer;
+            transition: all 0.3s ease;
+            margin-left: 10px;
+        }
+
+        .validate-csv-btn:hover {
+            transform: translateY(-2px);
+            box-shadow: 0 5px 15px rgba(253, 126, 20, 0.4);
+        }
+
         .result {
             padding: 20px;
             border-radius: 6px;
@@ -294,9 +311,29 @@
                 </button>
 
                 <button type="button" class="validate-btn" id="validateBtn" style="display: none;">
-                    🔍 Run Validation
+                    🔍 Run Validation (API)
+                </button>
+
+                <button type="button" class="validate-csv-btn" id="validateCsvBtn" style="display: none;">
+                    📄 Validate from CSV
                 </button>
             </form>
+
+            <!-- CSV Validation Section (shown after import) -->
+            <div id="csvValidationSection" style="display: none; margin-top: 20px; padding: 15px; background: #e7f5ff; border-radius: 6px; border: 1px solid #74c0fc;">
+                <strong>📄 CSV Validation (ScraperFC Workaround)</strong>
+                <p style="margin: 10px 0;">If API validation fails, download player stats from Understat filtered by gameweek dates:</p>
+                <ol style="margin: 5px 0; padding-left: 20px;">
+                    <li>Go to <a href="https://understat.com/league/EPL" target="_blank">Understat EPL League</a></li>
+                    <li>Filter by gameweek dates (e.g., Dec 7-9 for GW15)</li>
+                    <li>Click "Export data as CSV" on the Players table</li>
+                    <li>Upload the CSV below</li>
+                </ol>
+                <input type="file" id="validationCsvFile" accept=".csv" style="margin-top: 10px;">
+                <button type="button" class="validate-csv-btn" id="uploadValidationCsv" style="margin-top: 10px; margin-left: 0;">
+                    📤 Upload & Validate
+                </button>
+            </div>
         </div>
 
         <div class="loading" id="loading">
@@ -370,11 +407,23 @@
                         ` : ''}
                     `;
 
-                    // Show validation button after successful import
+                    // Show validation buttons after successful import
                     validateBtn.style.display = 'inline-block';
                     validateBtn.onclick = function() {
                         startValidation(data.game_number);
                     };
+
+                    // Show CSV validation option
+                    const validateCsvBtn = document.getElementById('validateCsvBtn');
+                    const csvValidationSection = document.getElementById('csvValidationSection');
+                    validateCsvBtn.style.display = 'inline-block';
+                    validateCsvBtn.onclick = function() {
+                        csvValidationSection.style.display = 'block';
+                        csvValidationSection.scrollIntoView({ behavior: 'smooth' });
+                    };
+
+                    // Store game number for CSV validation
+                    window.currentGameNumber = data.game_number;
 
                 } else {
                     result.className = 'result error';
@@ -565,7 +614,55 @@
         function closeValidationModal() {
             const modal = document.getElementById('validation-modal');
             modal.style.display = 'none';
-        }    </script>
+        }
+
+        // CSV Validation Handler
+        document.getElementById('uploadValidationCsv').addEventListener('click', async function() {
+            const fileInput = document.getElementById('validationCsvFile');
+            const file = fileInput.files[0];
+
+            if (!file) {
+                alert('Please select a CSV file first');
+                return;
+            }
+
+            const gameNumber = window.currentGameNumber || document.getElementById('gameNumber').value;
+
+            const formData = new FormData();
+            formData.append('file', file);
+            formData.append('game_number', gameNumber);
+
+            const loading = document.getElementById('validation-loading');
+            loading.style.display = 'block';
+
+            try {
+                const response = await fetch('/api/validate-game-scores-csv', {
+                    method: 'POST',
+                    body: formData
+                });
+
+                const data = await response.json();
+
+                if (!data.success) {
+                    throw new Error(data.error);
+                }
+
+                loading.style.display = 'none';
+
+                // If there are unmatched players, show manual matching UI
+                if (data.need_manual_matching > 0) {
+                    showManualMatchingUI(data);
+                } else {
+                    // All players matched automatically, proceed with validation
+                    await applyValidation(gameNumber, data.matched_players, {});
+                }
+
+            } catch (error) {
+                loading.style.display = 'none';
+                alert(`CSV validation failed: ${error.message}`);
+            }
+        });
+    </script>
     <!-- Validation Loading Indicator -->
     <div class="loading" id="validation-loading" style="display: none;">
         <div class="loading-spinner"></div>
