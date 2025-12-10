@@ -4404,7 +4404,8 @@ def import_understat_player_json():
 
         content = file.read().decode('utf-8-sig')  # Handle BOM
         players_data = json.loads(content)
-if not isinstance(players_data, list):            return jsonify({'error': 'JSON must be an array of player objects'}), 400
+        if not isinstance(players_data, list):
+            return jsonify({'error': 'JSON must be an array of player objects'}), 400
 
         # Extract player data from JSON
         json_players = []
@@ -5890,7 +5891,8 @@ def validate_game_scores_json():
 
         content = file.read().decode('utf-8-sig')  # Handle BOM
         players_data = json.loads(content)
-if not isinstance(players_data, list):            return jsonify({'error': 'JSON must be an array of player objects'}), 400
+        if not isinstance(players_data, list):
+            return jsonify({'error': 'JSON must be an array of player objects'}), 400
 
         # Extract players who played (min > 0)
         players_who_played = []
