@@ -15,8 +15,8 @@ const App = () => {
   const [uploadMenuAnchor, setUploadMenuAnchor] = useState(null);
 
   // Refs for hidden file inputs
-  const npxgCsvInputRef = useRef(null);
-  const understatCsvInputRef = useRef(null);
+  const npxgJsonInputRef = useRef(null);
+  const understatJsonInputRef = useRef(null);
 
   useEffect(() => {
     localStorage.setItem('darkMode', JSON.stringify(darkMode));
@@ -156,8 +156,8 @@ const App = () => {
     handleUploadMenuClose();
   };
 
-  // CSV Import Handlers (Workaround for broken ScraperFC)
-  const handleNPxGCsvUpload = async (event) => {
+  // JSON Import Handlers (Workaround for broken ScraperFC)
+  const handleNPxGJsonUpload = async (event) => {
     const file = event.target.files[0];
     if (!file) return;
 
@@ -165,19 +165,19 @@ const App = () => {
     formData.append('file', file);
 
     try {
-      const response = await fetch('/api/npxg/import-team-csv', {
+      const response = await fetch('/api/npxg/import-team-json', {
         method: 'POST',
         body: formData,
       });
       const result = await response.json();
 
       if (result.success) {
-        alert(`NPxG CSV import completed!\n\nTeams updated: ${result.teams_updated}\nLeague avg NPxG: ${result.league_avg_npxg}\nLeague avg NPxGA: ${result.league_avg_npxga}`);
+        alert(`NPxG JSON import completed!\n\nTeams updated: ${result.teams_updated}\nLeague avg NPxG: ${result.league_avg_npxg}\nLeague avg NPxGA: ${result.league_avg_npxga}`);
       } else {
-        alert('NPxG CSV import failed: ' + (result.error || 'Unknown error'));
+        alert('NPxG JSON import failed: ' + (result.error || 'Unknown error'));
       }
     } catch (error) {
-      alert('NPxG CSV import failed: ' + error.message);
+      alert('NPxG JSON import failed: ' + error.message);
     }
 
     // Reset file input
@@ -185,7 +185,7 @@ const App = () => {
     handleUploadMenuClose();
   };
 
-  const handleUnderstatCsvUpload = async (event) => {
+  const handleUnderstatJsonUpload = async (event) => {
     const file = event.target.files[0];
     if (!file) return;
 
@@ -193,7 +193,7 @@ const App = () => {
     formData.append('file', file);
 
     try {
-      const response = await fetch('/api/understat/import-player-csv', {
+      const response = await fetch('/api/understat/import-player-json', {
         method: 'POST',
         body: formData,
       });
@@ -202,13 +202,13 @@ const App = () => {
       if (result.verification_needed && result.unmatched_players > 0) {
         // Show confirmation with stats, then redirect to validation page
         const shouldVerify = window.confirm(
-          `CSV parsed successfully!\n\nMatched: ${result.successfully_matched} players\nNeed verification: ${result.unmatched_players} players\n\nWould you like to verify unmatched players now?`
+          `JSON parsed successfully!\n\nMatched: ${result.successfully_matched} players\nNeed verification: ${result.unmatched_players} players\n\nWould you like to verify unmatched players now?`
         );
 
         if (shouldVerify) {
           // Store matched data for later application
-          sessionStorage.setItem('understat_csv_matched', JSON.stringify(result.matched_data));
-          window.location.href = 'http://localhost:5001/import-validation?source=understat_csv';
+          sessionStorage.setItem('understat_json_matched', JSON.stringify(result.matched_data));
+          window.location.href = 'http://localhost:5001/import-validation?source=understat_json';
         } else {
           // Apply only matched players immediately
           const applyResponse = await fetch('/api/understat/apply-player-csv', {
@@ -227,12 +227,12 @@ const App = () => {
           body: JSON.stringify({ matched_players: result.matched_data, confirmed_mappings: {} }),
         });
         const applyResult = await applyResponse.json();
-        alert(`Understat CSV import completed!\n\nPlayers updated: ${applyResult.players_updated}`);
+        alert(`Understat JSON import completed!\n\nPlayers updated: ${applyResult.players_updated}`);
       } else {
-        alert('Understat CSV import failed: ' + (result.error || 'Unknown error'));
+        alert('Understat JSON import failed: ' + (result.error || 'Unknown error'));
       }
     } catch (error) {
-      alert('Understat CSV import failed: ' + error.message);
+      alert('Understat JSON import failed: ' + error.message);
     }
 
     // Reset file input
@@ -269,20 +269,20 @@ const App = () => {
               Upload & Sync
             </Button>
             
-            {/* Hidden file inputs for CSV uploads */}
+            {/* Hidden file inputs for JSON uploads */}
             <input
               type="file"
-              ref={npxgCsvInputRef}
+              ref={npxgJsonInputRef}
               style={{ display: 'none' }}
-              accept=".csv"
-              onChange={handleNPxGCsvUpload}
+              accept=".json"
+              onChange={handleNPxGJsonUpload}
             />
             <input
               type="file"
-              ref={understatCsvInputRef}
+              ref={understatJsonInputRef}
               style={{ display: 'none' }}
-              accept=".csv"
-              onChange={handleUnderstatCsvUpload}
+              accept=".json"
+              onChange={handleUnderstatJsonUpload}
             />
 
             <Menu
@@ -304,11 +304,11 @@ const App = () => {
                 Sync Understat (API)
               </MenuItem>
               <MenuItem
-                onClick={() => understatCsvInputRef.current?.click()}
+                onClick={() => understatJsonInputRef.current?.click()}
                 sx={{ color: darkMode ? '#ffffff' : '#333333', pl: 4 }}
               >
                 <FileUpload sx={{ mr: 1, fontSize: '1rem' }} />
-                Import Understat CSV
+                Import Understat JSON
               </MenuItem>
               <MenuItem
                 onClick={handleSyncNPxGTeams}
@@ -318,11 +318,11 @@ const App = () => {
                 Sync NPxG Teams (API)
               </MenuItem>
               <MenuItem
-                onClick={() => npxgCsvInputRef.current?.click()}
+                onClick={() => npxgJsonInputRef.current?.click()}
                 sx={{ color: darkMode ? '#ffffff' : '#333333', pl: 4 }}
               >
                 <FileUpload sx={{ mr: 1, fontSize: '1rem' }} />
-                Import NPxG CSV
+                Import NPxG JSON
               </MenuItem>
               <MenuItem
                 onClick={() => { window.open('http://localhost:5001/railway-sync', '_blank'); handleUploadMenuClose(); }}

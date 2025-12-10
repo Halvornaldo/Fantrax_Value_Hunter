@@ -932,7 +932,7 @@ def update_parameters():
                 {exclusion_clause}
             """, query_params + query_params[:4])  # Duplicate params for both updates
 
-            updated_csv_players = cursor_param.rowcount
+            updated_json_players = cursor_param.rowcount
 
             # Update non-CSV players with the same parameter values
             cursor_param.execute("""
@@ -948,14 +948,14 @@ def update_parameters():
                 )
             """, query_params[:4])
 
-            updated_non_csv_players = cursor_param.rowcount
+            updated_non_json_players = cursor_param.rowcount
 
             conn_param.commit()
             cursor_param.close()
             conn_param.close()
 
-            print(f"Updated {updated_csv_players} CSV players with new parameter values")
-            print(f"Updated {updated_non_csv_players} non-CSV players with new parameter values")
+            print(f"Updated {updated_json_players} CSV players with new parameter values")
+            print(f"Updated {updated_non_json_players} non-CSV players with new parameter values")
 
         except Exception as e:
             print(f"Error updating CSV multipliers: {e}")
@@ -1634,8 +1634,7 @@ def import_lineups():
         if not file.filename.lower().endswith('.csv'):
             return jsonify({'error': 'File must be a CSV'}), 400
         
-        # Read CSV content and parse properly with quotes
-        import csv
+        # Read JSON content and parse properly with quotes
         from io import StringIO
         
         csv_content = file.read().decode('utf-8')
@@ -2607,7 +2606,7 @@ def get_name_mapping_stats():
 @app.route('/api/import-form-data', methods=['POST'])
 def import_form_data():
     """
-    Import gameweek form data from Fantrax CSV export
+    Import gameweek form data from Fantrax JSON export
     Expects CSV with columns: ID, Player, Team, Position, RkOv, Opponent, Salary, FPts, etc.
     Extracts player ID and FPts for storage in player_form table
     """
@@ -2635,7 +2634,6 @@ def import_form_data():
         
         # Read CSV file
         import pandas as pd
-        import io
         
         # Read the CSV content
         stream = io.StringIO(file.stream.read().decode("UTF8"), newline=None)
@@ -2975,7 +2973,6 @@ def import_odds():
         }
         
         # Parse CSV content
-        import csv, io
         from datetime import datetime
         
         csv_content = file.read().decode('utf-8')
@@ -3293,7 +3290,7 @@ def import_odds():
 @app.route('/api/import-game-scores', methods=['POST'])
 def import_game_scores():
     """
-    Import individual game scores from Fantrax CSV export
+    Import individual game scores from Fantrax JSON export
     Expects CSV with columns: ID, Player, Team, Position, RkOv, Opponent, Salary, FPts, etc.
     Stores individual game scores in player_game_scores table for enhanced Form calculation
     """
@@ -3330,7 +3327,6 @@ def import_game_scores():
 
         # Read CSV file
         import pandas as pd
-        import io
 
         # Read the CSV content
         stream = io.StringIO(file.stream.read().decode("UTF8"), newline=None)
@@ -4387,13 +4383,13 @@ def apply_understat_mappings():
         }), 500
 
 
-@app.route('/api/understat/import-player-csv', methods=['POST'])
-def import_understat_player_csv():
+@app.route('/api/understat/import-player-json', methods=['POST'])
+def import_understat_player_json():
     """
-    Import Understat player xGI data from CSV export.
+    Import Understat player xGI data from JSON export.
     Workaround for broken ScraperFC library.
 
-    Expected CSV format (semicolon-delimited):
+    Expected JSON format (array of objects):
     "number";"player";"team";"apps";"min";"goals";"a";"xG";"xA";"xG90";"xA90";"xG90xA90"
     """
     try:
@@ -4404,33 +4400,32 @@ def import_understat_player_csv():
         if file.filename == '':
             return jsonify({'error': 'No file selected'}), 400
 
-        # Read CSV content
-        import io
-        import csv
+        # Read JSON content
 
         content = file.read().decode('utf-8-sig')  # Handle BOM
-        reader = csv.DictReader(io.StringIO(content), delimiter=';')
+        players_data = json.loads(content)
+if not isinstance(players_data, list):            return jsonify({'error': 'JSON must be an array of player objects'}), 400
 
-        # Extract player data from CSV
-        csv_players = []
-        for row in reader:
-            player_name = row.get('player', '').strip('"')
-            team = row.get('team', '').strip('"')
+        # Extract player data from JSON
+        json_players = []
+        for player_row in players_data:
+            player_name = player_row.get('player', '')
+            team = player_row.get('team', '')
 
             # Skip empty rows
             if not player_name:
                 continue
 
-            csv_players.append({
+            json_players.append({
                 'player_name': player_name,
                 'team': team,
-                'apps': int(row.get('apps', 0)),
-                'minutes': int(row.get('min', 0)),
-                'xG': float(row.get('xG', 0)),
-                'xA': float(row.get('xA', 0)),
-                'xG90': float(row.get('xG90', 0)),
-                'xA90': float(row.get('xA90', 0)),
-                'xGI90': float(row.get('xG90xA90', 0))  # CSV calls it xG90xA90
+                'apps': int(player_row.get('apps', 0)),
+                'minutes': int(player_row.get('min', 0)),
+                'xG': float(player_row.get('xG', 0)),
+                'xA': float(player_row.get('xA', 0)),
+                'xG90': float(player_row.get('xG90', 0)),
+                'xA90': float(player_row.get('xA90', 0)),
+                'xGI90': float(player_row.get('xG90xA90', 0))  # JSON uses xG90xA90
             })
 
         # Use Global Name Matching System for player matching
@@ -4438,7 +4433,7 @@ def import_understat_player_csv():
         matched_players = []
         unmatched_players = []
 
-        for player in csv_players:
+        for player in json_players:
             match_result = matcher.match_player(
                 source_name=player['player_name'],
                 source_system='understat',
@@ -4479,7 +4474,7 @@ def import_understat_player_csv():
 
         response_data = {
             'success': True,
-            'total_csv_players': total_players,
+            'total_json_players': total_players,
             'successfully_matched': len(matched_players),
             'unmatched_players': len(unmatched_players),
             'match_rate': match_rate,
@@ -4688,7 +4683,6 @@ def parse_formation_csv(lines, cursor):
     Parse formation matrix CSV format from FFS scraping.
     Returns list of player dictionaries with position constraint checking.
     """
-    import csv
     from io import StringIO
     
     # Team name mapping from CSV (full names) to database (abbreviations)
@@ -4790,7 +4784,6 @@ def parse_ffp_formation_csv(lines, cursor, starter_params=None):
     Format: Team Name, Player1, %, Player2, %, Player3, %...
     Returns list of player dictionaries.
     """
-    import csv
     from io import StringIO
     from src.convert_ffp_csv import confidence_to_multiplier
     
@@ -4903,7 +4896,6 @@ def parse_individual_csv(lines):
     Parse individual player CSV format (original format).
     Returns list of player dictionaries.
     """
-    import csv
     from io import StringIO
     
     players_to_process = []
@@ -4941,7 +4933,6 @@ def parse_ffp_csv(lines):
     Returns list of player dictionaries with custom multipliers.
     Format: Team, Player Name, Position, Predicted Status, Confidence, Multiplier
     """
-    import csv
     from io import StringIO
     
     players_to_process = []
@@ -5870,10 +5861,10 @@ def validate_game_scores():
         return jsonify({'error': f'Validation failed: {str(e)}'}), 500
 
 
-@app.route('/api/validate-game-scores-csv', methods=['POST'])
-def validate_game_scores_csv():
+@app.route('/api/validate-game-scores-json', methods=['POST'])
+def validate_game_scores_json():
     """
-    Validate game scores using Understat CSV export (filtered by gameweek dates).
+    Validate game scores using Understat JSON export (filtered by gameweek dates).
     Workaround for broken ScraperFC library.
 
     Expected CSV format (semicolon-delimited, filtered by gameweek dates on Understat):
@@ -5895,19 +5886,18 @@ def validate_game_scores_csv():
             return jsonify({'error': 'game_number is required'}), 400
         game_number = int(game_number)
 
-        # Read CSV content
-        import io
-        import csv
+        # Read JSON content
 
         content = file.read().decode('utf-8-sig')  # Handle BOM
-        reader = csv.DictReader(io.StringIO(content), delimiter=';')
+        players_data = json.loads(content)
+if not isinstance(players_data, list):            return jsonify({'error': 'JSON must be an array of player objects'}), 400
 
         # Extract players who played (min > 0)
         players_who_played = []
-        for row in reader:
-            player_name = row.get('player', '').strip('"')
-            team = row.get('team', '').strip('"')
-            minutes = int(row.get('min', 0))
+        for player_row in players_data:
+            player_name = player_row.get('player', '')
+            team = player_row.get('team', '')
+            minutes = int(player_row.get('min', 0))
 
             # Only include players who actually played
             if player_name and minutes > 0:
@@ -5917,7 +5907,7 @@ def validate_game_scores_csv():
                     'minutes': minutes
                 })
 
-        print(f"CSV Validation: Found {len(players_who_played)} players who played in Game {game_number}")
+        print(f"JSON Validation: Found {len(players_who_played)} players who played in Game {game_number}")
 
         # Use Global Name Matching System for player matching
         matcher = UnifiedNameMatcher(DB_CONFIG)
@@ -5949,7 +5939,7 @@ def validate_game_scores_csv():
                     'confidence': match_result.get('confidence', 0)
                 })
 
-        print(f"CSV Validation: Matched {len(matched_players)}/{len(players_who_played)} players automatically")
+        print(f"JSON Validation: Matched {len(matched_players)}/{len(players_who_played)} players automatically")
 
         # Get current game scores for this gameweek
         conn = get_db_connection()
@@ -5967,7 +5957,7 @@ def validate_game_scores_csv():
         cursor.close()
         conn.close()
 
-        print(f"CSV Validation: Found {len(game_scores)} game score records for Game {game_number}")
+        print(f"JSON Validation: Found {len(game_scores)} game score records for Game {game_number}")
 
         # Return validation data in same format as ScraperFC endpoint
         return jsonify({
@@ -5980,11 +5970,11 @@ def validate_game_scores_csv():
             'unmatched_players': unmatched_players,
             'game_scores_total': len(game_scores),
             'message': f'Found {len(players_who_played)} players who played in Game {game_number} (from CSV)',
-            'source': 'csv_import'
+            'source': 'json_import'
         })
 
     except Exception as e:
-        print(f"Error in validate_game_scores_csv: {str(e)}")
+        print(f"Error in validate_game_scores_json: {str(e)}")
         import traceback
         traceback.print_exc()
         return jsonify({'error': f'CSV validation failed: {str(e)}'}), 500
@@ -6269,13 +6259,13 @@ def sync_npxg_team_stats():
         return jsonify({'error': str(e)}), 500
 
 
-@app.route('/api/npxg/import-team-csv', methods=['POST'])
-def import_npxg_team_csv():
+@app.route('/api/npxg/import-team-json', methods=['POST'])
+def import_npxg_team_json():
     """
-    Import NPxG team statistics from Understat CSV export.
+    Import NPxG team statistics from Understat JSON export.
     Workaround for broken ScraperFC library.
 
-    Expected CSV format (semicolon-delimited):
+    Expected JSON format (array of objects):
     "number";"team";"matches";"wins";"draws";"loses";"goals";"ga";"points";"xG";"NPxG";"xGA";"NPxGA";"xPTS"
     """
     try:
@@ -6286,12 +6276,10 @@ def import_npxg_team_csv():
         if file.filename == '':
             return jsonify({'error': 'No file selected'}), 400
 
-        # Read CSV content
-        import io
-        import csv
+        # Read JSON content
 
         content = file.read().decode('utf-8-sig')  # Handle BOM
-        reader = csv.DictReader(io.StringIO(content), delimiter=';')
+        teams_data = json.loads(content)
 
         # Team name to code mapping (same as ScraperFC endpoint)
         team_code_mapping = {
@@ -6331,12 +6319,12 @@ def import_npxg_team_csv():
         updated_teams = 0
         league_totals = {'npxg': 0, 'npxga': 0, 'matches': 0}
 
-        for row in reader:
-            # Extract data from CSV columns
-            team_name = row.get('team', '').strip('"')
-            npxg = float(row.get('NPxG', 0))
-            npxga = float(row.get('NPxGA', 0))
-            matches_played = int(row.get('matches', 0))
+        for team in teams_data:
+            # Extract data from JSON object
+            team_name = team.get('team', '')
+            npxg = float(team.get('NPxG', 0))
+            npxga = float(team.get('NPxGA', 0))
+            matches_played = int(team.get('matches', 0))
 
             # Calculate NPxGD (Difference)
             npxgd = npxg - npxga
