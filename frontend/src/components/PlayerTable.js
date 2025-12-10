@@ -350,7 +350,7 @@ const PlayerTable = ({ playersData, gameweekInfo, systemConfig, onDataRefresh })
         interpretation: 'Green (≥5): Regular starter • Yellow (2-4): Some starts • Red (0-1): Limited appearances'
       },
       true_value: {
-        title: 'True Value (V2.0)',
+        title: 'Projected Score (V2.0)',
         description: 'Advanced prediction using 5-factor model',
         formula: 'True Value = Dynamic_PPG × Form × Fixture × Starter × xGI',
         interpretation: 'Deep Green (≥20): Elite • Green (15-20): Excellent • Yellow (10-15): Good • Red (<5): Poor'
@@ -779,7 +779,7 @@ const PlayerTable = ({ playersData, gameweekInfo, systemConfig, onDataRefresh })
     },
     {
       field: 'true_value',
-      headerName: 'True Value',
+      headerName: 'Projected',
       width: 110,
       type: 'number',
       renderCell: (params) => renderValueCell(params, getTrueValueColor),

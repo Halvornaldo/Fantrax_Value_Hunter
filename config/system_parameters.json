@@ -6,10 +6,12 @@
   },
   "xgi_integration": {
     "enabled": true,
-    "last_sync": 1764939499.7350483,
-    "matched_players": 456,
+    "last_sync": 1765358160.772575,
+    "matched_players": 458,
     "unmatched_players": 5,
-    "description": "xGI integration toggle and statistics"
+    "description": "xGI integration toggle and statistics",
+    "source": "csv_import",
+    "manual_mappings": 0
   },
   "starter_prediction": {
     "enabled": true,
@@ -160,9 +162,10 @@
       "max": 2.5
     },
     "description": "NPxG-based fixture difficulty with position-specific formulas and home/away adjustments. Weight controlled by exponential_fixture.base parameter (mapped from Fixture Base slider).",
-    "last_sync": 1764939569.3525772,
+    "last_sync": 1765353150.262468,
     "teams_updated": 20,
-    "league_avg_npxg": 18.841,
-    "league_avg_npxga": 18.841
+    "league_avg_npxg": 20.289,
+    "league_avg_npxga": 20.288,
+    "source": "csv_import"
   }
 }

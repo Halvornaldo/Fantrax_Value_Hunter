@@ -199,37 +199,22 @@ const App = () => {
       });
       const result = await response.json();
 
-      if (result.verification_needed && result.unmatched_players > 0) {
-        // Show confirmation with stats, then redirect to validation page
-        const shouldVerify = window.confirm(
-          `JSON parsed successfully!\n\nMatched: ${result.successfully_matched} players\nNeed verification: ${result.unmatched_players} players\n\nWould you like to verify unmatched players now?`
-        );
-
-        if (shouldVerify) {
-          // Store matched data for later application
-          sessionStorage.setItem('understat_json_matched', JSON.stringify(result.matched_data));
-          window.location.href = 'http://localhost:5001/import-validation?source=understat_json';
-        } else {
-          // Apply only matched players immediately
-          const applyResponse = await fetch('/api/understat/apply-player-csv', {
-            method: 'POST',
-            headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({ matched_players: result.matched_data, confirmed_mappings: {} }),
-          });
-          const applyResult = await applyResponse.json();
-          alert(`Applied ${applyResult.players_updated} matched players. ${result.unmatched_players} players skipped.`);
-        }
-      } else if (result.success) {
-        // All players matched - apply immediately
+      // Always apply matched players immediately
+      if (result.success && result.matched_data && result.matched_data.length > 0) {
         const applyResponse = await fetch('/api/understat/apply-player-csv', {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify({ matched_players: result.matched_data, confirmed_mappings: {} }),
         });
         const applyResult = await applyResponse.json();
-        alert(`Understat JSON import completed!\n\nPlayers updated: ${applyResult.players_updated}`);
+
+        if (result.unmatched_players > 0) {
+          alert(`Understat JSON import completed!\n\nPlayers updated: ${applyResult.players_updated}\nUnmatched players skipped: ${result.unmatched_players}\n\n(Unmatched: ${result.unmatched_names?.slice(0, 5).join(', ')}${result.unmatched_names?.length > 5 ? '...' : ''})`);
+        } else {
+          alert(`Understat JSON import completed!\n\nPlayers updated: ${applyResult.players_updated}`);
+        }
       } else {
-        alert('Understat JSON import failed: ' + (result.error || 'Unknown error'));
+        alert('Understat JSON import failed: ' + (result.error || 'No players matched'));
       }
     } catch (error) {
       alert('Understat JSON import failed: ' + error.message);
