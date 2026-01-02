@@ -18,7 +18,13 @@ import psycopg2
 from psycopg2.extras import RealDictCursor
 from datetime import datetime, timedelta
 from typing import Dict, List, Optional, Tuple
-import ScraperFC as sfc
+# ScraperFC is optional - only needed for live scraping (not used on Railway)
+try:
+    import ScraperFC as sfc
+    SCRAPERFC_AVAILABLE = True
+except (ImportError, FileNotFoundError):
+    sfc = None
+    SCRAPERFC_AVAILABLE = False
 
 logger = logging.getLogger(__name__)
 
@@ -32,7 +38,7 @@ class NPxGFixtureMultiplier:
         self.db_config = db_config
         self.config_path = config_path or 'config/system_parameters.json'
         self.config = self._load_config()
-        self.understat = sfc.Understat()
+        self.understat = sfc.Understat() if SCRAPERFC_AVAILABLE else None
 
         # Team name mapping from Understat to Fantrax codes
         self.team_mapping = {
@@ -115,6 +121,10 @@ class NPxGFixtureMultiplier:
         """
         Fetch latest NPxG/NPxGA data from Understat and update database
         """
+        if not SCRAPERFC_AVAILABLE:
+            logger.warning("ScraperFC not available - cannot fetch live data")
+            return False
+
         try:
             logger.info(f"Fetching NPxG data for {season}")
 
