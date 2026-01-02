@@ -29,7 +29,8 @@ class UnifiedNameMatcher:
         self.strategies = MatchingStrategies()
         self.suggestion_engine = SuggestionEngine(db_config)
         self.cache = {}  # In-memory cache for session performance
-        
+        self._players_cache = None  # Cache all players for name-first matching
+
         # Set up logging
         self.logger = logging.getLogger(__name__)
     
@@ -146,70 +147,134 @@ class UnifiedNameMatcher:
         finally:
             conn.close()
     
+    def _get_all_candidates(self) -> List[Dict]:
+        """
+        Get all players from database, cached for performance.
+        This enables name-first matching without team/position filtering.
+        """
+        if self._players_cache is not None:
+            return self._players_cache
+
+        conn = psycopg2.connect(**self.db_config)
+        try:
+            cursor = conn.cursor(cursor_factory=RealDictCursor)
+            cursor.execute("""
+                SELECT p.id, p.name, p.team, p.position
+                FROM players p
+                ORDER BY p.name
+            """)
+            self._players_cache = [dict(row) for row in cursor.fetchall()]
+            self.logger.info(f"Cached {len(self._players_cache)} players for name matching")
+            return self._players_cache
+        finally:
+            conn.close()
+
     def _multi_strategy_match(self, source_name: str, team: Optional[str] = None,
                             position: Optional[str] = None) -> Dict:
         """
-        Apply multiple matching strategies to find best match
+        Apply multiple matching strategies to find best match.
+
+        Uses NAME-FIRST matching: tries exact/normalized match against ALL players
+        before using team/position for disambiguation. This prevents mismatches
+        when team codes differ between sources (e.g., "Manchester United" vs "MUN").
         """
-        conn = psycopg2.connect(**self.db_config)
-        
-        try:
-            cursor = conn.cursor(cursor_factory=RealDictCursor)
-            
-            # Get potential candidates from database
-            base_query = """
-                SELECT p.id, p.name, p.team, p.position
-                FROM players p
-                WHERE 1=1
-            """
-            params = []
-            
-            # Filter by team and position if provided
-            if team:
-                base_query += " AND p.team = %s"
-                params.append(team)
-            
-            if position and position != 'Unknown':
-                base_query += " AND p.position = %s"
-                params.append(position)
-            
-            cursor.execute(base_query, params)
-            candidates = cursor.fetchall()
-            
-            if not candidates:
-                return {
-                    'fantrax_id': None,
-                    'fantrax_name': None,
-                    'confidence': 0.0,
-                    'match_type': 'no_candidates'
-                }
-            
-            # Apply matching strategies
-            candidate_names = [c['name'] for c in candidates]
-            best_match_name, confidence, strategy = self.strategies.find_best_match(
-                source_name, candidate_names
-            )
-            
-            if best_match_name:
-                # Find the matching candidate details
-                for candidate in candidates:
-                    if candidate['name'] == best_match_name:
-                        return {
-                            'fantrax_id': candidate['id'],
-                            'fantrax_name': candidate['name'],
-                            'confidence': confidence,
-                            'match_type': strategy
-                        }
-            
+        candidates = self._get_all_candidates()
+
+        if not candidates:
             return {
                 'fantrax_id': None,
                 'fantrax_name': None,
                 'confidence': 0.0,
-                'match_type': 'no_match'
+                'match_type': 'no_candidates'
             }
-            
-        finally:
-            conn.close()
+
+        # Step 1: Try exact/normalized match against ALL players first
+        exact_matches = []
+        for candidate in candidates:
+            # Try exact match
+            is_match, confidence = self.strategies.exact_match(source_name, candidate['name'])
+            if is_match:
+                exact_matches.append({
+                    'id': candidate['id'],
+                    'name': candidate['name'],
+                    'team': candidate['team'],
+                    'position': candidate['position'],
+                    'confidence': confidence,
+                    'match_type': 'exact'
+                })
+                continue
+
+            # Try normalized match (handles accents, apostrophes, etc.)
+            is_match, confidence = self.strategies.normalized_match(source_name, candidate['name'])
+            if is_match:
+                exact_matches.append({
+                    'id': candidate['id'],
+                    'name': candidate['name'],
+                    'team': candidate['team'],
+                    'position': candidate['position'],
+                    'confidence': confidence,
+                    'match_type': 'normalized'
+                })
+
+        # Step 2: Handle exact matches
+        if len(exact_matches) == 1:
+            # Single exact match - use it regardless of team/position
+            match = exact_matches[0]
+            return {
+                'fantrax_id': match['id'],
+                'fantrax_name': match['name'],
+                'confidence': match['confidence'],
+                'match_type': match['match_type']
+            }
+
+        if len(exact_matches) > 1:
+            # Multiple exact matches - try to disambiguate by team
+            if team:
+                team_filtered = [m for m in exact_matches if m['team'] == team]
+                if len(team_filtered) == 1:
+                    match = team_filtered[0]
+                    return {
+                        'fantrax_id': match['id'],
+                        'fantrax_name': match['name'],
+                        'confidence': match['confidence'],
+                        'match_type': match['match_type']
+                    }
+
+            # Still ambiguous - return first match but lower confidence to trigger review
+            match = exact_matches[0]
+            return {
+                'fantrax_id': match['id'],
+                'fantrax_name': match['name'],
+                'confidence': 75.0,  # Lower confidence to trigger manual review
+                'match_type': 'ambiguous_exact'
+            }
+
+        # Step 3: No exact match - fall back to fuzzy strategies
+        candidate_names = [c['name'] for c in candidates]
+        best_match_name, confidence, strategy = self.strategies.find_best_match(
+            source_name, candidate_names
+        )
+
+        if best_match_name:
+            # Find the matching candidate details
+            for candidate in candidates:
+                if candidate['name'] == best_match_name:
+                    # Boost confidence if team matches
+                    if team and candidate['team'] == team:
+                        confidence = min(confidence + 5.0, 100.0)
+                    return {
+                        'fantrax_id': candidate['id'],
+                        'fantrax_name': candidate['name'],
+                        'confidence': confidence,
+                        'match_type': strategy
+                    }
+
+        return {
+            'fantrax_id': None,
+            'fantrax_name': None,
+            'confidence': 0.0,
+            'match_type': 'no_match'
+        }
     
     def _save_mapping(self, mapping_data: Dict) -> int:
         """Save a new mapping to the database"""
@@ -413,6 +478,7 @@ class UnifiedNameMatcher:
         return results
     
     def clear_cache(self):
-        """Clear the in-memory cache"""
+        """Clear the in-memory caches"""
         self.cache.clear()
-        self.logger.info("Name matching cache cleared")
+        self._players_cache = None
+        self.logger.info("Name matching caches cleared")
