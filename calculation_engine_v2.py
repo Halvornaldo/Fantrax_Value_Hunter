@@ -112,8 +112,8 @@ class FormulaEngineV2:
                 starter_mult = float(starter_mult)
             
             # Step 3: Apply multiplier caps (NEW v2.0 feature)
-            form_mult = self._apply_multiplier_cap(form_mult, 'form')
-            fixture_mult = self._apply_multiplier_cap(fixture_mult, 'fixture') 
+            # Note: form_mult is NOT capped here - sigmoid already handles bounds [0.5, 2.0]
+            fixture_mult = self._apply_multiplier_cap(fixture_mult, 'fixture')
             xgi_mult = self._apply_multiplier_cap(xgi_mult, 'xgi')
             
             # Step 4: Calculate True Value (CORE v2.0 FIX - separate from price)
@@ -250,65 +250,55 @@ class FormulaEngineV2:
             # Get dynamic baseline using blended PPG for normalization
             blended_baseline, _ = self._calculate_blended_ppg(player_data)
             
+            # Calculate raw form multiplier (before sigmoid transformation)
+            # Offset ensures negative scores are handled proportionally
+            # (a -2 score is only 3 points below +1, not catastrophically worse)
+            offset = 25.0  # Handles scores down to -20
             if blended_baseline > 0:
-                form_multiplier = form_score / blended_baseline
+                raw_multiplier = (form_score + offset) / (blended_baseline + offset)
             else:
-                form_multiplier = 1.0
-                
-            # Apply progressive range based on games played
+                raw_multiplier = 1.0
+
+            # Apply log-sigmoid curve for smooth distribution
+            # This creates a gradient that approaches but never hits [0.5, 2.0] bounds
+            # Formula: multiplier = 0.5 * (4 ** sigmoid_exponent)
+            # where sigmoid uses log(raw_mult) to center at 1.0
+
+            # Get steepness parameter (higher = more spread, lower = more compression)
+            k = self.v2_config.get('exponential_form', {}).get('sigmoid_k', 2.0)
+            min_mult = 0.5
+            max_mult = 2.0
+
+            if raw_multiplier > 0:
+                # Log transform ensures raw_mult=1.0 maps to sigmoid center (0.5)
+                sigmoid_input = math.log(raw_multiplier) * k
+                exponent = 1 / (1 + math.exp(-sigmoid_input))
+                form_multiplier = min_mult * (max_mult / min_mult) ** exponent
+            else:
+                form_multiplier = min_mult  # Edge case: no score
+
             games_played = len(numeric_games)
-            progressive_config = self.v2_config.get('progressive_form_ranges', {})
+            logger.debug(f"Player form: {games_played} games, raw={raw_multiplier:.3f}, sigmoid k={k}, final={form_multiplier:.3f}")
 
-            # Get form cap from multiplier caps configuration
-            form_cap = self.v2_config.get('multiplier_caps', {}).get('form', 1.5)
-            form_floor = 2.0 - form_cap  # Symmetric bounds around 1.0
-
-            if progressive_config.get('enabled', True):
-                # Use dynamic progressive ranges based on form cap parameter
-                # Scale the ranges based on sample size, respecting the form cap
-                if games_played <= 2:
-                    # Early season: ±5% range
-                    range_factor = 0.05
-                elif games_played <= 4:
-                    # Building confidence: ±15% range
-                    range_factor = 0.15
-                elif games_played <= 6:
-                    # Moderate confidence: ±25% range
-                    range_factor = 0.25
-                elif games_played <= 8:
-                    # Good confidence: ±40% range
-                    range_factor = 0.40
-                else:
-                    # Full confidence: Use full form cap range
-                    range_factor = 1.0
-
-                # Calculate dynamic bounds based on form cap and sample size
-                max_deviation = (form_cap - 1.0) * range_factor
-                form_min = max(form_floor, 1.0 - max_deviation)
-                form_max = min(form_cap, 1.0 + max_deviation)
-
-                # Apply the dynamic bounds
-                form_multiplier = max(form_min, min(form_max, form_multiplier))
-
-                logger.debug(f"Player form: {games_played} games played, dynamic range [{form_min:.3f}, {form_max:.3f}], cap: {form_cap}, multiplier: {form_multiplier:.3f}")
-            else:
-                # If progressive ranges disabled, use full form cap range
-                form_multiplier = max(form_floor, min(form_cap, form_multiplier))
-                
             return form_multiplier
             
         except Exception as e:
             logger.warning(f"Error calculating exponential form multiplier: {e}")
             return 1.0
     
-    def _get_recent_points_from_db(self, player_id: str, limit: int = 5) -> List[float]:
+    def _get_recent_points_from_db(self, player_id: str, limit: int = None) -> List[float]:
         """
         Fetch recent points from player_game_scores table for EWMA calculation
         Only includes games where player actually played (did_play = true)
         Returns points in chronological order (most recent first)
+        Lookback period is configurable via system_parameters.json
         """
         if not player_id:
             return []
+
+        # Read lookback from config, default to 9
+        if limit is None:
+            limit = self.v2_config.get('exponential_form', {}).get('lookback_games', 9)
 
         try:
             import psycopg2

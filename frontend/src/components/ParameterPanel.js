@@ -36,11 +36,12 @@ const ParameterPanel = ({ systemConfig, onParametersUpdate, playersCount }) => {
   // Parameter states
   const [parameters, setParameters] = useState({
     ewmaAlpha: 0.44,
+    formLookback: 9,
     adaptationGameweek: 10,
     xgiEnabled: false,
     xgiWeight: 0.13,
     mfPositionWeight: 0.3,
-    formCap: 1.4,
+    formSteepness: 2.0,
     fixtureCap: 1.8,
     xgiCap: 2.5,
     globalCap: 3.0,
@@ -68,11 +69,12 @@ const ParameterPanel = ({ systemConfig, onParametersUpdate, playersCount }) => {
       const starterConfig = systemConfig.starter_prediction;
       setParameters({
         ewmaAlpha: v2Config.ewma_form?.alpha || 0.44,
+        formLookback: v2Config.exponential_form?.lookback_games || 9,
         adaptationGameweek: v2Config.dynamic_blending?.full_adaptation_gw || 10,
         xgiEnabled: v2Config.positional_xgi?.enabled || false,
         xgiWeight: v2Config.positional_xgi?.xgi_weight || 0.13,
         mfPositionWeight: v2Config.positional_xgi?.mf_position_weight || 0.3,
-        formCap: v2Config.multiplier_caps?.form || 1.4,
+        formSteepness: v2Config.exponential_form?.sigmoid_k || 2.0,
         fixtureCap: v2Config.multiplier_caps?.fixture || 1.8,
         xgiCap: v2Config.multiplier_caps?.xgi || 2.5,
         globalCap: v2Config.multiplier_caps?.global || 3.0,
@@ -114,7 +116,9 @@ const ParameterPanel = ({ systemConfig, onParametersUpdate, playersCount }) => {
           },
           exponential_form: {
             enabled: true,
-            alpha: parameters.ewmaAlpha
+            alpha: parameters.ewmaAlpha,
+            lookback_games: parameters.formLookback,
+            sigmoid_k: parameters.formSteepness
           },
           dynamic_blending: {
             full_adaptation_gw: parameters.adaptationGameweek
@@ -125,7 +129,6 @@ const ParameterPanel = ({ systemConfig, onParametersUpdate, playersCount }) => {
             mf_position_weight: parameters.mfPositionWeight
           },
           multiplier_caps: {
-            form: parameters.formCap,
             fixture: parameters.fixtureCap,
             xgi: parameters.xgiCap,
             global: parameters.globalCap
@@ -292,12 +295,12 @@ const ParameterPanel = ({ systemConfig, onParametersUpdate, playersCount }) => {
         <Divider orientation="vertical" flexItem />
 
         {/* EWMA Alpha */}
-        <Grid item xs={2}>
+        <Grid item xs={1.5}>
           <Typography variant="body2" gutterBottom>EWMA α</Typography>
           <Slider
             value={parameters.ewmaAlpha}
             onChange={(e, value) => handleParameterChange('ewmaAlpha', value)}
-            min={0.25}
+            min={0.15}
             max={0.75}
             step={0.01}
             size="small"
@@ -305,6 +308,23 @@ const ParameterPanel = ({ systemConfig, onParametersUpdate, playersCount }) => {
           />
           <Typography variant="caption" color="text.secondary">
             Current: {parameters.ewmaAlpha.toFixed(2)}
+          </Typography>
+        </Grid>
+
+        {/* Form Lookback Games */}
+        <Grid item xs={1.5}>
+          <Typography variant="body2" gutterBottom>Form Games</Typography>
+          <Slider
+            value={parameters.formLookback}
+            onChange={(e, value) => handleParameterChange('formLookback', value)}
+            min={5}
+            max={15}
+            step={1}
+            size="small"
+            valueLabelDisplay="auto"
+          />
+          <Typography variant="caption" color="text.secondary">
+            Lookback: {parameters.formLookback}
           </Typography>
         </Grid>
 
@@ -425,20 +445,20 @@ const ParameterPanel = ({ systemConfig, onParametersUpdate, playersCount }) => {
 
         <Divider orientation="vertical" flexItem />
 
-        {/* Form Cap */}
+        {/* Form Steepness (Sigmoid k) */}
         <Grid item xs={1.5}>
-          <Typography variant="body2" gutterBottom>Form Cap</Typography>
+          <Typography variant="body2" gutterBottom>Form Curve</Typography>
           <Slider
-            value={parameters.formCap}
-            onChange={(e, value) => handleParameterChange('formCap', value)}
-            min={1.1}
-            max={2.0}
-            step={0.05}
+            value={parameters.formSteepness}
+            onChange={(e, value) => handleParameterChange('formSteepness', value)}
+            min={0.5}
+            max={4.0}
+            step={0.1}
             size="small"
             valueLabelDisplay="auto"
           />
           <Typography variant="caption" color="text.secondary">
-            {parameters.formCap.toFixed(1)}x
+            k={parameters.formSteepness.toFixed(1)}
           </Typography>
         </Grid>
 

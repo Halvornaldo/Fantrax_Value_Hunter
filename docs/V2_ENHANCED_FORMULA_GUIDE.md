@@ -70,27 +70,43 @@ n#### **Enhanced MAX Formula Implementation** ✅ *Updated 2025-09-17*
 
 **Display Format**: "38+2" (historical+current games)
 
-### **2. Progressive Form Calculation (EWMA)** ✅ *Enhanced 2025-08-28*
-**Purpose**: Responsive form tracking using Exponential Weighted Moving Average with sample-size aware boundaries
+### **2. Progressive Form Calculation (EWMA)** ✅ *Enhanced 2026-01-03*
+**Purpose**: Responsive form tracking using Exponential Weighted Moving Average with log-sigmoid smoothing
 
 **Algorithm**:
-- Recent 5 games weighted exponentially: α^0, α^1, α^2, α^3, α^4
-- Alpha (α) = 0.87 (5-game half-life)
-- Normalized against dynamic baseline: `form_score ÷ blended_ppg`
+- Configurable lookback: 5-15 games (default 9), UI slider controlled
+- Games weighted exponentially: α^0, α^1, α^2, ... α^(n-1)
+- Alpha (α) = 0.15-0.40 configurable (lower α = more weight on recent games)
+- Normalized against dynamic baseline with offset shift: `(form_score + 25) ÷ (blended_ppg + 25)`
 
-**Progressive Range System** ✅ *New Feature*:
+**Offset Shift System** ✅ *New 2026-01-03*:
+Handles negative game scores proportionally:
+- Offset of 25 added to both numerator and denominator
+- Ensures -2 score treated as only 3 points below +1 (not catastrophically worse)
+- Handles scores down to -20 (database range: -20 to +42)
+- Preserves neutral point: form = baseline → multiplier = 1.0
+
+**Log-Sigmoid Curve** ✅ *New 2026-01-03*:
+Smooth distribution replacing hard caps:
+- **Formula**: `multiplier = 0.5 × (4 ^ sigmoid_exponent)`
+- **Sigmoid input**: `log(raw_multiplier) × k`
+- **Steepness (k)**: 0.5-4.0 configurable via "Form Curve" slider
+- **Bounds**: Approaches but never hits [0.5, 2.0]
+- **Benefit**: Gradient distribution instead of clustering at caps
+
+**Progressive Range System**:
 Progressive multiplier boundaries based on statistical confidence of sample size:
-- **Games 1-2**: ±5% range (0.95-1.05) - Tight early-season control  
+- **Games 1-2**: ±5% range (0.95-1.05) - Tight early-season control
 - **Games 3-4**: ±15% range (0.85-1.15) - Moderate expansion
 - **Games 5-6**: ±20% range (0.80-1.20) - Increased differentiation
 - **Games 7-8**: ±25% range (0.75-1.25) - Strong sample confidence
 - **Games 9-10**: ±30% range (0.70-1.30) - Full statistical confidence
 - **Games 11+**: ±30% range maintained - Maximum differentiation allowed
 
-**Benefits**:
-- **Early Season Volatility Control**: 50% reduction in multiplier extremes (±5% vs ±10%)
-- **Statistical Rigor**: Ranges expand as sample size increases reliability
-- **Balance**: Form impact scales appropriately relative to other multipliers
+**UI Controls**:
+- **Form Games slider**: Lookback period (5-15 games)
+- **EWMA α slider**: Weight decay (0.15-0.40)
+- **Form Curve slider**: Sigmoid steepness (0.5-4.0)
 
 **Implementation**: `calculation_engine_v2.py:_calculate_exponential_form_multiplier`
 
@@ -143,12 +159,12 @@ Progressive multiplier boundaries based on statistical confidence of sample size
 ## **Multiplier Cap System**
 
 **Enhanced V2.0 Caps**:
-- **Form**: Progressive ranges (0.95-1.05 early → 0.70-1.30 late season) - Sample-size aware
-- **Fixture**: 0.5 - 1.8x
+- **Form**: Log-sigmoid bounds [0.5, 2.0] with smooth gradient (no hard clipping)
+- **Fixture**: 0.4 - 2.5x (NPxG-based)
 - **xGI**: 0.5 - 2.5x
 - **Global**: 3.0x maximum (total product)
 
-**Implementation**: Individual caps applied first, then global scaling if total exceeds 3.0x
+**Implementation**: Form uses log-sigmoid for soft bounds; other multipliers use hard caps; global scaling if total exceeds 3.0x
 
 ---
 
@@ -426,6 +442,6 @@ curl http://localhost:5001/api/config
 
 ---
 
-**Last Updated**: 2025-08-23 - V2.0 Enhanced Formula Production System
+**Last Updated**: 2026-01-03 - Enhanced form calculation with log-sigmoid curve and offset shift
 
 *This guide documents the complete V2.0 Enhanced Formula system serving 714 Premier League players with advanced mathematical calculations including True Value predictions, ROI analysis, dynamic blending, EWMA form tracking, and normalized xGI integration.*
