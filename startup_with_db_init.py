@@ -44,27 +44,19 @@ def run_migrations():
         print(f"⚠️ Migration warning: {e}")
 
 def main():
-    print("🚀 Starting Fantrax Value Hunter with Database Auto-Initialization...")
+    print("Starting Fantrax Value Hunter...")
 
-    # Run migrations first
-    print("🔄 Running database migrations...")
+    # Run migrations first (safe - only adds columns, never drops)
+    print("Running database migrations...")
     run_migrations()
 
-    # Import and run database initialization
-    try:
-        from init_database import init_database_if_needed
-        print("📊 Initializing database if needed...")
-        init_success = init_database_if_needed()
-        if init_success:
-            print("✅ Database initialization completed successfully")
-        else:
-            print("⚠️ Database initialization had issues but continuing...")
-    except Exception as e:
-        print(f"❌ Database initialization failed: {e}")
-        print("⚠️ Continuing with app startup...")
+    # NOTE: Database initialization removed - Railway is a read-only mirror
+    # Data is synced from local database via dashboard "Sync to Railway" button
+    # The old init_database_if_needed() could DROP all tables if it detected
+    # an "incomplete" database, which caused data loss issues.
 
     # Import and start the Flask app
-    print("🌐 Starting Flask application...")
+    print("Starting Flask application...")
     from app import app
 
     # Get port from environment (Railway sets this)
