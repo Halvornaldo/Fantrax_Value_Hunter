@@ -497,7 +497,9 @@ const PlayerTable = ({ playersData, gameweekInfo, systemConfig, onDataRefresh })
   const renderValueCell = (params, colorFunc) => {
     const value = params.value;
     const color = colorFunc(value);
-    const displayValue = typeof value === 'number' ? value.toFixed(3) : (value || '--');
+    // Handle both number and string representations (Railway returns decimals as strings)
+    const numValue = parseFloat(value);
+    const displayValue = !isNaN(numValue) ? numValue.toFixed(3) : (value || '--');
 
     return (
       <Box
