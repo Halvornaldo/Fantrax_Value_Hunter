@@ -31,7 +31,7 @@ ESSENTIAL_TABLES = [
     'fixture_odds',          # Legacy fixture data
 
     # New tables with data (will be created if needed)
-    'verified_name_mappings', # Verified player mappings
+    # verified_name_mappings is a VIEW, not synced (auto-populates from name_mappings)
     'raw_data_complete',     # Complete raw data
 ]
 
@@ -170,13 +170,25 @@ class OptimizedRailwaySync:
 
                 col_defs = []
                 for col in columns:
-                    col_def = f'"{col[0]}" {col[1]}'
-                    if col[1] == 'character varying' and col[2]:
-                        col_def += f'({col[2]})'
-                    if col[3] == 'NO':
+                    col_name, data_type, char_max_len, is_nullable, col_default = col
+
+                    # Handle serial/sequence columns - convert to SERIAL type
+                    if col_default and 'nextval' in str(col_default):
+                        if data_type == 'integer':
+                            col_def = f'"{col_name}" SERIAL'
+                        elif data_type == 'bigint':
+                            col_def = f'"{col_name}" BIGSERIAL'
+                        else:
+                            col_def = f'"{col_name}" {data_type}'
+                    else:
+                        col_def = f'"{col_name}" {data_type}'
+                        if data_type == 'character varying' and char_max_len:
+                            col_def += f'({char_max_len})'
+                        if col_default and 'nextval' not in str(col_default):
+                            col_def += f' DEFAULT {col_default}'
+
+                    if is_nullable == 'NO' and 'SERIAL' not in col_def:
                         col_def += ' NOT NULL'
-                    if col[4]:
-                        col_def += f' DEFAULT {col[4]}'
                     col_defs.append(col_def)
 
                 create_sql = f"CREATE TABLE {table_name} ({', '.join(col_defs)})"
