@@ -417,6 +417,167 @@ export const updateNPxGConfig = async (config) => {
   }
 };
 
+// ============================================================================
+// LINEUP OPTIMIZER API FUNCTIONS
+// ============================================================================
+
+/**
+ * Import team roster CSV for lineup optimization.
+ * @param {File} csvFile - The CSV file to upload
+ * @returns {Promise<Object>} - Roster data with current prices and True Values
+ */
+export const importLineupRoster = async (csvFile) => {
+  try {
+    const formData = new FormData();
+    formData.append('roster_csv', csvFile);
+
+    const response = await fetch(`${API_BASE_URL}/api/lineup/import`, {
+      method: 'POST',
+      body: formData,
+    });
+
+    if (!response.ok) {
+      const errorData = await response.json();
+      throw new Error(errorData.error || `HTTP error! status: ${response.status}`);
+    }
+
+    const data = await response.json();
+    return {
+      success: data.success,
+      roster: data.roster || [],
+      unmatched: data.unmatched || [],
+      totalPlayers: data.total_players || 0,
+      matchedCount: data.matched_count || 0,
+      totals: data.totals || {}
+    };
+  } catch (error) {
+    console.error('Lineup import failed:', error);
+    return {
+      success: false,
+      error: error.message,
+      roster: []
+    };
+  }
+};
+
+/**
+ * Get the current imported lineup roster.
+ * @returns {Promise<Object>} - Current roster and totals
+ */
+export const getCurrentLineup = async () => {
+  try {
+    const data = await makeRequest('/api/lineup/current');
+    return {
+      success: true,
+      roster: data.roster || [],
+      formation: data.formation || '',
+      totals: data.totals || {},
+      message: data.message
+    };
+  } catch (error) {
+    console.error('Get current lineup failed:', error);
+    return {
+      success: false,
+      error: error.message,
+      roster: []
+    };
+  }
+};
+
+/**
+ * Generate 3 optimized lineup alternatives.
+ * @param {string[]} lockedPlayerIds - IDs of players to keep in lineup
+ * @param {number} budget - Total budget constraint (default 100)
+ * @param {Object[]} lockedPlayersData - Locked players with purchase prices
+ * @returns {Promise<Object>} - 3 alternative lineup suggestions
+ */
+export const optimizeLineup = async (lockedPlayerIds = [], budget = 100, lockedPlayersData = []) => {
+  try {
+    const data = await makeRequest('/api/lineup/optimize', {
+      method: 'POST',
+      body: JSON.stringify({
+        locked_player_ids: lockedPlayerIds,
+        locked_players_data: lockedPlayersData,
+        budget: budget
+      }),
+    });
+
+    return {
+      success: data.success,
+      alternatives: data.alternatives || [],
+      lockedPlayers: data.locked_players || [],
+      lockedCost: data.locked_cost || 0,
+      budget: data.budget || 100
+    };
+  } catch (error) {
+    console.error('Lineup optimization failed:', error);
+    return {
+      success: false,
+      error: error.message,
+      alternatives: []
+    };
+  }
+};
+
+// Toggle player exclusion from optimizer
+export const togglePlayerExclusion = async (playerId) => {
+  try {
+    const data = await makeRequest(`/api/players/${playerId}/toggle-exclude`, {
+      method: 'POST',
+    });
+
+    return {
+      success: true,
+      ...data
+    };
+  } catch (error) {
+    return {
+      success: false,
+      error: error.message
+    };
+  }
+};
+
+// Reset all player exclusions
+export const resetAllExclusions = async () => {
+  try {
+    const data = await makeRequest('/api/players/reset-exclusions', {
+      method: 'POST',
+    });
+
+    return {
+      success: true,
+      ...data
+    };
+  } catch (error) {
+    return {
+      success: false,
+      error: error.message
+    };
+  }
+};
+
+// Search players for lineup replacement
+export const searchPlayersForReplacement = async (search, position = null) => {
+  try {
+    let url = `/api/players?limit=50&search=${encodeURIComponent(search)}`;
+    if (position) {
+      url += `&position=${position}`;
+    }
+    const data = await makeRequest(url);
+    return {
+      success: true,
+      players: data.players || []
+    };
+  } catch (error) {
+    return {
+      success: false,
+      error: error.message,
+      players: []
+    };
+  }
+};
+
 export default {
   fetchPlayersData,
   fetchSystemConfig,
@@ -433,4 +594,13 @@ export default {
   fetchNPxGTeamStats,
   fetchNPxGConfig,
   updateNPxGConfig,
+  // Lineup Optimizer
+  importLineupRoster,
+  getCurrentLineup,
+  optimizeLineup,
+  // Player Exclusions
+  togglePlayerExclusion,
+  resetAllExclusions,
+  // Player Search
+  searchPlayersForReplacement,
 };

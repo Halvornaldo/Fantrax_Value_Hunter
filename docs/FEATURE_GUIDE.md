@@ -578,6 +578,97 @@ Result: Moderate True Value with below-average ROI due to premium pricing and di
 
 ---
 
-**Last Updated**: 2025-08-23 - V2.0 Enhanced Formula Dashboard with Trend Analysis System
+## **Lineup Optimizer** ✅ *Added 2026-01-04*
+
+### **Overview: ILP-Based Team Optimization**
+The Lineup Optimizer uses Integer Linear Programming (ILP) with PuLP to find mathematically optimal lineups based on True Value scores, budget constraints, and formation requirements.
+
+**Dashboard Access**: Navigate to the "Lineup Optimizer" tab in the React dashboard
+
+### **Core Features**
+
+**1. Roster Import**
+- Import your current Fantrax team roster via CSV export
+- Automatic matching of players to database records with True Value data
+- Budget calculation based on purchase prices from CSV
+
+**2. Pitch Visualization**
+- Interactive football pitch display showing your current lineup
+- Players grouped by position (GK, DEF, MID, FWD)
+- Formation badge displays current formation (e.g., 3-5-2, 3-4-3)
+
+**3. Player Actions (Icon Buttons)**
+- **Lock Icon (top right)**: Lock/unlock players to keep them in optimized lineups
+- **Replace Icon (top left)**: Swap any player with another from the full database
+  - Search by name with position filtering
+  - Replaced players are automatically locked
+  - Budget and True Value totals update automatically
+
+**4. Lock Discounted Button**
+- One-click button to lock all players where purchase price < current market value
+- Shows count of discounted players (players that appreciated in value)
+- Protects value gains when optimizing
+
+### **Optimization Engine**
+
+**ILP Formulation**:
+```
+Maximize: Σ(x_i × true_value_i)
+Subject to:
+  - Budget: Σ(x_i × price_i) ≤ remaining_budget
+  - Total: Σ(x_i) = 11 players
+  - Positions: 1 GK, 3-5 DEF, 3-5 MID, 1-3 FWD
+  - Locked: x_i = 1 for locked players
+```
+
+**Multi-Position Handling**: Players with dual positions (e.g., "M,F") are expanded into separate variables with mutual exclusion constraints.
+
+### **Lineup Generation**
+
+**Per Formation Output** (18 total lineups):
+- **6 Optimal Lineups**: Best True Value combinations with variation constraints
+- **3 Differential Lineups**: Exclude top 8 performers to surface alternative picks
+
+**Formation Support**:
+- 3-5-2: 3 defenders, 5 midfielders, 2 forwards
+- 3-4-3: 3 defenders, 4 midfielders, 3 forwards
+
+### **Player Exclusion System**
+
+**From Players Table**:
+- Checkbox column to exclude specific players from optimization
+- "Reset Exclusions" button to clear all exclusions
+- Filter dropdown to view only excluded players
+- Excluded players won't appear in any generated lineups
+
+### **Usage Workflow**
+
+1. **Import Roster**: Export your team from Fantrax → Import CSV in Lineup Optimizer
+2. **Lock Key Players**: Click lock icon or use "Lock Discounted" button
+3. **Replace if Needed**: Click replace icon to swap in different players
+4. **Exclude Unwanted**: Use Players table to exclude specific players
+5. **Generate Lineups**: Click "GENERATE LINEUPS" button
+6. **Review Options**: Browse 9 lineups per formation (6 optimal + 3 differential)
+7. **Select Lineup**: Click any lineup card to view it on the pitch
+
+### **Technical Implementation**
+
+**Dependencies**: `pulp>=2.7.0` (added to requirements.txt)
+
+**API Endpoints**:
+- `POST /api/lineup/import` - Import roster CSV
+- `POST /api/lineup/optimize` - Generate optimized lineups
+- `POST /api/players/<id>/toggle-exclude` - Toggle player exclusion
+- `POST /api/players/reset-exclusions` - Reset all exclusions
+- `GET /api/players?search=<term>` - Search players for replacement
+
+**Frontend Components**:
+- `LineupOptimizer.js` - Main optimizer interface
+- `PitchView.js` - Football pitch visualization
+- `PlayerSearchDialog.js` - Player replacement search modal
+
+---
+
+**Last Updated**: 2026-01-04 - V2.0 Enhanced Formula Dashboard with Lineup Optimizer
 
 *This document reflects the current V2.0-only dashboard features with all legacy components removed. The dashboard serves 714 Premier League players with optimized V2.0 Enhanced Formula calculations including True Value predictions, ROI analysis, dynamic blending, EWMA form calculations, and normalized xGI integration. The trend analysis system enables retrospective analysis using captured raw data snapshots for season-long performance tracking.*

@@ -37,7 +37,7 @@ import {
 import { useTheme } from '@mui/material/styles';
 import { Tooltip as ReactTooltip } from 'react-tooltip';
 
-import { exportPlayersCSV, applyStarterOverride } from '../services/api';
+import { exportPlayersCSV, applyStarterOverride, togglePlayerExclusion, resetAllExclusions } from '../services/api';
 
 const PlayerTable = ({ playersData, gameweekInfo, systemConfig, onDataRefresh }) => {
   const theme = useTheme();
@@ -57,6 +57,7 @@ const PlayerTable = ({ playersData, gameweekInfo, systemConfig, onDataRefresh })
   const [roiFilterEnabled, setRoiFilterEnabled] = useState(false);
   const [roiThreshold, setRoiThreshold] = useState(0.75);
   const [overrideFilter, setOverrideFilter] = useState('All');
+  const [excludedFilter, setExcludedFilter] = useState('All');
   const [includeAllPlayers, setIncludeAllPlayers] = useState(false);
 
   // Table states
@@ -65,6 +66,10 @@ const PlayerTable = ({ playersData, gameweekInfo, systemConfig, onDataRefresh })
 
   // Starter override states
   const [processingOverride, setProcessingOverride] = useState(null);
+
+  // Exclusion states
+  const [processingExclusion, setProcessingExclusion] = useState(null);
+  const [resettingExclusions, setResettingExclusions] = useState(false);
 
   // Help panel state
   const [helpPanelOpen, setHelpPanelOpen] = useState(false);
@@ -297,6 +302,12 @@ const PlayerTable = ({ playersData, gameweekInfo, systemConfig, onDataRefresh })
   // Enhanced tooltip content for help panel
   const getColumnTooltip = (field) => {
     const tooltips = {
+      exclude_from_optimizer: {
+        title: 'Exclude from Optimizer',
+        description: 'Checkbox to exclude player from lineup optimization',
+        interpretation: 'Check to exclude unreliable players (low sample size, injury risk). Use Reset Exclusions button to clear all.',
+        details: 'Excluded players will not appear in optimizer suggestions but remain in the main table for tracking.'
+      },
       name: {
         title: 'Player Name',
         description: 'Full player name as registered in Fantasy Premier League'
@@ -442,6 +453,46 @@ const PlayerTable = ({ playersData, gameweekInfo, systemConfig, onDataRefresh })
     }
   };
 
+  // Handle exclusion toggle
+  const handleToggleExclusion = async (playerId) => {
+    try {
+      setProcessingExclusion(playerId);
+      const response = await togglePlayerExclusion(playerId);
+      if (response.success) {
+        if (onDataRefresh) {
+          await onDataRefresh();
+        }
+      } else {
+        throw new Error(response.error || 'Toggle exclusion failed');
+      }
+    } catch (error) {
+      console.error('Toggle exclusion failed:', error);
+      alert('Toggle exclusion failed: ' + error.message);
+    } finally {
+      setProcessingExclusion(null);
+    }
+  };
+
+  // Handle reset all exclusions
+  const handleResetExclusions = async () => {
+    try {
+      setResettingExclusions(true);
+      const response = await resetAllExclusions();
+      if (response.success) {
+        if (onDataRefresh) {
+          await onDataRefresh();
+        }
+      } else {
+        throw new Error(response.error || 'Reset exclusions failed');
+      }
+    } catch (error) {
+      console.error('Reset exclusions failed:', error);
+      alert('Reset exclusions failed: ' + error.message);
+    } finally {
+      setResettingExclusions(false);
+    }
+  };
+
   // Custom cell renderer with gradients
   const renderValueCell = (params, colorFunc) => {
     const value = params.value;
@@ -583,6 +634,34 @@ const PlayerTable = ({ playersData, gameweekInfo, systemConfig, onDataRefresh })
 
   // Column definitions with tooltips
   const columns = [
+    {
+      field: 'exclude_from_optimizer',
+      headerName: 'Excl',
+      width: 50,
+      sortable: true,
+      renderCell: (params) => {
+        const playerId = params.row.id;
+        const isExcluded = params.value || false;
+        const isLoading = processingExclusion === playerId;
+
+        return (
+          <Checkbox
+            checked={isExcluded}
+            disabled={isLoading}
+            onChange={() => handleToggleExclusion(playerId)}
+            size="small"
+            sx={{
+              color: isExcluded ? '#f44336' : 'text.secondary',
+              '&.Mui-checked': {
+                color: '#f44336',
+              },
+              padding: 0,
+            }}
+            title={isExcluded ? 'Excluded from optimizer - click to include' : 'Click to exclude from optimizer'}
+          />
+        );
+      },
+    },
     {
       field: 'name',
       headerName: 'Name',
@@ -998,9 +1077,16 @@ const PlayerTable = ({ playersData, gameweekInfo, systemConfig, onDataRefresh })
         if (overrideFilter === 'No Override' && hasOverride) return false;
       }
 
+      // Excluded filter
+      if (excludedFilter !== 'All') {
+        const isExcluded = player.exclude_from_optimizer || false;
+        if (excludedFilter === 'Excluded' && !isExcluded) return false;
+        if (excludedFilter === 'Not Excluded' && isExcluded) return false;
+      }
+
       return true;
     });
-  }, [playersData, positionFilter, priceMin, priceMax, teamFilter, searchTerm, historicalDataFilter, minutesFilterEnabled, minutesThreshold, starterFilterEnabled, starterThreshold, roiFilterEnabled, roiThreshold, overrideFilter]);
+  }, [playersData, positionFilter, priceMin, priceMax, teamFilter, searchTerm, historicalDataFilter, minutesFilterEnabled, minutesThreshold, starterFilterEnabled, starterThreshold, roiFilterEnabled, roiThreshold, overrideFilter, excludedFilter]);
 
   // Calculate maximum values for dynamic color coding
   const columnMaxValues = useMemo(() => {
@@ -1069,6 +1155,17 @@ const PlayerTable = ({ playersData, gameweekInfo, systemConfig, onDataRefresh })
           >
             Export CSV
           </Button>
+          <Tooltip title="Reset all player exclusions from lineup optimizer">
+            <Button
+              onClick={handleResetExclusions}
+              disabled={resettingExclusions}
+              sx={{ color: "#ff9800", borderColor: "#ff9800" }}
+              variant="outlined"
+              size="small"
+            >
+              {resettingExclusions ? 'Resetting...' : 'Reset Exclusions'}
+            </Button>
+          </Tooltip>
         </Box>
       </Box>
 
@@ -1110,7 +1207,7 @@ const PlayerTable = ({ playersData, gameweekInfo, systemConfig, onDataRefresh })
           <CardContent sx={{ pt: 0 }}>
             <Grid container spacing={1.5}>
               {[
-                'name', 'team', 'position', 'price', 'total_fpts', 'ppg', 'pp90', 'blended_ppg',
+                'exclude_from_optimizer', 'name', 'team', 'position', 'price', 'total_fpts', 'ppg', 'pp90', 'blended_ppg',
                 'games_played_historical', 'games_played', 'true_value', 'roi',
                 'form_multiplier', 'fixture_multiplier', 'starter_multiplier', 'starter_override',
                 'xgi_multiplier', 'xgi90', 'xg90', 'xa90', 'minutes'
@@ -1258,6 +1355,22 @@ const PlayerTable = ({ playersData, gameweekInfo, systemConfig, onDataRefresh })
                 <MenuItem value="All">All</MenuItem>
                 <MenuItem value="Has Override">Has Override</MenuItem>
                 <MenuItem value="No Override">No Override</MenuItem>
+              </Select>
+            </FormControl>
+          </Grid>
+
+          {/* Excluded Filter */}
+          <Grid item>
+            <FormControl size="small" sx={{ minWidth: 120 }}>
+              <InputLabel>Excluded</InputLabel>
+              <Select
+                value={excludedFilter}
+                label="Excluded"
+                onChange={(e) => setExcludedFilter(e.target.value)}
+              >
+                <MenuItem value="All">All</MenuItem>
+                <MenuItem value="Excluded">Excluded</MenuItem>
+                <MenuItem value="Not Excluded">Not Excluded</MenuItem>
               </Select>
             </FormControl>
           </Grid>

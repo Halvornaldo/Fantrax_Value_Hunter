@@ -17,6 +17,7 @@ from typing import Dict, List, Optional, Any
 import time
 import sys
 from datetime import datetime
+import pulp  # For lineup optimization (Integer Linear Programming)
 
 # Add name_matching module to path
 sys.path.append(os.path.dirname(__file__))
@@ -617,6 +618,7 @@ def get_players():
                 p.id, p.name, p.team, p.position,
                 p.minutes, p.xg90, p.xa90, p.xgi90, p.baseline_xgi,
                 p.games_current_season,
+                COALESCE(p.exclude_from_optimizer, FALSE) as exclude_from_optimizer,
                 pm.price, 
                 COALESCE(pf.total_points, 0) as total_fpts,
                 CASE
@@ -1263,6 +1265,67 @@ def manual_override():
         
     except Exception as e:
         return jsonify({'error': str(e)}), 500
+
+@app.route('/api/players/<player_id>/toggle-exclude', methods=['POST'])
+def toggle_exclude_player(player_id):
+    """Toggle exclude_from_optimizer flag for a player"""
+    try:
+        conn = get_db_connection()
+        cursor = conn.cursor()
+
+        # Toggle the current value
+        cursor.execute("""
+            UPDATE players
+            SET exclude_from_optimizer = NOT COALESCE(exclude_from_optimizer, FALSE)
+            WHERE id = %s
+            RETURNING id, name, exclude_from_optimizer
+        """, (player_id,))
+
+        result = cursor.fetchone()
+        conn.commit()
+        cursor.close()
+        conn.close()
+
+        if result:
+            return jsonify({
+                'success': True,
+                'player_id': result[0],
+                'player_name': result[1],
+                'excluded': result[2],
+                'message': f"{'Excluded' if result[2] else 'Included'} {result[1]} from optimizer"
+            })
+        else:
+            return jsonify({'success': False, 'error': 'Player not found'}), 404
+
+    except Exception as e:
+        return jsonify({'success': False, 'error': str(e)}), 500
+
+@app.route('/api/players/reset-exclusions', methods=['POST'])
+def reset_all_exclusions():
+    """Reset all player exclusions (set exclude_from_optimizer to FALSE for all)"""
+    try:
+        conn = get_db_connection()
+        cursor = conn.cursor()
+
+        cursor.execute("""
+            UPDATE players
+            SET exclude_from_optimizer = FALSE
+            WHERE exclude_from_optimizer = TRUE
+        """)
+
+        affected = cursor.rowcount
+        conn.commit()
+        cursor.close()
+        conn.close()
+
+        return jsonify({
+            'success': True,
+            'players_reset': affected,
+            'message': f"Reset {affected} player exclusions"
+        })
+
+    except Exception as e:
+        return jsonify({'success': False, 'error': str(e)}), 500
 
 @app.route('/api/verify-starter-status', methods=['GET'])
 def verify_starter_status():
@@ -4480,6 +4543,7 @@ def import_understat_player_json():
             'total_json_players': total_players,
             'successfully_matched': len(matched_players),
             'unmatched_players': len(unmatched_players),
+            'unmatched_names': [p['player_name'] for p in unmatched_players],
             'match_rate': match_rate,
             'matched_data': matched_players,
             'unmatched_data': unmatched_players
@@ -6589,6 +6653,663 @@ def manage_npxg_config():
     except Exception as e:
         return jsonify({'error': str(e)}), 500
 
+
+# ============================================================================
+# LINEUP OPTIMIZER ENDPOINTS
+# ============================================================================
+
+# In-memory storage for current lineup (per-session in production, use Flask session)
+_current_lineup_roster = []
+
+@app.route('/api/lineup/import', methods=['POST'])
+def import_lineup_roster():
+    """
+    Import team roster CSV from Fantrax export.
+    Expects CSV with columns: ID, Player, Team, Position, Salary
+    Returns enriched roster with current prices and True Values from database.
+    """
+    global _current_lineup_roster
+
+    try:
+        # Check for uploaded file
+        if 'roster_csv' not in request.files:
+            return jsonify({
+                'success': False,
+                'error': 'No file uploaded. Use form field name "roster_csv"'
+            }), 400
+
+        file = request.files['roster_csv']
+        if file.filename == '':
+            return jsonify({
+                'success': False,
+                'error': 'No file selected'
+            }), 400
+
+        # Read CSV file - Fantrax Team Roster has multiple sections (GK vs Outfield)
+        import pandas as pd
+
+        file_content = file.stream.read().decode("UTF8")
+        lines = file_content.strip().split('\n')
+
+        # Parse Fantrax multi-section Team Roster CSV
+        # Format: Section header row, then column header row, then data rows
+        # Sections: "Goalkeeper" and "Outfielder" with different column counts
+        players_data = []
+        current_section = None
+        header_row = None
+
+        for line in lines:
+            line = line.strip()
+            if not line:
+                continue
+
+            # Check for section headers (e.g., "","Goalkeeper" or "","Outfielder")
+            if line.startswith('""') and ('Goalkeeper' in line or 'Outfielder' in line):
+                current_section = 'G' if 'Goalkeeper' in line else 'Outfield'
+                header_row = None  # Next row will be the header
+                continue
+
+            # Parse the row
+            # Handle CSV quoting properly
+            try:
+                reader = csv.reader([line])
+                row = next(reader)
+            except:
+                continue
+
+            # Check if this is a header row (starts with "ID")
+            if row and row[0] == 'ID':
+                header_row = row
+                continue
+
+            # Skip if no header yet or empty row
+            if not header_row or not row or not row[0]:
+                continue
+
+            # Skip rows that don't start with a player ID (e.g., "*044ei*")
+            if not row[0].startswith('*'):
+                continue
+
+            # Parse data row using header mapping
+            try:
+                row_dict = dict(zip(header_row, row))
+
+                # Extract required fields with fallbacks
+                player_id = row_dict.get('ID', '').strip('*')
+                player_name = row_dict.get('Player', 'Unknown')
+                team = row_dict.get('Team', 'UNK')
+                position = row_dict.get('Pos', row_dict.get('Position', 'UNK'))
+                salary = float(row_dict.get('Salary', '0') or '0')
+
+                if player_id and player_name:
+                    players_data.append({
+                        'ID': player_id,
+                        'Player': player_name,
+                        'Team': team,
+                        'Position': position,
+                        'Salary': salary
+                    })
+            except Exception as parse_error:
+                print(f"Skipping row due to parse error: {parse_error}")
+                continue
+
+        if not players_data:
+            return jsonify({
+                'success': False,
+                'error': 'No valid player data found in CSV. Expected Fantrax Team Roster format.'
+            }), 400
+
+        # Convert to DataFrame for consistent processing
+        csv_input = pd.DataFrame(players_data)
+
+        conn = get_db_connection()
+        cursor = conn.cursor(cursor_factory=psycopg2.extras.RealDictCursor)
+
+        roster = []
+        unmatched = []
+
+        for index, row in csv_input.iterrows():
+            # Extract player data from CSV
+            player_id = str(row['ID']).strip('*')
+            player_name = row['Player']
+            team = row['Team']
+            position = row['Position']
+            purchase_price = float(row['Salary'])
+
+            # Look up current data from database
+            cursor.execute("""
+                SELECT
+                    p.id, p.name, p.team, p.position,
+                    pm.price as current_price,
+                    pm.true_value,
+                    p.roi,
+                    pm.form_multiplier,
+                    pm.fixture_multiplier,
+                    pm.starter_multiplier,
+                    pm.xgi_multiplier,
+                    pm.next_opponent,
+                    pm.is_home
+                FROM players p
+                JOIN player_metrics pm ON p.id = pm.player_id AND pm.gameweek = 1
+                WHERE p.id = %s
+            """, [player_id])
+
+            db_player = cursor.fetchone()
+
+            if db_player:
+                roster.append({
+                    'csv_id': player_id,
+                    'player_id': db_player['id'],
+                    'name': db_player['name'],
+                    'team': db_player['team'],
+                    'position': db_player['position'],
+                    'purchase_price': purchase_price,
+                    'current_price': float(db_player['current_price']) if db_player['current_price'] else purchase_price,
+                    'true_value': float(db_player['true_value']) if db_player['true_value'] else 0,
+                    'roi': float(db_player['roi']) if db_player['roi'] else 0,
+                    'form_multiplier': float(db_player['form_multiplier']) if db_player['form_multiplier'] else 1.0,
+                    'fixture_multiplier': float(db_player['fixture_multiplier']) if db_player['fixture_multiplier'] else 1.0,
+                    'starter_multiplier': float(db_player['starter_multiplier']) if db_player['starter_multiplier'] else 1.0,
+                    'xgi_multiplier': float(db_player['xgi_multiplier']) if db_player['xgi_multiplier'] else 1.0,
+                    'next_opponent': db_player['next_opponent'],
+                    'is_home': db_player['is_home'],
+                    'matched': True
+                })
+            else:
+                # Player not in database - still include but mark as unmatched
+                unmatched.append({
+                    'csv_id': player_id,
+                    'name': player_name,
+                    'team': team,
+                    'position': position,
+                    'purchase_price': purchase_price
+                })
+                roster.append({
+                    'csv_id': player_id,
+                    'player_id': player_id,
+                    'name': player_name,
+                    'team': team,
+                    'position': position,
+                    'purchase_price': purchase_price,
+                    'current_price': purchase_price,
+                    'true_value': 0,
+                    'roi': 0,
+                    'form_multiplier': 1.0,
+                    'fixture_multiplier': 1.0,
+                    'starter_multiplier': 1.0,
+                    'xgi_multiplier': 1.0,
+                    'next_opponent': None,
+                    'is_home': None,
+                    'matched': False
+                })
+
+        cursor.close()
+        conn.close()
+
+        # Store roster in memory for subsequent calls
+        _current_lineup_roster = roster
+
+        # Calculate totals
+        total_purchase = sum(p['purchase_price'] for p in roster)
+        total_current = sum(p['current_price'] for p in roster)
+        total_true_value = sum(p['true_value'] for p in roster)
+
+        return jsonify({
+            'success': True,
+            'roster': roster,
+            'unmatched': unmatched,
+            'total_players': len(roster),
+            'matched_count': len([p for p in roster if p['matched']]),
+            'totals': {
+                'purchase_price': round(total_purchase, 2),
+                'current_price': round(total_current, 2),
+                'true_value': round(total_true_value, 2),
+                'price_change': round(total_current - total_purchase, 2)
+            }
+        })
+
+    except Exception as e:
+        import traceback
+        traceback.print_exc()
+        return jsonify({
+            'success': False,
+            'error': str(e)
+        }), 500
+
+
+@app.route('/api/lineup/current', methods=['GET'])
+def get_current_lineup():
+    """Return the current imported lineup roster."""
+    global _current_lineup_roster
+
+    if not _current_lineup_roster:
+        return jsonify({
+            'success': True,
+            'roster': [],
+            'message': 'No roster imported yet'
+        })
+
+    # Calculate totals
+    total_purchase = sum(p['purchase_price'] for p in _current_lineup_roster)
+    total_current = sum(p['current_price'] for p in _current_lineup_roster)
+    total_true_value = sum(p['true_value'] for p in _current_lineup_roster)
+
+    # Detect formation
+    def detect_formation(players):
+        positions = {'G': 0, 'D': 0, 'M': 0, 'F': 0}
+        for p in players:
+            pos = p['position'].split(',')[0]  # Primary position
+            if pos in positions:
+                positions[pos] += 1
+        return f"{positions['D']}-{positions['M']}-{positions['F']}"
+
+    return jsonify({
+        'success': True,
+        'roster': _current_lineup_roster,
+        'formation': detect_formation(_current_lineup_roster),
+        'totals': {
+            'purchase_price': round(total_purchase, 2),
+            'current_price': round(total_current, 2),
+            'true_value': round(total_true_value, 2),
+            'budget_used': round(total_current, 2),
+            'budget_remaining': round(100 - total_current, 2)
+        }
+    })
+
+
+@app.route('/api/lineup/optimize', methods=['POST'])
+def optimize_lineup():
+    """
+    Generate 3 optimized lineup alternatives based on True Value.
+
+    Request body:
+    {
+        "locked_player_ids": ["id1", "id2"],  # Players to keep in lineup
+        "locked_players_data": [{"player_id": "id1", "purchase_price": 5.5}, ...],  # Optional: with purchase prices
+        "budget": 100,                         # Total budget constraint
+    }
+    """
+    try:
+        data = request.get_json() or {}
+        locked_player_ids = set(data.get('locked_player_ids', []))
+        locked_players_data = {p['player_id']: p for p in data.get('locked_players_data', [])}
+        budget = float(data.get('budget', 100))
+
+        conn = get_db_connection()
+        cursor = conn.cursor(cursor_factory=psycopg2.extras.RealDictCursor)
+
+        # Get all available players with their stats
+        # Note: No gameweek filter - using live table approach (matches main /api/players)
+        cursor.execute("""
+            SELECT
+                p.id, p.name, p.team, p.position,
+                pm.price as current_price,
+                pm.true_value,
+                p.roi,
+                pm.form_multiplier,
+                pm.fixture_multiplier,
+                pm.starter_multiplier,
+                pm.xgi_multiplier,
+                pm.next_opponent,
+                pm.is_home
+            FROM players p
+            JOIN player_metrics pm ON p.id = pm.player_id
+            WHERE pm.price > 0 
+              AND pm.true_value IS NOT NULL
+              AND COALESCE(p.exclude_from_optimizer, FALSE) = FALSE
+            ORDER BY pm.true_value DESC
+        """)
+
+        all_players = cursor.fetchall()
+        cursor.close()
+        conn.close()
+
+        # Convert to list of dicts with proper types
+        players_pool = []
+        for p in all_players:
+            players_pool.append({
+                'player_id': p['id'],
+                'name': p['name'],
+                'team': p['team'],
+                'position': p['position'],
+                'current_price': float(p['current_price']) if p['current_price'] else 0,
+                'true_value': float(p['true_value']) if p['true_value'] else 0,
+                'roi': float(p['roi']) if p['roi'] else 0,
+                'form_multiplier': float(p['form_multiplier']) if p['form_multiplier'] else 1.0,
+                'fixture_multiplier': float(p['fixture_multiplier']) if p['fixture_multiplier'] else 1.0,
+                'starter_multiplier': float(p['starter_multiplier']) if p['starter_multiplier'] else 1.0,
+                'xgi_multiplier': float(p['xgi_multiplier']) if p['xgi_multiplier'] else 1.0,
+                'next_opponent': p['next_opponent'],
+                'is_home': p['is_home']
+            })
+
+        # Get locked players from pool
+        locked_players = [p for p in players_pool if p['player_id'] in locked_player_ids]
+
+        # For locked players, use PURCHASE price (what was actually spent) if provided
+        # For new players, use CURRENT price (what they would cost to buy)
+        def get_locked_cost(player):
+            player_id = player['player_id']
+            if player_id in locked_players_data and 'purchase_price' in locked_players_data[player_id]:
+                return float(locked_players_data[player_id]['purchase_price'])
+            return player['current_price']
+
+        locked_cost = sum(get_locked_cost(p) for p in locked_players)
+
+        # Position constraints
+        POSITION_CONSTRAINTS = {
+            'G': {'min': 1, 'max': 1},
+            'D': {'min': 3, 'max': 5},
+            'M': {'min': 3, 'max': 5},
+            'F': {'min': 1, 'max': 3}
+        }
+
+        def get_primary_position(position_str):
+            """Get primary position from multi-position string like 'M,F'"""
+            return position_str.split(',')[0].strip()
+
+        def can_play_position(player, target_pos):
+            """Check if player can fill a position slot"""
+            return target_pos in player['position']
+
+        def count_positions(lineup):
+            """Count players in each position (uses selected_position if available from ILP)"""
+            counts = {'G': 0, 'D': 0, 'M': 0, 'F': 0}
+            for p in lineup:
+                # Use selected_position from ILP if available, otherwise fall back to primary position
+                pos = p.get('selected_position') or get_primary_position(p['position'])
+                if pos in counts:
+                    counts[pos] += 1
+            return counts
+
+        def validate_formation(lineup):
+            """Check if lineup meets position constraints"""
+            counts = count_positions(lineup)
+            for pos, constraints in POSITION_CONSTRAINTS.items():
+                if counts[pos] < constraints['min'] or counts[pos] > constraints['max']:
+                    return False
+            return len(lineup) == 11
+
+        def optimize_lineup_ilp(locked, available, remaining_budget, excluded_ids=None, previous_lineups=None, formation="3-5-2"):
+            """
+            Use Integer Linear Programming to find optimal lineup.
+
+            Args:
+                locked: List of locked player dicts
+                available: List of all available player dicts
+                remaining_budget: Budget after locked players
+                excluded_ids: Set of player IDs to exclude
+                previous_lineups: List of previous lineup player ID sets (for generating alternatives)
+                formation: Target formation ("3-5-2" or "3-4-3")
+
+            Returns: (lineup, total_cost) or (None, 0) if infeasible
+            """
+            if excluded_ids is None:
+                excluded_ids = set()
+            if previous_lineups is None:
+                previous_lineups = []
+
+            # Filter available players (exclude locked and excluded)
+            locked_ids = set(p['player_id'] for p in locked)
+            candidates = [
+                p for p in available
+                if p['player_id'] not in locked_ids
+                and p['player_id'] not in excluded_ids
+                and p['current_price'] <= remaining_budget  # Basic budget filter
+            ]
+
+            if not candidates:
+                return None, 0
+
+            # Create the ILP problem
+            prob = pulp.LpProblem("LineupOptimization", pulp.LpMaximize)
+
+            # Create binary variables for each player-position combination
+            # For multi-position players like "M,F", create separate variables for each position
+            player_vars = {}  # (player_id, position) -> variable
+            player_to_positions = {}  # player_id -> list of positions
+
+            for p in candidates:
+                positions = [pos.strip() for pos in p['position'].split(',')]
+                player_to_positions[p['player_id']] = positions
+                for pos in positions:
+                    var_name = f"x_{p['player_id']}_{pos}"
+                    player_vars[(p['player_id'], pos)] = pulp.LpVariable(var_name, cat='Binary')
+
+            # Also add locked players (they're fixed at 1)
+            for p in locked:
+                positions = [pos.strip() for pos in p['position'].split(',')]
+                player_to_positions[p['player_id']] = positions
+                # Use primary position for locked players
+                primary_pos = positions[0]
+                var_name = f"x_{p['player_id']}_{primary_pos}"
+                player_vars[(p['player_id'], primary_pos)] = pulp.LpVariable(var_name, cat='Binary')
+
+            # Objective: Maximize total true value
+            prob += pulp.lpSum([
+                player_vars[(p['player_id'], pos)] * p['true_value']
+                for p in candidates
+                for pos in player_to_positions[p['player_id']]
+                if (p['player_id'], pos) in player_vars
+            ]) + pulp.lpSum([
+                player_vars[(p['player_id'], player_to_positions[p['player_id']][0])] * p['true_value']
+                for p in locked
+                if (p['player_id'], player_to_positions[p['player_id']][0]) in player_vars
+            ]), "TotalTrueValue"
+
+            # Constraint 1: Budget (only for candidates, locked players already accounted for)
+            prob += pulp.lpSum([
+                player_vars[(p['player_id'], pos)] * p['current_price']
+                for p in candidates
+                for pos in player_to_positions[p['player_id']]
+                if (p['player_id'], pos) in player_vars
+            ]) <= remaining_budget, "Budget"
+
+            # Constraint 2: Each player can only be selected once (across all positions)
+            for player_id, positions in player_to_positions.items():
+                if len(positions) > 1:  # Multi-position player
+                    prob += pulp.lpSum([
+                        player_vars[(player_id, pos)]
+                        for pos in positions
+                        if (player_id, pos) in player_vars
+                    ]) <= 1, f"OnePosition_{player_id}"
+
+            # Constraint 3: Locked players must be selected
+            for p in locked:
+                primary_pos = player_to_positions[p['player_id']][0]
+                if (p['player_id'], primary_pos) in player_vars:
+                    prob += player_vars[(p['player_id'], primary_pos)] == 1, f"Locked_{p['player_id']}"
+
+            # Constraint 4: Position constraints
+            # Count how many locked players are in each position
+            locked_counts = {'G': 0, 'D': 0, 'M': 0, 'F': 0}
+            for p in locked:
+                primary_pos = player_to_positions[p['player_id']][0]
+                if primary_pos in locked_counts:
+                    locked_counts[primary_pos] += 1
+
+            # GK: exactly 1
+            gk_needed = 1 - locked_counts['G']
+            if gk_needed > 0:
+                prob += pulp.lpSum([
+                    player_vars[(p['player_id'], 'G')]
+                    for p in candidates
+                    if 'G' in player_to_positions[p['player_id']] and (p['player_id'], 'G') in player_vars
+                ]) == gk_needed, "GK_Count"
+
+            # DEF: exactly 3 (formations: 3-5-2 or 3-4-3)
+            def_candidates_sum = pulp.lpSum([
+                player_vars[(p['player_id'], 'D')]
+                for p in candidates
+                if 'D' in player_to_positions[p['player_id']] and (p['player_id'], 'D') in player_vars
+            ])
+            def_needed = 3 - locked_counts['D']
+            prob += def_candidates_sum == def_needed, "DEF_Exact"
+
+            # MID/FWD constraints based on formation parameter
+            # Parse formation (e.g., "3-5-2" -> DEF=3, MID=5, FWD=2)
+            formation_parts = formation.split('-')
+            target_mid = int(formation_parts[1])
+            target_fwd = int(formation_parts[2])
+
+            mid_candidates_sum = pulp.lpSum([
+                player_vars[(p['player_id'], 'M')]
+                for p in candidates
+                if 'M' in player_to_positions[p['player_id']] and (p['player_id'], 'M') in player_vars
+            ])
+            mid_needed = target_mid - locked_counts['M']
+            prob += mid_candidates_sum == mid_needed, "MID_Exact"
+
+            fwd_candidates_sum = pulp.lpSum([
+                player_vars[(p['player_id'], 'F')]
+                for p in candidates
+                if 'F' in player_to_positions[p['player_id']] and (p['player_id'], 'F') in player_vars
+            ])
+            fwd_needed = target_fwd - locked_counts['F']
+            prob += fwd_candidates_sum == fwd_needed, "FWD_Exact"
+
+            # Constraint 5: Total players = 11
+            total_candidates_needed = 11 - len(locked)
+            prob += pulp.lpSum([
+                player_vars[(p['player_id'], pos)]
+                for p in candidates
+                for pos in player_to_positions[p['player_id']]
+                if (p['player_id'], pos) in player_vars
+            ]) == total_candidates_needed, "TotalPlayers"
+
+            # Constraint 6: For generating alternatives - must differ from previous lineups
+            for i, prev_lineup_ids in enumerate(previous_lineups):
+                # At least one player from candidates that was in prev lineup must NOT be selected
+                prev_candidates = [p for p in candidates if p['player_id'] in prev_lineup_ids]
+                if prev_candidates:
+                    prob += pulp.lpSum([
+                        player_vars[(p['player_id'], pos)]
+                        for p in prev_candidates
+                        for pos in player_to_positions[p['player_id']]
+                        if (p['player_id'], pos) in player_vars
+                    ]) <= len(prev_candidates) - 1, f"DifferFromPrev_{i}"
+
+            # Solve
+            prob.solve(pulp.PULP_CBC_CMD(msg=0, timeLimit=30))
+
+            # Check if solution found
+            if prob.status != pulp.LpStatusOptimal:
+                print(f"[DEBUG] ILP status: {pulp.LpStatus[prob.status]}")
+                return None, 0
+
+            # Extract solution - track which position each player was selected for
+            lineup = []
+            selected_ids = set()
+
+            # Add locked players with their primary position
+            for p in locked:
+                player_copy = dict(p)
+                player_copy['selected_position'] = player_to_positions[p['player_id']][0]
+                lineup.append(player_copy)
+                selected_ids.add(p['player_id'])
+
+            # Add selected candidates with their ILP-selected position
+            for p in candidates:
+                for pos in player_to_positions[p['player_id']]:
+                    if (p['player_id'], pos) in player_vars:
+                        if player_vars[(p['player_id'], pos)].value() == 1:
+                            player_copy = dict(p)
+                            player_copy['selected_position'] = pos  # Track which position ILP chose
+                            lineup.append(player_copy)
+                            selected_ids.add(p['player_id'])
+                            break  # Don't double-count multi-position players
+
+            total_cost = sum(p['current_price'] for p in lineup)
+            return lineup, total_cost
+
+        # Generate 18 alternative lineups: 9 per formation (6 optimal + 3 differential)
+        alternatives = []
+
+        # Get top performers by true_value (excluding locked players) for differential lineups
+        non_locked_pool = [p for p in players_pool if p['player_id'] not in locked_player_ids]
+        top_performers = sorted(non_locked_pool, key=lambda x: x.get('true_value', 0), reverse=True)[:8]
+        top_performer_ids = set(p['player_id'] for p in top_performers)
+
+        for target_formation in ["3-5-2", "3-4-3"]:
+            # Phase 1: 6 Optimal lineups
+            previous_lineup_ids = []
+
+            for alt_num in range(6):
+                remaining_budget = budget - locked_cost
+
+                lineup, total_cost = optimize_lineup_ilp(
+                    locked_players,
+                    players_pool,
+                    remaining_budget,
+                    excluded_ids=set(),
+                    previous_lineups=previous_lineup_ids,
+                    formation=target_formation
+                )
+
+                if lineup and len(lineup) == 11:
+                    total_true_value = sum(p['true_value'] for p in lineup)
+
+                    alternatives.append({
+                        'lineup': lineup,
+                        'formation': target_formation,
+                        'total_true_value': round(total_true_value, 2),
+                        'total_cost': round(total_cost, 2),
+                        'budget_remaining': round(budget - total_cost, 2),
+                        'locked_count': len(locked_players),
+                        'positions': count_positions(lineup),
+                        'type': 'optimal'
+                    })
+
+                    this_lineup_ids = set(p['player_id'] for p in lineup if p['player_id'] not in locked_player_ids)
+                    previous_lineup_ids.append(this_lineup_ids)
+
+            # Phase 2: 3 Differential lineups (excluding top performers to surface alternatives)
+            differential_previous = []
+
+            for alt_num in range(3):
+                remaining_budget = budget - locked_cost
+
+                lineup, total_cost = optimize_lineup_ilp(
+                    locked_players,
+                    players_pool,
+                    remaining_budget,
+                    excluded_ids=top_performer_ids,
+                    previous_lineups=differential_previous,
+                    formation=target_formation
+                )
+
+                if lineup and len(lineup) == 11:
+                    total_true_value = sum(p['true_value'] for p in lineup)
+
+                    alternatives.append({
+                        'lineup': lineup,
+                        'formation': target_formation,
+                        'total_true_value': round(total_true_value, 2),
+                        'total_cost': round(total_cost, 2),
+                        'budget_remaining': round(budget - total_cost, 2),
+                        'locked_count': len(locked_players),
+                        'positions': count_positions(lineup),
+                        'type': 'differential'
+                    })
+
+                    this_lineup_ids = set(p['player_id'] for p in lineup if p['player_id'] not in locked_player_ids)
+                    differential_previous.append(this_lineup_ids)
+
+        return jsonify({
+            'success': True,
+            'alternatives': alternatives,
+            'locked_players': locked_players,
+            'locked_cost': round(locked_cost, 2),
+            'budget': budget
+        })
+
+    except Exception as e:
+        import traceback
+        traceback.print_exc()
+        return jsonify({
+            'success': False,
+            'error': str(e)
+        }), 500
 
 
 if __name__ == '__main__':

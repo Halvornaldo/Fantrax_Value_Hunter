@@ -1,9 +1,10 @@
 import React, { useState, useEffect, useRef } from 'react';
 import { ThemeProvider, createTheme } from '@mui/material/styles';
-import { CssBaseline, Box, IconButton, Toolbar, AppBar, Button, Menu, MenuItem, Divider } from '@mui/material';
-import { Brightness4, Brightness7, Upload, CloudSync, Archive, SportsEsports, Sports, FileUpload } from '@mui/icons-material';
+import { CssBaseline, Box, IconButton, Toolbar, AppBar, Button, Menu, MenuItem, Divider, Tabs, Tab } from '@mui/material';
+import { Brightness4, Brightness7, Upload, CloudSync, Archive, SportsEsports, Sports, FileUpload, Dashboard as DashboardIcon, GroupWork } from '@mui/icons-material';
 import Banner from './components/Banner';
 import Dashboard from './components/Dashboard';
+import LineupOptimizer from './components/LineupOptimizer';
 import './App.css';
 
 const App = () => {
@@ -13,6 +14,11 @@ const App = () => {
   });
 
   const [uploadMenuAnchor, setUploadMenuAnchor] = useState(null);
+  const [activeTab, setActiveTab] = useState(0);
+
+  const handleTabChange = (event, newValue) => {
+    setActiveTab(newValue);
+  };
 
   // Refs for hidden file inputs
   const npxgJsonInputRef = useRef(null);
@@ -237,22 +243,49 @@ const App = () => {
         {/* Top App Bar with Upload Menu and Theme Toggle */}
         <AppBar position="static" elevation={0} sx={{ background: 'transparent' }}>
           <Toolbar sx={{ justifyContent: 'space-between' }}>
-            {/* Upload Menu */}
-            <Button
-              variant="outlined"
-              startIcon={<Upload />}
-              onClick={handleUploadMenuOpen}
-              sx={{
-                color: darkMode ? '#ffffff' : '#333333',
-                borderColor: darkMode ? 'rgba(255,255,255,0.3)' : 'rgba(0,0,0,0.3)',
-                '&:hover': {
-                  backgroundColor: darkMode ? 'rgba(255,255,255,0.1)' : 'rgba(0,0,0,0.1)',
-                  borderColor: darkMode ? 'rgba(255,255,255,0.5)' : 'rgba(0,0,0,0.5)',
-                },
-              }}
-            >
-              Upload & Sync
-            </Button>
+            {/* Left side: Upload Menu + Tabs */}
+            <Box sx={{ display: 'flex', alignItems: 'center', gap: 2 }}>
+              {/* Upload Menu */}
+              <Button
+                variant="outlined"
+                startIcon={<Upload />}
+                onClick={handleUploadMenuOpen}
+                sx={{
+                  color: darkMode ? '#ffffff' : '#333333',
+                  borderColor: darkMode ? 'rgba(255,255,255,0.3)' : 'rgba(0,0,0,0.3)',
+                  '&:hover': {
+                    backgroundColor: darkMode ? 'rgba(255,255,255,0.1)' : 'rgba(0,0,0,0.1)',
+                    borderColor: darkMode ? 'rgba(255,255,255,0.5)' : 'rgba(0,0,0,0.5)',
+                  },
+                }}
+              >
+                Upload & Sync
+              </Button>
+
+              {/* Navigation Tabs */}
+              <Tabs
+                value={activeTab}
+                onChange={handleTabChange}
+                sx={{
+                  '& .MuiTab-root': {
+                    color: darkMode ? 'rgba(255,255,255,0.7)' : 'rgba(0,0,0,0.6)',
+                    minHeight: 48,
+                    textTransform: 'none',
+                    fontSize: '0.95rem',
+                    fontWeight: 500,
+                  },
+                  '& .Mui-selected': {
+                    color: darkMode ? '#667eea' : '#764ba2',
+                  },
+                  '& .MuiTabs-indicator': {
+                    backgroundColor: darkMode ? '#667eea' : '#764ba2',
+                  },
+                }}
+              >
+                <Tab icon={<DashboardIcon sx={{ fontSize: 20 }} />} iconPosition="start" label="Dashboard" />
+                <Tab icon={<GroupWork sx={{ fontSize: 20 }} />} iconPosition="start" label="Lineup Optimizer" />
+              </Tabs>
+            </Box>
             
             {/* Hidden file inputs for JSON uploads */}
             <input
@@ -376,12 +409,13 @@ const App = () => {
           </Toolbar>
         </AppBar>
 
-        {/* Dragon Banner */}
-        <Banner />
+        {/* Dragon Banner - only show on Dashboard */}
+        {activeTab === 0 && <Banner />}
 
-        {/* Main Dashboard */}
+        {/* Main Content - Conditional Rendering */}
         <Box sx={{ px: 3, pb: 3 }}>
-          <Dashboard />
+          {activeTab === 0 && <Dashboard />}
+          {activeTab === 1 && <LineupOptimizer darkMode={darkMode} />}
         </Box>
       </Box>
     </ThemeProvider>
