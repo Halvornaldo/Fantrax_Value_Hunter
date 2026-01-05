@@ -217,11 +217,21 @@ const LineupOptimizer = ({ darkMode }) => {
     setSelectedAlternative(index);
     // Update roster display with alternative lineup
     setRoster(alt.lineup);
+
+    // Calculate budget spent for this lineup
+    // For CSV players: use purchase_price (their discounted cost)
+    // For new players (replacements): use current_price (market cost to acquire)
+    const budgetSpent = alt.lineup.reduce((sum, player) => {
+      // If player has a purchase_price different from current_price, they're from CSV
+      const cost = player.purchase_price || player.current_price || 0;
+      return sum + parseFloat(cost);
+    }, 0);
+
     setTotals({
-      purchase_price: totals.purchase_price, // Keep original purchase price
+      purchase_price: budgetSpent,
       current_price: alt.total_cost,
       true_value: alt.total_true_value,
-      price_change: alt.total_cost - totals.purchase_price,
+      price_change: alt.total_cost - budgetSpent,
     });
   };
 
