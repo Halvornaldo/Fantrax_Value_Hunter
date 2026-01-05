@@ -410,7 +410,7 @@ const LineupOptimizer = ({ darkMode }) => {
                       {totals.true_value?.toFixed(1) || '0.0'}
                     </Typography>
                     <Typography variant="caption" color="text.secondary">
-                      Total True Value
+                      Total Projected
                     </Typography>
                   </Box>
                 </Grid>

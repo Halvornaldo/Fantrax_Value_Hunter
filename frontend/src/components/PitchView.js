@@ -19,7 +19,7 @@ const PlayerCard = ({ player, isLocked, onToggleLock, onReplace, darkMode }) => 
     return name.length > 10 ? name.substring(0, 9) + '.' : name;
   };
 
-  // Get True Value color
+  // Get Projected Points color
   const getTrueValueColor = (tv) => {
     if (!tv || tv <= 0) return '#9e9e9e';
     if (tv >= 20) return '#00cc66';
@@ -43,7 +43,7 @@ const PlayerCard = ({ player, isLocked, onToggleLock, onReplace, darkMode }) => 
             Current: ${player.current_price?.toFixed(2) || '0.00'}
           </Typography>
           <Typography variant="caption" display="block">
-            True Value: {player.true_value?.toFixed(2) || '0.00'}
+            Projected: {player.true_value?.toFixed(2) || '0.00'}
           </Typography>
           <Typography variant="caption" display="block">
             ROI: {player.roi?.toFixed(2) || '0.00'}
@@ -166,9 +166,9 @@ const PlayerCard = ({ player, isLocked, onToggleLock, onReplace, darkMode }) => 
           ({priceDiff > 0 ? '+' : ''}{priceDiff.toFixed(1)})
         </Typography>
 
-        {/* True Value Chip */}
+        {/* Projected Points Chip */}
         <Chip
-          label={`TV: ${player.true_value?.toFixed(1) || '0.0'}`}
+          label={`Proj: ${player.true_value?.toFixed(1) || '0.0'}`}
           size="small"
           sx={{
             mt: 0.5,
