@@ -20,6 +20,7 @@ import {
   TrendingUp,
   AttachMoney,
   OpenInNew,
+  Replay,
 } from '@mui/icons-material';
 import PitchView from './PitchView';
 import PlayerSearchDialog from './PlayerSearchDialog';
@@ -248,6 +249,27 @@ const LineupOptimizer = ({ darkMode }) => {
     });
   };
 
+  // Reset to original imported lineup
+  const handleResetToOriginal = () => {
+    setRoster(originalRoster);
+    setSelectedAlternative(null);
+
+    // Recalculate totals from original roster
+    const budgetSpent = originalRoster.reduce((sum, p) => sum + parseFloat(p.purchase_price || 0), 0);
+    const marketValue = originalRoster.reduce((sum, p) => sum + parseFloat(p.current_price || 0), 0);
+    const totalTV = originalRoster.reduce((sum, p) => sum + parseFloat(p.true_value || 0), 0);
+
+    setTotals({
+      purchase_price: budgetSpent,
+      current_price: marketValue,
+      true_value: totalTV,
+      price_change: marketValue - budgetSpent,
+    });
+  };
+
+  // Create a set of original roster player IDs for highlighting new players
+  const originalRosterIds = new Set(originalRoster.map(p => p.player_id));
+
   // Calculate budget usage - use PURCHASE price (what you actually spent)
   const budgetUsed = totals.purchase_price || 0;
   const budgetRemaining = BUDGET - budgetUsed;
@@ -301,6 +323,17 @@ const LineupOptimizer = ({ darkMode }) => {
             >
               GENERATE LINEUPS
             </Button>
+            {/* Reset button - shows when viewing a generated lineup */}
+            {alternatives.length > 0 && selectedAlternative !== null && (
+              <Button
+                variant="outlined"
+                startIcon={<Replay />}
+                onClick={handleResetToOriginal}
+                color="secondary"
+              >
+                Reset to Original
+              </Button>
+            )}
           </Box>
         </Box>
 
@@ -405,6 +438,7 @@ const LineupOptimizer = ({ darkMode }) => {
               onToggleLock={handleToggleLock}
               onReplace={handleOpenReplace}
               darkMode={darkMode}
+              originalRosterIds={originalRosterIds}
             />
           </Grid>
 

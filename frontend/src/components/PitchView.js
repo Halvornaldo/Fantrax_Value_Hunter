@@ -4,8 +4,9 @@ import { Lock, LockOpen, SwapHoriz } from '@mui/icons-material';
 
 /**
  * PlayerCard - Individual player display on the pitch
+ * @param {boolean} isNewPlayer - True if this player is NOT in the original CSV roster (a suggested swap)
  */
-const PlayerCard = ({ player, isLocked, onToggleLock, onReplace, darkMode }) => {
+const PlayerCard = ({ player, isLocked, onToggleLock, onReplace, darkMode, isNewPlayer }) => {
   const priceDiff = (player.current_price || 0) - (player.purchase_price || 0);
   const priceColor = priceDiff > 0 ? '#4caf50' : priceDiff < 0 ? '#f44336' : '#9e9e9e';
 
@@ -59,7 +60,7 @@ const PlayerCard = ({ player, isLocked, onToggleLock, onReplace, darkMode }) => 
       placement="top"
     >
       <Paper
-        elevation={isLocked ? 6 : 3}
+        elevation={isLocked ? 6 : isNewPlayer ? 5 : 3}
         sx={{
           width: 90,
           textAlign: 'center',
@@ -70,10 +71,18 @@ const PlayerCard = ({ player, isLocked, onToggleLock, onReplace, darkMode }) => 
             ? darkMode
               ? 'linear-gradient(145deg, #4a4a1a 0%, #3d3d0f 100%)'
               : 'linear-gradient(145deg, #fff8e1 0%, #ffecb3 100%)'
+            : isNewPlayer
+            ? darkMode
+              ? 'linear-gradient(145deg, #1a3a4a 0%, #0f3d3d 100%)'  // Teal/cyan for new players (dark)
+              : 'linear-gradient(145deg, #e0f7fa 0%, #b2ebf2 100%)'  // Light cyan for new players (light)
             : darkMode
             ? 'linear-gradient(145deg, #2c3e50 0%, #34495e 100%)'
             : 'linear-gradient(145deg, #ffffff 0%, #f5f5f5 100%)',
-          border: isLocked ? '2px solid #ffd700' : '1px solid transparent',
+          border: isLocked
+            ? '2px solid #ffd700'
+            : isNewPlayer
+            ? '2px solid #00bcd4'  // Cyan border for new players
+            : '1px solid transparent',
           borderRadius: 2,
           '&:hover': {
             transform: 'translateY(-3px)',
@@ -188,7 +197,7 @@ const PlayerCard = ({ player, isLocked, onToggleLock, onReplace, darkMode }) => 
 /**
  * PlayerRow - A row of players (for each position group)
  */
-const PlayerRow = ({ players, lockedPlayers, onToggleLock, onReplace, darkMode, label }) => {
+const PlayerRow = ({ players, lockedPlayers, onToggleLock, onReplace, darkMode, label, originalRosterIds }) => {
   return (
     <Box
       sx={{
@@ -226,6 +235,7 @@ const PlayerRow = ({ players, lockedPlayers, onToggleLock, onReplace, darkMode, 
           onToggleLock={onToggleLock}
           onReplace={onReplace}
           darkMode={darkMode}
+          isNewPlayer={originalRosterIds && originalRosterIds.size > 0 && !originalRosterIds.has(player.player_id)}
         />
       ))}
     </Box>
@@ -234,8 +244,9 @@ const PlayerRow = ({ players, lockedPlayers, onToggleLock, onReplace, darkMode, 
 
 /**
  * PitchView - Football pitch visualization of the lineup
+ * @param {Set} originalRosterIds - Set of player IDs from the original CSV import (for highlighting new players)
  */
-const PitchView = ({ players, lockedPlayers, onToggleLock, onReplace, darkMode }) => {
+const PitchView = ({ players, lockedPlayers, onToggleLock, onReplace, darkMode, originalRosterIds }) => {
 
   // Group players by position (use selected_position from ILP if available)
   const groupByPosition = (players) => {
@@ -357,6 +368,7 @@ const PitchView = ({ players, lockedPlayers, onToggleLock, onReplace, darkMode }
           onReplace={onReplace}
           darkMode={darkMode}
           label="FWD"
+          originalRosterIds={originalRosterIds}
         />
 
         {/* Midfielders */}
@@ -367,6 +379,7 @@ const PitchView = ({ players, lockedPlayers, onToggleLock, onReplace, darkMode }
           onReplace={onReplace}
           darkMode={darkMode}
           label="MID"
+          originalRosterIds={originalRosterIds}
         />
 
         {/* Defenders */}
@@ -377,6 +390,7 @@ const PitchView = ({ players, lockedPlayers, onToggleLock, onReplace, darkMode }
           onReplace={onReplace}
           darkMode={darkMode}
           label="DEF"
+          originalRosterIds={originalRosterIds}
         />
 
         {/* Goalkeeper (bottom) */}
@@ -387,6 +401,7 @@ const PitchView = ({ players, lockedPlayers, onToggleLock, onReplace, darkMode }
           onReplace={onReplace}
           darkMode={darkMode}
           label="GK"
+          originalRosterIds={originalRosterIds}
         />
       </Box>
 
