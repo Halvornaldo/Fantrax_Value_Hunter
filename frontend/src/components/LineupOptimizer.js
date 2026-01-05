@@ -30,6 +30,7 @@ const LineupOptimizer = ({ darkMode }) => {
 
   // State
   const [roster, setRoster] = useState([]);
+  const [originalRoster, setOriginalRoster] = useState([]); // Store CSV roster with purchase prices
   const [lockedPlayers, setLockedPlayers] = useState(new Set());
   const [alternatives, setAlternatives] = useState([]);
   const [selectedAlternative, setSelectedAlternative] = useState(null);
@@ -62,6 +63,7 @@ const LineupOptimizer = ({ darkMode }) => {
 
       if (result.success) {
         setRoster(result.roster);
+        setOriginalRoster(result.roster); // Store original CSV roster with purchase prices
         setTotals(result.totals);
         setLockedPlayers(new Set()); // Reset locks on new import
         setAlternatives([]); // Clear previous alternatives
@@ -215,17 +217,32 @@ const LineupOptimizer = ({ darkMode }) => {
   // Apply selected alternative to view
   const handleSelectAlternative = (alt, index) => {
     setSelectedAlternative(index);
-    // Update roster display with alternative lineup
-    setRoster(alt.lineup);
+
+    // Create a map of original roster player_id → purchase_price
+    const originalPriceMap = {};
+    originalRoster.forEach((p) => {
+      originalPriceMap[p.player_id] = parseFloat(p.purchase_price || 0);
+    });
+
+    // Update lineup with original purchase prices where available
+    const lineupWithPrices = alt.lineup.map((player) => {
+      const originalPrice = originalPriceMap[player.player_id];
+      if (originalPrice !== undefined && originalPrice > 0) {
+        // Player was in original CSV - use their purchase price
+        return { ...player, purchase_price: originalPrice };
+      } else {
+        // New player - purchase price equals current price (market cost)
+        return { ...player, purchase_price: parseFloat(player.current_price || 0) };
+      }
+    });
 
     // Calculate budget spent for this lineup
-    // For CSV players: use purchase_price (their discounted cost)
-    // For new players (replacements): use current_price (market cost to acquire)
-    const budgetSpent = alt.lineup.reduce((sum, player) => {
-      // If player has a purchase_price different from current_price, they're from CSV
-      const cost = player.purchase_price || player.current_price || 0;
-      return sum + parseFloat(cost);
+    const budgetSpent = lineupWithPrices.reduce((sum, player) => {
+      return sum + parseFloat(player.purchase_price || 0);
     }, 0);
+
+    // Update roster display with corrected purchase prices
+    setRoster(lineupWithPrices);
 
     setTotals({
       purchase_price: budgetSpent,
