@@ -6926,6 +6926,7 @@ def optimize_lineup():
     {
         "locked_player_ids": ["id1", "id2"],  # Players to keep in lineup
         "locked_players_data": [{"player_id": "id1", "purchase_price": 5.5}, ...],  # Optional: with purchase prices
+        "roster_players_data": [{"player_id": "id1", "purchase_price": 5.5}, ...],  # Full CSV roster with purchase prices
         "budget": 100,                         # Total budget constraint
     }
     """
@@ -6933,6 +6934,8 @@ def optimize_lineup():
         data = request.get_json() or {}
         locked_player_ids = set(data.get('locked_player_ids', []))
         locked_players_data = {p['player_id']: p for p in data.get('locked_players_data', [])}
+        # NEW: Full roster with purchase prices - use these as "owned player" costs
+        roster_players_data = {p['player_id']: float(p.get('purchase_price', 0)) for p in data.get('roster_players_data', [])}
         budget = float(data.get('budget', 100))
 
         conn = get_db_connection()
@@ -6986,15 +6989,21 @@ def optimize_lineup():
         # Get locked players from pool
         locked_players = [p for p in players_pool if p['player_id'] in locked_player_ids]
 
-        # For locked players, use PURCHASE price (what was actually spent) if provided
-        # For new players, use CURRENT price (what they would cost to buy)
-        def get_locked_cost(player):
+        # Get effective cost for ANY player:
+        # - If player is in roster (CSV), use their purchase_price (discounted cost)
+        # - Otherwise, use current_price (market cost to acquire)
+        def get_player_cost(player):
             player_id = player['player_id']
+            # First check roster_players_data (full CSV roster with purchase prices)
+            if player_id in roster_players_data and roster_players_data[player_id] > 0:
+                return roster_players_data[player_id]
+            # Fallback to locked_players_data for backward compatibility
             if player_id in locked_players_data and 'purchase_price' in locked_players_data[player_id]:
                 return float(locked_players_data[player_id]['purchase_price'])
+            # New player - use market price
             return player['current_price']
 
-        locked_cost = sum(get_locked_cost(p) for p in locked_players)
+        locked_cost = sum(get_player_cost(p) for p in locked_players)
 
         # Position constraints
         POSITION_CONSTRAINTS = {
@@ -7098,8 +7107,9 @@ def optimize_lineup():
             ]), "TotalTrueValue"
 
             # Constraint 1: Budget (only for candidates, locked players already accounted for)
+            # Use get_player_cost() to respect CSV purchase prices for owned players
             prob += pulp.lpSum([
-                player_vars[(p['player_id'], pos)] * p['current_price']
+                player_vars[(p['player_id'], pos)] * get_player_cost(p)
                 for p in candidates
                 for pos in player_to_positions[p['player_id']]
                 if (p['player_id'], pos) in player_vars
@@ -7205,6 +7215,7 @@ def optimize_lineup():
             for p in locked:
                 player_copy = dict(p)
                 player_copy['selected_position'] = player_to_positions[p['player_id']][0]
+                player_copy['purchase_price'] = get_player_cost(p)  # Include purchase price
                 lineup.append(player_copy)
                 selected_ids.add(p['player_id'])
 
@@ -7215,11 +7226,13 @@ def optimize_lineup():
                         if player_vars[(p['player_id'], pos)].value() == 1:
                             player_copy = dict(p)
                             player_copy['selected_position'] = pos  # Track which position ILP chose
+                            player_copy['purchase_price'] = get_player_cost(p)  # Include purchase price
                             lineup.append(player_copy)
                             selected_ids.add(p['player_id'])
                             break  # Don't double-count multi-position players
 
-            total_cost = sum(p['current_price'] for p in lineup)
+            # Use get_player_cost to respect CSV purchase prices for owned players
+            total_cost = sum(get_player_cost(p) for p in lineup)
             return lineup, total_cost
 
         # Generate 18 alternative lineups: 9 per formation (6 optimal + 3 differential)

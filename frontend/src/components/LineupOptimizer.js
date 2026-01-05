@@ -195,10 +195,18 @@ const LineupOptimizer = ({ darkMode }) => {
           purchase_price: p.purchase_price
         }));
 
+      // Send FULL roster with purchase prices so optimizer knows your discounts
+      // This way, even unlocked CSV players use their purchase price (not market price)
+      const rosterPlayersData = roster.map(p => ({
+        player_id: p.player_id,
+        purchase_price: parseFloat(p.purchase_price || 0)
+      }));
+
       const result = await optimizeLineup(
         Array.from(lockedPlayers),
         BUDGET,
-        lockedPlayersData
+        lockedPlayersData,
+        rosterPlayersData  // New: full roster with purchase prices
       );
 
       if (result.success) {
@@ -218,37 +226,25 @@ const LineupOptimizer = ({ darkMode }) => {
   const handleSelectAlternative = (alt, index) => {
     setSelectedAlternative(index);
 
-    // Create a map of original roster player_id → purchase_price
-    const originalPriceMap = {};
-    originalRoster.forEach((p) => {
-      originalPriceMap[p.player_id] = parseFloat(p.purchase_price || 0);
-    });
+    // Backend now sends purchase_price with each player
+    // - CSV players: their discounted purchase price
+    // - New players: current market price
+    setRoster(alt.lineup);
 
-    // Update lineup with original purchase prices where available
-    const lineupWithPrices = alt.lineup.map((player) => {
-      const originalPrice = originalPriceMap[player.player_id];
-      if (originalPrice !== undefined && originalPrice > 0) {
-        // Player was in original CSV - use their purchase price
-        return { ...player, purchase_price: originalPrice };
-      } else {
-        // New player - purchase price equals current price (market cost)
-        return { ...player, purchase_price: parseFloat(player.current_price || 0) };
-      }
-    });
-
-    // Calculate budget spent for this lineup
-    const budgetSpent = lineupWithPrices.reduce((sum, player) => {
-      return sum + parseFloat(player.purchase_price || 0);
+    // Calculate values from the lineup
+    const budgetSpent = alt.lineup.reduce((sum, player) => {
+      return sum + parseFloat(player.purchase_price || player.current_price || 0);
     }, 0);
 
-    // Update roster display with corrected purchase prices
-    setRoster(lineupWithPrices);
+    const marketValue = alt.lineup.reduce((sum, player) => {
+      return sum + parseFloat(player.current_price || 0);
+    }, 0);
 
     setTotals({
-      purchase_price: budgetSpent,
-      current_price: alt.total_cost,
+      purchase_price: budgetSpent,        // What you actually pay (CSV discounts applied)
+      current_price: marketValue,          // Current market value of the team
       true_value: alt.total_true_value,
-      price_change: alt.total_cost - budgetSpent,
+      price_change: marketValue - budgetSpent,  // Profit from your discounts
     });
   };
 

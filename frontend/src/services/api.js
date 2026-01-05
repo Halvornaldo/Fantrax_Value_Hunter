@@ -491,13 +491,14 @@ export const getCurrentLineup = async () => {
  * @param {Object[]} lockedPlayersData - Locked players with purchase prices
  * @returns {Promise<Object>} - 3 alternative lineup suggestions
  */
-export const optimizeLineup = async (lockedPlayerIds = [], budget = 100, lockedPlayersData = []) => {
+export const optimizeLineup = async (lockedPlayerIds = [], budget = 100, lockedPlayersData = [], rosterPlayersData = []) => {
   try {
     const data = await makeRequest('/api/lineup/optimize', {
       method: 'POST',
       body: JSON.stringify({
         locked_player_ids: lockedPlayerIds,
         locked_players_data: lockedPlayersData,
+        roster_players_data: rosterPlayersData,  // Full roster with purchase prices for owned players
         budget: budget
       }),
     });
