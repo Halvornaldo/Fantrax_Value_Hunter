@@ -144,10 +144,11 @@ const LineupOptimizer = ({ darkMode }) => {
       is_manual_addition: true, // Mark as manually added
     };
 
-    // Replace in roster
+    // Replace in roster - use String comparison to handle type mismatches
+    const targetPlayerId = String(playerToReplace.player_id);
     setRoster((prev) => {
       const newRoster = prev.map((p) =>
-        p.player_id === playerToReplace.player_id ? replacementPlayer : p
+        String(p.player_id) === targetPlayerId ? replacementPlayer : p
       );
       return newRoster;
     });
@@ -155,7 +156,9 @@ const LineupOptimizer = ({ darkMode }) => {
     // Lock the new player automatically
     setLockedPlayers((prev) => {
       const newLocks = new Set(prev);
-      newLocks.delete(playerToReplace.player_id); // Remove old player lock
+      // Remove old player lock - check both string and original format
+      newLocks.delete(playerToReplace.player_id);
+      newLocks.delete(String(playerToReplace.player_id));
       newLocks.add(newPlayer.id); // Lock new player
       return newLocks;
     });

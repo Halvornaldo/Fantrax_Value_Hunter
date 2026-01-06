@@ -67,6 +67,7 @@ const PlayerCard = ({ player, isLocked, onToggleLock, onReplace, darkMode, isNew
           p: 1,
           cursor: 'pointer',
           transition: 'all 0.2s',
+          position: 'relative',  // Required for absolute positioned children (replace/lock buttons)
           background: isLocked
             ? darkMode
               ? 'linear-gradient(145deg, #4a4a1a 0%, #3d3d0f 100%)'
