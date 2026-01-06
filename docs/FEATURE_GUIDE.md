@@ -646,10 +646,22 @@ Subject to:
 1. **Import Roster**: Export your team from Fantrax → Import CSV in Lineup Optimizer
 2. **Lock Key Players**: Click lock icon or use "Lock Discounted" button
 3. **Replace if Needed**: Click replace icon to swap in different players
-4. **Exclude Unwanted**: Use Players table to exclude specific players
-5. **Generate Lineups**: Click "GENERATE LINEUPS" button
+4. **Exclude Unwanted**: Use Players table checkbox to exclude specific players
+5. **Generate Lineups**: Click "GENERATE LINEUPS" button (prominent button in Team Stats panel)
 6. **Review Options**: Browse 9 lineups per formation (6 optimal + 3 differential)
 7. **Select Lineup**: Click any lineup card to view it on the pitch
+8. **Reset to Original**: Use "Reset to Original" button to restore your imported CSV lineup
+
+### **Visual Indicators**
+- **Gold Border**: Locked players (protected from optimization)
+- **Cyan Border**: New players suggested by optimizer (not in your original CSV)
+
+### **Built-in Help Section**
+The optimizer includes a "How to Use" panel explaining all features:
+- Lock Players, Lock Discounted, Replace Players
+- Optimal vs Differential lineup types
+- Exclude Players from main dashboard
+- Cyan border meaning for new players
 
 ### **Technical Implementation**
 
@@ -666,9 +678,48 @@ Subject to:
 - `LineupOptimizer.js` - Main optimizer interface
 - `PitchView.js` - Football pitch visualization
 - `PlayerSearchDialog.js` - Player replacement search modal
+- `InspirationLineups.js` - Inspiration lineup viewer
 
 ---
 
-**Last Updated**: 2026-01-04 - V2.0 Enhanced Formula Dashboard with Lineup Optimizer
+## **Inspiration Lineups** ✅ *Added 2026-01-06*
+
+### **Overview: View-Only Best XI by Metric**
+The Inspiration Lineups feature displays the top players by various metrics in a read-only pitch view. This helps users discover high-performing players they might want to target.
+
+**Visibility**: Appears below the main Lineup Optimizer after importing a roster CSV
+
+### **Metric Options**
+Select from 6 different metrics via dropdown:
+- **Projected Points**: Best True Value scores (default)
+- **Best Form**: Highest form multipliers
+- **XG90+XA90**: Best xGI multiplier scores
+- **Points per game**: Highest PPG
+- **Points per 90**: Highest PP90 (calculated from total points / minutes × 90)
+- **Value (ROI)**: Best return on investment
+
+### **Formation & Bench**
+- **Formation**: Fixed 3-4-3 (1 GK, 3 DEF, 4 MID, 3 FWD)
+- **Bench**: 7 players (1 GK, 2 DEF, 2 MID, 2 FWD)
+
+### **Filters**
+- **Minimum Minutes**: Only players with 135+ minutes played are eligible
+- **Likely Starters Toggle**: Optional filter to only show players with starter_multiplier ≥ 0.8
+
+### **Display Features**
+- **Pitch View**: Football pitch layout matching the main optimizer
+- **Stats Panel**: Shows total metric value, team cost, formation, and player counts
+- **Player Cards**: Compact cards showing name, team, price, and selected metric value
+- **Tooltips**: Hover for full player details (price, minutes, projected, PPG, form)
+
+### **Use Cases**
+- Discover undervalued players with high ROI
+- Find in-form players to target for transfers
+- Compare best possible XIs across different metrics
+- Identify likely starters with strong projections
+
+---
+
+**Last Updated**: 2026-01-06 - V2.0 Enhanced Formula Dashboard with Lineup Optimizer and Inspiration Lineups
 
 *This document reflects the current V2.0-only dashboard features with all legacy components removed. The dashboard serves 714 Premier League players with optimized V2.0 Enhanced Formula calculations including True Value predictions, ROI analysis, dynamic blending, EWMA form calculations, and normalized xGI integration. The trend analysis system enables retrospective analysis using captured raw data snapshots for season-long performance tracking.*

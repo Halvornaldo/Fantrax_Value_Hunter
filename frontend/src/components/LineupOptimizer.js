@@ -21,9 +21,11 @@ import {
   AttachMoney,
   OpenInNew,
   Replay,
+  HelpOutline,
 } from '@mui/icons-material';
 import PitchView from './PitchView';
 import PlayerSearchDialog from './PlayerSearchDialog';
+import InspirationLineups from './InspirationLineups';
 import { importLineupRoster, optimizeLineup } from '../services/api';
 
 const LineupOptimizer = ({ darkMode }) => {
@@ -312,20 +314,6 @@ const LineupOptimizer = ({ darkMode }) => {
             >
               Import Team Roster CSV
             </Button>
-            <Button
-              variant="contained"
-              startIcon={optimizing ? <CircularProgress size={20} color="inherit" /> : <AutoAwesome />}
-              onClick={handleOptimize}
-              disabled={roster.length === 0 || optimizing}
-              sx={{
-                background: 'linear-gradient(45deg, #667eea 0%, #764ba2 100%)',
-                '&:hover': {
-                  background: 'linear-gradient(45deg, #5a6fd6 0%, #6a4190 100%)',
-                },
-              }}
-            >
-              GENERATE LINEUPS
-            </Button>
             {/* Reset button - shows when viewing a generated lineup */}
             {alternatives.length > 0 && selectedAlternative !== null && (
               <Button
@@ -552,6 +540,29 @@ const LineupOptimizer = ({ darkMode }) => {
                   Lock Discounted ({discountedCount})
                 </Button>
               )}
+
+              {/* Generate Lineups Button */}
+              <Button
+                variant="contained"
+                size="large"
+                startIcon={optimizing ? <CircularProgress size={20} color="inherit" /> : <AutoAwesome />}
+                onClick={handleOptimize}
+                disabled={roster.length === 0 || optimizing}
+                fullWidth
+                sx={{
+                  mt: 2,
+                  py: 1.5,
+                  fontSize: '1rem',
+                  fontWeight: 700,
+                  background: 'linear-gradient(45deg, #667eea 0%, #764ba2 100%)',
+                  '&:hover': {
+                    background: 'linear-gradient(45deg, #5a6fd6 0%, #6a4190 100%)',
+                  },
+                  boxShadow: '0 4px 15px rgba(102, 126, 234, 0.4)',
+                }}
+              >
+                GENERATE LINEUPS
+              </Button>
             </Paper>
 
             {/* Alternative Lineups - Grouped by Formation */}
@@ -690,9 +701,88 @@ const LineupOptimizer = ({ darkMode }) => {
                 </Typography>
               </Paper>
             )}
+
+            {/* Help Section */}
+            <Paper
+              elevation={2}
+              sx={{
+                p: 2,
+                mt: 2,
+                borderRadius: 3,
+                background: darkMode
+                  ? 'linear-gradient(145deg, #1e2139 0%, #252847 100%)'
+                  : 'linear-gradient(145deg, #ffffff 0%, #f8f9fa 100%)',
+              }}
+            >
+              <Box sx={{ display: 'flex', alignItems: 'center', gap: 1, mb: 1.5 }}>
+                <HelpOutline sx={{ fontSize: 18, color: 'text.secondary' }} />
+                <Typography variant="subtitle2" fontWeight={600}>
+                  How to Use
+                </Typography>
+              </Box>
+
+              <Box sx={{ display: 'flex', flexDirection: 'column', gap: 1.5 }}>
+                <Box>
+                  <Typography variant="caption" fontWeight={600} color="primary">
+                    Lock Players
+                  </Typography>
+                  <Typography variant="caption" display="block" color="text.secondary">
+                    Click the lock icon on any player to keep them in your lineup. Locked players won't be replaced during optimization.
+                  </Typography>
+                </Box>
+
+                <Box>
+                  <Typography variant="caption" fontWeight={600} color="primary">
+                    Lock Discounted
+                  </Typography>
+                  <Typography variant="caption" display="block" color="text.secondary">
+                    One-click locks all players you bought below current market price - protecting your value picks.
+                  </Typography>
+                </Box>
+
+                <Box>
+                  <Typography variant="caption" fontWeight={600} color="primary">
+                    Replace Players
+                  </Typography>
+                  <Typography variant="caption" display="block" color="text.secondary">
+                    Click the swap icon to manually search and replace any player with another from the database.
+                  </Typography>
+                </Box>
+
+                <Box>
+                  <Typography variant="caption" fontWeight={600} color="primary">
+                    Optimal vs Differential
+                  </Typography>
+                  <Typography variant="caption" display="block" color="text.secondary">
+                    Optimal lineups maximize projected points. Differential lineups exclude top performers to find under-the-radar picks.
+                  </Typography>
+                </Box>
+
+                <Box>
+                  <Typography variant="caption" fontWeight={600} color="primary">
+                    Exclude Players
+                  </Typography>
+                  <Typography variant="caption" display="block" color="text.secondary">
+                    In the Players table, click the checkbox to the left of a player's name to exclude them from optimization. Use "Reset Exclusions" to clear all.
+                  </Typography>
+                </Box>
+
+                <Box>
+                  <Typography variant="caption" fontWeight={600} sx={{ color: '#00bcd4' }}>
+                    Cyan Border = New Player
+                  </Typography>
+                  <Typography variant="caption" display="block" color="text.secondary">
+                    Players with a cyan border are suggestions not in your current roster.
+                  </Typography>
+                </Box>
+              </Box>
+            </Paper>
           </Grid>
         </Grid>
       )}
+
+      {/* Inspiration Lineups - Only visible after roster import */}
+      {roster.length > 0 && <InspirationLineups darkMode={darkMode} />}
 
       {/* Player Replacement Dialog */}
       <PlayerSearchDialog
