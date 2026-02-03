@@ -1,4 +1,4 @@
-import React, { useState, useRef } from 'react';
+import React, { useState, useRef, useEffect } from 'react';
 import {
   Box,
   Paper,
@@ -12,6 +12,9 @@ import {
   Alert,
   CircularProgress,
   Divider,
+  Slider,
+  Tooltip,
+  Collapse,
 } from '@mui/material';
 import {
   Upload,
@@ -22,11 +25,14 @@ import {
   OpenInNew,
   Replay,
   HelpOutline,
+  Settings,
+  ExpandMore,
+  ExpandLess,
 } from '@mui/icons-material';
 import PitchView from './PitchView';
 import PlayerSearchDialog from './PlayerSearchDialog';
 import InspirationLineups from './InspirationLineups';
-import { importLineupRoster, optimizeLineup } from '../services/api';
+import { importLineupRoster, optimizeLineup, fetchSystemConfig, updateSystemParameters } from '../services/api';
 
 const LineupOptimizer = ({ darkMode }) => {
   const fileInputRef = useRef(null);
@@ -51,7 +57,59 @@ const LineupOptimizer = ({ darkMode }) => {
   const [replaceDialogOpen, setReplaceDialogOpen] = useState(false);
   const [playerToReplace, setPlayerToReplace] = useState(null);
 
+  // Position weight settings (optimizer bias control)
+  const [showSettings, setShowSettings] = useState(false);
+  const [positionWeights, setPositionWeights] = useState({
+    G: 0.85,
+    D: 0.90,
+  });
+  const [weightsPendingChange, setWeightsPendingChange] = useState(false);
+
   const BUDGET = 100;
+
+  // Load position weights from system config on mount
+  useEffect(() => {
+    const loadWeights = async () => {
+      try {
+        const result = await fetchSystemConfig();
+        if (result.success && result.config?.lineup_optimizer?.position_value_weights) {
+          const weights = result.config.lineup_optimizer.position_value_weights;
+          setPositionWeights({
+            G: weights.G ?? 0.85,
+            D: weights.D ?? 0.90,
+          });
+        }
+      } catch (err) {
+        console.error('Failed to load position weights:', err);
+      }
+    };
+    loadWeights();
+  }, []);
+
+  // Save position weights to system config
+  const handleSaveWeights = async () => {
+    try {
+      await updateSystemParameters({
+        lineup_optimizer: {
+          position_value_weights: {
+            G: positionWeights.G,
+            D: positionWeights.D,
+            M: 1.0,
+            F: 1.0,
+          },
+        },
+      });
+      setWeightsPendingChange(false);
+    } catch (err) {
+      console.error('Failed to save position weights:', err);
+    }
+  };
+
+  // Handle weight slider change
+  const handleWeightChange = (position, value) => {
+    setPositionWeights((prev) => ({ ...prev, [position]: value }));
+    setWeightsPendingChange(true);
+  };
 
   // Handle CSV file import
   const handleFileSelect = async (event) => {
@@ -563,6 +621,96 @@ const LineupOptimizer = ({ darkMode }) => {
               >
                 GENERATE LINEUPS
               </Button>
+
+              {/* Position Weight Settings */}
+              <Box sx={{ mt: 2 }}>
+                <Button
+                  size="small"
+                  onClick={() => setShowSettings(!showSettings)}
+                  startIcon={<Settings sx={{ fontSize: 16 }} />}
+                  endIcon={showSettings ? <ExpandLess /> : <ExpandMore />}
+                  sx={{
+                    color: 'text.secondary',
+                    fontSize: '0.75rem',
+                    textTransform: 'none',
+                  }}
+                >
+                  Optimizer Settings
+                </Button>
+                <Collapse in={showSettings}>
+                  <Box sx={{ mt: 1.5, px: 1 }}>
+                    <Typography variant="caption" color="text.secondary" sx={{ display: 'block', mb: 1.5 }}>
+                      Reduce position priority to limit budget spent on GK/DEF.
+                      Lower values = less budget allocated.
+                    </Typography>
+
+                    {/* GK Weight Slider */}
+                    <Box sx={{ mb: 2 }}>
+                      <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                        <Typography variant="caption" fontWeight={600}>
+                          GK Priority
+                        </Typography>
+                        <Chip
+                          label={`${(positionWeights.G * 100).toFixed(0)}%`}
+                          size="small"
+                          sx={{ height: 18, fontSize: '0.65rem' }}
+                        />
+                      </Box>
+                      <Slider
+                        value={positionWeights.G}
+                        onChange={(_, value) => handleWeightChange('G', value)}
+                        min={0.5}
+                        max={1.0}
+                        step={0.01}
+                        size="small"
+                        sx={{
+                          color: '#667eea',
+                          '& .MuiSlider-thumb': { width: 14, height: 14 },
+                        }}
+                      />
+                    </Box>
+
+                    {/* DEF Weight Slider */}
+                    <Box sx={{ mb: 2 }}>
+                      <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                        <Typography variant="caption" fontWeight={600}>
+                          DEF Priority
+                        </Typography>
+                        <Chip
+                          label={`${(positionWeights.D * 100).toFixed(0)}%`}
+                          size="small"
+                          sx={{ height: 18, fontSize: '0.65rem' }}
+                        />
+                      </Box>
+                      <Slider
+                        value={positionWeights.D}
+                        onChange={(_, value) => handleWeightChange('D', value)}
+                        min={0.5}
+                        max={1.0}
+                        step={0.01}
+                        size="small"
+                        sx={{
+                          color: '#764ba2',
+                          '& .MuiSlider-thumb': { width: 14, height: 14 },
+                        }}
+                      />
+                    </Box>
+
+                    {/* Save Button */}
+                    {weightsPendingChange && (
+                      <Button
+                        size="small"
+                        variant="outlined"
+                        onClick={handleSaveWeights}
+                        fullWidth
+                        sx={{ fontSize: '0.7rem' }}
+                      >
+                        Save Settings
+                      </Button>
+                    )}
+                  </Box>
+                </Collapse>
+              </Box>
             </Paper>
 
             {/* Alternative Lineups - Grouped by Formation */}

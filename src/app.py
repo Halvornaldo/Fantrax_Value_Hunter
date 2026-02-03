@@ -6938,6 +6938,13 @@ def optimize_lineup():
         roster_players_data = {p['player_id']: float(p.get('purchase_price', 0)) for p in data.get('roster_players_data', [])}
         budget = float(data.get('budget', 100))
 
+        # Load position value weights for optimizer bias control
+        params = load_system_parameters()
+        lineup_config = params.get('lineup_optimizer', {})
+        position_value_weights = lineup_config.get('position_value_weights', {
+            'G': 0.85, 'D': 0.90, 'M': 1.0, 'F': 1.0
+        })
+
         conn = get_db_connection()
         cursor = conn.cursor(cursor_factory=psycopg2.extras.RealDictCursor)
 
@@ -7039,7 +7046,7 @@ def optimize_lineup():
                     return False
             return len(lineup) == 11
 
-        def optimize_lineup_ilp(locked, available, remaining_budget, excluded_ids=None, previous_lineups=None, formation="3-5-2"):
+        def optimize_lineup_ilp(locked, available, remaining_budget, excluded_ids=None, previous_lineups=None, formation="3-5-2", pos_weights=None):
             """
             Use Integer Linear Programming to find optimal lineup.
 
@@ -7050,9 +7057,12 @@ def optimize_lineup():
                 excluded_ids: Set of player IDs to exclude
                 previous_lineups: List of previous lineup player ID sets (for generating alternatives)
                 formation: Target formation ("3-5-2" or "3-4-3")
+                pos_weights: Dict of position value weights {'G': 0.85, 'D': 0.90, 'M': 1.0, 'F': 1.0}
 
             Returns: (lineup, total_cost) or (None, 0) if infeasible
             """
+            if pos_weights is None:
+                pos_weights = {'G': 1.0, 'D': 1.0, 'M': 1.0, 'F': 1.0}
             if excluded_ids is None:
                 excluded_ids = set()
             if previous_lineups is None:
@@ -7094,17 +7104,19 @@ def optimize_lineup():
                 var_name = f"x_{p['player_id']}_{primary_pos}"
                 player_vars[(p['player_id'], primary_pos)] = pulp.LpVariable(var_name, cat='Binary')
 
-            # Objective: Maximize total true value
+            # Objective: Maximize total true value (with position weights applied)
+            # Position weights reduce priority of certain positions (e.g., G=0.85, D=0.90)
+            # This only affects optimization, not the actual True Value shown in results
             prob += pulp.lpSum([
-                player_vars[(p['player_id'], pos)] * p['true_value']
+                player_vars[(p['player_id'], pos)] * p['true_value'] * pos_weights.get(pos, 1.0)
                 for p in candidates
                 for pos in player_to_positions[p['player_id']]
                 if (p['player_id'], pos) in player_vars
             ]) + pulp.lpSum([
-                player_vars[(p['player_id'], player_to_positions[p['player_id']][0])] * p['true_value']
+                player_vars[(p['player_id'], player_to_positions[p['player_id']][0])] * p['true_value'] * pos_weights.get(player_to_positions[p['player_id']][0], 1.0)
                 for p in locked
                 if (p['player_id'], player_to_positions[p['player_id']][0]) in player_vars
-            ]), "TotalTrueValue"
+            ]), "WeightedTrueValue"
 
             # Constraint 1: Budget (only for candidates, locked players already accounted for)
             # Use get_player_cost() to respect CSV purchase prices for owned players
@@ -7256,7 +7268,8 @@ def optimize_lineup():
                     remaining_budget,
                     excluded_ids=set(),
                     previous_lineups=previous_lineup_ids,
-                    formation=target_formation
+                    formation=target_formation,
+                    pos_weights=position_value_weights
                 )
 
                 if lineup and len(lineup) == 11:
@@ -7288,7 +7301,8 @@ def optimize_lineup():
                     remaining_budget,
                     excluded_ids=top_performer_ids,
                     previous_lineups=differential_previous,
-                    formation=target_formation
+                    formation=target_formation,
+                    pos_weights=position_value_weights
                 )
 
                 if lineup and len(lineup) == 11:

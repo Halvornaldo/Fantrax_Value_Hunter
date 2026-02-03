@@ -6,8 +6,8 @@
   },
   "xgi_integration": {
     "enabled": true,
-    "last_sync": 1767356303.4375012,
-    "matched_players": 480,
+    "last_sync": 1770073975.4682477,
+    "matched_players": 500,
     "unmatched_players": 5,
     "description": "xGI integration toggle and statistics",
     "source": "csv_import",
@@ -143,6 +143,15 @@
     "last_updated": "2025-09-30",
     "description": "Enhanced with NPxG fixture system"
   },
+  "lineup_optimizer": {
+    "position_value_weights": {
+      "G": 0.85,
+      "D": 0.9,
+      "M": 1.0,
+      "F": 1.0
+    },
+    "description": "Weights applied to True Value during lineup optimization only. Lower values reduce position priority. Range: 0.5-1.0"
+  },
   "npxg_fixture": {
     "enabled": true,
     "home_away_adjustments": {
@@ -164,10 +173,10 @@
       "max": 2.5
     },
     "description": "NPxG-based fixture difficulty with position-specific formulas and home/away adjustments. Weight controlled by exponential_fixture.base parameter (mapped from Fixture Base slider).",
-    "last_sync": 1767356376.340954,
+    "last_sync": 1770073994.5326898,
     "teams_updated": 20,
-    "league_avg_npxg": 26.35,
-    "league_avg_npxga": 26.351,
+    "league_avg_npxg": 33.581,
+    "league_avg_npxga": 33.58,
     "source": "csv_import"
   }
 }
