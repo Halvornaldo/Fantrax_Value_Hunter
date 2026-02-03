@@ -63,31 +63,37 @@ const LineupOptimizer = ({ darkMode }) => {
     G: 0.85,
     D: 0.90,
   });
-  const [weightsPendingChange, setWeightsPendingChange] = useState(false);
+  const [defenderBudgetCap, setDefenderBudgetCap] = useState(22);
+  const [settingsPendingChange, setSettingsPendingChange] = useState(false);
 
   const BUDGET = 100;
 
-  // Load position weights from system config on mount
+  // Load optimizer settings from system config on mount
   useEffect(() => {
-    const loadWeights = async () => {
+    const loadSettings = async () => {
       try {
         const result = await fetchSystemConfig();
-        if (result.success && result.config?.lineup_optimizer?.position_value_weights) {
-          const weights = result.config.lineup_optimizer.position_value_weights;
-          setPositionWeights({
-            G: weights.G ?? 0.85,
-            D: weights.D ?? 0.90,
-          });
+        if (result.success && result.config?.lineup_optimizer) {
+          const config = result.config.lineup_optimizer;
+          if (config.position_value_weights) {
+            setPositionWeights({
+              G: config.position_value_weights.G ?? 0.85,
+              D: config.position_value_weights.D ?? 0.90,
+            });
+          }
+          if (config.position_budget_caps?.D !== undefined) {
+            setDefenderBudgetCap(config.position_budget_caps.D);
+          }
         }
       } catch (err) {
-        console.error('Failed to load position weights:', err);
+        console.error('Failed to load optimizer settings:', err);
       }
     };
-    loadWeights();
+    loadSettings();
   }, []);
 
-  // Save position weights to system config
-  const handleSaveWeights = async () => {
+  // Save optimizer settings to system config
+  const handleSaveSettings = async () => {
     try {
       await updateSystemParameters({
         lineup_optimizer: {
@@ -97,18 +103,27 @@ const LineupOptimizer = ({ darkMode }) => {
             M: 1.0,
             F: 1.0,
           },
+          position_budget_caps: {
+            D: defenderBudgetCap,
+          },
         },
       });
-      setWeightsPendingChange(false);
+      setSettingsPendingChange(false);
     } catch (err) {
-      console.error('Failed to save position weights:', err);
+      console.error('Failed to save optimizer settings:', err);
     }
   };
 
   // Handle weight slider change
   const handleWeightChange = (position, value) => {
     setPositionWeights((prev) => ({ ...prev, [position]: value }));
-    setWeightsPendingChange(true);
+    setSettingsPendingChange(true);
+  };
+
+  // Handle budget cap change
+  const handleBudgetCapChange = (value) => {
+    setDefenderBudgetCap(value);
+    setSettingsPendingChange(true);
   };
 
   // Handle CSV file import
@@ -696,12 +711,48 @@ const LineupOptimizer = ({ darkMode }) => {
                       />
                     </Box>
 
+                    <Divider sx={{ my: 1.5 }} />
+
+                    {/* DEF Budget Cap Slider */}
+                    <Box sx={{ mb: 2 }}>
+                      <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                        <Typography variant="caption" fontWeight={600}>
+                          DEF Budget Cap
+                        </Typography>
+                        <Chip
+                          label={`$${defenderBudgetCap}`}
+                          size="small"
+                          sx={{ height: 18, fontSize: '0.65rem' }}
+                        />
+                      </Box>
+                      <Typography variant="caption" color="text.secondary" sx={{ display: 'block', mb: 0.5, fontSize: '0.65rem' }}>
+                        Max budget for 3 defenders combined
+                      </Typography>
+                      <Slider
+                        value={defenderBudgetCap}
+                        onChange={(_, value) => handleBudgetCapChange(value)}
+                        min={15}
+                        max={40}
+                        step={1}
+                        size="small"
+                        marks={[
+                          { value: 15, label: '$15' },
+                          { value: 40, label: '$40' },
+                        ]}
+                        sx={{
+                          color: '#4caf50',
+                          '& .MuiSlider-thumb': { width: 14, height: 14 },
+                          '& .MuiSlider-markLabel': { fontSize: '0.6rem' },
+                        }}
+                      />
+                    </Box>
+
                     {/* Save Button */}
-                    {weightsPendingChange && (
+                    {settingsPendingChange && (
                       <Button
                         size="small"
                         variant="outlined"
-                        onClick={handleSaveWeights}
+                        onClick={handleSaveSettings}
                         fullWidth
                         sx={{ fontSize: '0.7rem' }}
                       >

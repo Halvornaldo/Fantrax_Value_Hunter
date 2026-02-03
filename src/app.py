@@ -6938,12 +6938,13 @@ def optimize_lineup():
         roster_players_data = {p['player_id']: float(p.get('purchase_price', 0)) for p in data.get('roster_players_data', [])}
         budget = float(data.get('budget', 100))
 
-        # Load position value weights for optimizer bias control
+        # Load position value weights and budget caps for optimizer bias control
         params = load_system_parameters()
         lineup_config = params.get('lineup_optimizer', {})
         position_value_weights = lineup_config.get('position_value_weights', {
             'G': 0.85, 'D': 0.90, 'M': 1.0, 'F': 1.0
         })
+        position_budget_caps = lineup_config.get('position_budget_caps', {})
 
         conn = get_db_connection()
         cursor = conn.cursor(cursor_factory=psycopg2.extras.RealDictCursor)
@@ -7046,7 +7047,7 @@ def optimize_lineup():
                     return False
             return len(lineup) == 11
 
-        def optimize_lineup_ilp(locked, available, remaining_budget, excluded_ids=None, previous_lineups=None, formation="3-5-2", pos_weights=None):
+        def optimize_lineup_ilp(locked, available, remaining_budget, excluded_ids=None, previous_lineups=None, formation="3-5-2", pos_weights=None, budget_caps=None):
             """
             Use Integer Linear Programming to find optimal lineup.
 
@@ -7058,11 +7059,14 @@ def optimize_lineup():
                 previous_lineups: List of previous lineup player ID sets (for generating alternatives)
                 formation: Target formation ("3-5-2" or "3-4-3")
                 pos_weights: Dict of position value weights {'G': 0.85, 'D': 0.90, 'M': 1.0, 'F': 1.0}
+                budget_caps: Dict of position budget caps {'D': 22} (total for all players in that position)
 
             Returns: (lineup, total_cost) or (None, 0) if infeasible
             """
             if pos_weights is None:
                 pos_weights = {'G': 1.0, 'D': 1.0, 'M': 1.0, 'F': 1.0}
+            if budget_caps is None:
+                budget_caps = {}
             if excluded_ids is None:
                 excluded_ids = set()
             if previous_lineups is None:
@@ -7199,7 +7203,25 @@ def optimize_lineup():
                 if (p['player_id'], pos) in player_vars
             ]) == total_candidates_needed, "TotalPlayers"
 
-            # Constraint 6: For generating alternatives - must differ from previous lineups
+            # Constraint 6: Position budget caps (e.g., max $22 on defenders)
+            for pos, cap in budget_caps.items():
+                if cap is not None and cap > 0:
+                    # Calculate locked cost for this position
+                    locked_pos_cost = sum(
+                        get_player_cost(p) for p in locked
+                        if player_to_positions[p['player_id']][0] == pos
+                    )
+                    remaining_pos_budget = cap - locked_pos_cost
+
+                    if remaining_pos_budget > 0:
+                        # Add constraint for candidate spending in this position
+                        prob += pulp.lpSum([
+                            player_vars[(p['player_id'], pos)] * get_player_cost(p)
+                            for p in candidates
+                            if pos in player_to_positions[p['player_id']] and (p['player_id'], pos) in player_vars
+                        ]) <= remaining_pos_budget, f"BudgetCap_{pos}"
+
+            # Constraint 7: For generating alternatives - must differ from previous lineups
             for i, prev_lineup_ids in enumerate(previous_lineups):
                 # At least one player from candidates that was in prev lineup must NOT be selected
                 prev_candidates = [p for p in candidates if p['player_id'] in prev_lineup_ids]
@@ -7269,7 +7291,8 @@ def optimize_lineup():
                     excluded_ids=set(),
                     previous_lineups=previous_lineup_ids,
                     formation=target_formation,
-                    pos_weights=position_value_weights
+                    pos_weights=position_value_weights,
+                    budget_caps=position_budget_caps
                 )
 
                 if lineup and len(lineup) == 11:
@@ -7302,7 +7325,8 @@ def optimize_lineup():
                     excluded_ids=top_performer_ids,
                     previous_lineups=differential_previous,
                     formation=target_formation,
-                    pos_weights=position_value_weights
+                    pos_weights=position_value_weights,
+                    budget_caps=position_budget_caps
                 )
 
                 if lineup and len(lineup) == 11:

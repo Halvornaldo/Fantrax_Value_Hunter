@@ -6,8 +6,8 @@
   },
   "xgi_integration": {
     "enabled": true,
-    "last_sync": 1770073975.4682477,
-    "matched_players": 500,
+    "last_sync": 1770077758.757649,
+    "matched_players": 501,
     "unmatched_players": 5,
     "description": "xGI integration toggle and statistics",
     "source": "csv_import",
@@ -150,7 +150,10 @@
       "M": 1.0,
       "F": 1.0
     },
-    "description": "Weights applied to True Value during lineup optimization only. Lower values reduce position priority. Range: 0.5-1.0"
+    "position_budget_caps": {
+      "D": 22
+    },
+    "description": "Weights applied to True Value during lineup optimization. Budget caps limit total spend per position group (D = 3 defenders combined)."
   },
   "npxg_fixture": {
     "enabled": true,
