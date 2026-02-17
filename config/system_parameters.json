@@ -6,8 +6,8 @@
   },
   "xgi_integration": {
     "enabled": true,
-    "last_sync": 1770077758.757649,
-    "matched_players": 501,
+    "last_sync": 1770736004.8429723,
+    "matched_players": 510,
     "unmatched_players": 5,
     "description": "xGI integration toggle and statistics",
     "source": "csv_import",
@@ -15,7 +15,12 @@
   },
   "starter_prediction": {
     "enabled": true,
-    "manual_overrides": {},
+    "manual_overrides": {
+      "06xza": {
+        "type": "likely",
+        "multiplier": 0.8
+      }
+    },
     "likely_starter_penalty": 0.8,
     "auto_rotation_penalty": 0.7,
     "unlikely_starter_penalty": 0.5,
@@ -35,7 +40,7 @@
       "enabled": true,
       "alpha": 0.2,
       "lookback_games": 9,
-      "sigmoid_k": 2.5
+      "sigmoid_k": 2.6
     },
     "dynamic_blending": {
       "enabled": true,
@@ -176,10 +181,10 @@
       "max": 2.5
     },
     "description": "NPxG-based fixture difficulty with position-specific formulas and home/away adjustments. Weight controlled by exponential_fixture.base parameter (mapped from Fixture Base slider).",
-    "last_sync": 1770073994.5326898,
+    "last_sync": 1770736113.2824128,
     "teams_updated": 20,
-    "league_avg_npxg": 33.581,
-    "league_avg_npxga": 33.58,
+    "league_avg_npxg": 35.097,
+    "league_avg_npxga": 35.097,
     "source": "csv_import"
   }
 }

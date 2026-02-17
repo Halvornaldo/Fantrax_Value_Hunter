@@ -129,3 +129,5 @@ calculation_engine_v2_fixed.py
 calculation_engine_v2_patched.py
 verify_true_value.py
 verify_true_value_correct.py
+tmpclaude-*-cwd
+lineup_result.json
